@@ -1,3 +1,36 @@
+This fevis/tools/fuzzball subdirectory of the FEVIS repository is a
+a branch of the upstream Git repository at:
+
+https://github.com/bitblaze-fuzzball/fuzzball
+
+It's probably best to use this directory just for changes to FuzzBALL
+itself, or code that works closely enough with the existing FuzzBALL
+code that it needs to be linked together.
+
+We created this branch using the "git subtree" command which exists in
+recent versions of Git. A suggested configuration is to have a remote
+named fuzzball-upstream pointing at the GitHub version, which you can
+create with:
+
+git remote add fuzzball-upstream https://github.com/bitblaze-fuzzball/fuzzball.git
+
+The command that created this subtree was:
+
+git subtree add --prefix tools/fuzzball fuzzball-upstream master
+
+From the web resources I was consulting, I'm guessing that the command
+for merging the most recent changes from upstream into this branch
+will be:
+
+git fetch fuzzball-upstream master
+git subtree pull --prefix tools/fuzzball fuzzball-upstream master
+
+But I haven't yet tested this commands with any updates.
+
+The rest of this file is the upstream README.md, which may still be
+useful:
+
+
 FuzzBALL is a symbolic execution tool for x86 (and a little ARM)
 binary code, based on the BitBlaze Vine library. (The name comes from
 the phrase "FUZZing Binaries with A Little Language", where "fuzzing"
