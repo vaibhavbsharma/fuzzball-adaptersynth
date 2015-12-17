@@ -389,6 +389,10 @@ class virtual fragment_machine = object
   method virtual set_word_reg_fresh_symbolic : register_name -> string -> unit
   method virtual set_word_reg_fresh_region : register_name -> string -> unit
 
+  method virtual get_fresh_symbolic : string -> int -> Vine.exp
+  method virtual get_reg_symbolic : register_name -> Vine.exp
+  method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+  
   method virtual run_sl : (string -> bool) -> Vine.stmt list -> string
 		  
   method virtual run : unit -> string
@@ -567,15 +571,33 @@ struct
 		    (new GM.granular_hash_memory))
 		 (new GM.granular_hash_memory))
 
-    val form_man = new FormMan.formula_manager
-    method get_form_man = form_man
-
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
     val mutable frag = ([], [])
     val mutable insns = []
+
+    val form_man = new FormMan.formula_manager
+    method get_form_man = form_man
+    
+    (* Vaibhav - changes start here *)
+    method set_reg_symbolic reg symb_var =
+      self#set_int_var (Hashtbl.find reg_to_var reg)
+        (D.from_symbolic symb_var);    
+
+    method get_reg_symbolic reg =
+      D.to_symbolic_64 (self#get_int_var (Hashtbl.find reg_to_var reg))
+    
+    method get_fresh_symbolic name size = 
+      match size with
+        | 1  -> D.to_symbolic_1 (form_man#fresh_symbolic_1 name)
+        | 8  -> D.to_symbolic_8 (form_man#fresh_symbolic_8 name)
+        | 16 -> D.to_symbolic_16 (form_man#fresh_symbolic_16 name)
+        | 32 -> D.to_symbolic_32 (form_man#fresh_symbolic_32 name)
+        | 64 -> D.to_symbolic_64 (form_man#fresh_symbolic_64 name)
+        | _ -> failwith "Bad size in on_missing_symbol"
+    (* Vaibhav - changes end here *)
 
     val mutable snap = (V.VarHash.create 1, V.VarHash.create 1)
 

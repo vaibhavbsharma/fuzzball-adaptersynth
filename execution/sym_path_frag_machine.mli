@@ -155,6 +155,11 @@ sig
       Fragment_machine.register_name -> int -> unit
     method set_word_var_second_byte :
       Fragment_machine.register_name -> int -> unit
+    method get_fresh_symbolic : string -> int -> Vine.exp
+    method get_reg_symbolic : 
+      Fragment_machine.register_name -> Vine.exp
+    method set_reg_symbolic : 
+      Fragment_machine.register_name -> Vine.exp -> unit
     method set_word_reg_symbolic :
       Fragment_machine.register_name -> string -> unit
     method set_word_reg_concolic :

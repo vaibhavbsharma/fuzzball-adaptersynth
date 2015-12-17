@@ -93,6 +93,33 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	    fuzz_start_eip := eip;
 	    extra_setup := setup);
      fm#start_symbolic;
+     
+     (if (List.length !opt_synth_adaptor) <> 0 then
+       let (mode,_,_,_,nargs2) = List.hd !opt_synth_adaptor in 
+       let rec simple_loop n =
+         let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+         ignore(fm#get_fresh_symbolic (var_name^"_is_const") 1);
+         ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
+         if n > 0 then simple_loop (n-1); in
+       let rec arith_loop n = 
+         let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+         let tree_depth = 3 in (* hardcoded for now *)
+         let rec arith_loop' d base = 
+           if d > 0
+           then 
+             (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 32);
+              ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 64);
+              arith_loop' (d-1) (base ^ "0");
+              arith_loop' (d-1) (base ^ "1"))
+           else () in
+         arith_loop' tree_depth "R";
+         if n > 0 then arith_loop (n-1); in
+       if mode = "simple" 
+       then simple_loop ((Int64.to_int nargs2)-1)
+       else if mode = "arithmetic"
+            then arith_loop ((Int64.to_int nargs2)-1)
+            else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
+
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);
      symbolic_init ();

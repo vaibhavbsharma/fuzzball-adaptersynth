@@ -158,6 +158,10 @@ class virtual fragment_machine : object
   method virtual set_word_reg_fresh_symbolic : register_name -> string -> unit
   method virtual set_word_reg_fresh_region : register_name -> string -> unit
 
+  method virtual get_fresh_symbolic : string -> int -> Vine.exp
+  method virtual get_reg_symbolic : register_name -> Vine.exp
+  method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+  
   method virtual run_sl : (string -> bool) -> Vine.stmt list -> string
 		  
   method virtual run : unit -> string
@@ -377,6 +381,10 @@ sig
     method set_word_reg_fresh_symbolic : register_name -> string -> unit
     method set_word_reg_fresh_region : register_name -> string -> unit
 
+    method get_fresh_symbolic : string -> int -> Vine.exp
+    method get_reg_symbolic : register_name -> Vine.exp
+    method set_reg_symbolic : register_name -> Vine.exp -> unit
+    
     method private handle_load : Vine.exp -> Vine.typ -> (D.t * Vine.typ)
     method private handle_store : Vine.exp -> Vine.typ -> Vine.exp -> unit
 
@@ -477,6 +485,7 @@ sig
     val form_man : Formula_manager.FormulaManagerFunctor(D).formula_manager
     method get_form_man :
       Formula_manager.FormulaManagerFunctor(D).formula_manager
+    
     val reg_to_var : (register_name, Vine.var) Hashtbl.t
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory

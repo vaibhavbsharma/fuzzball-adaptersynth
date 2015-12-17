@@ -108,6 +108,7 @@ let opt_trace_stopping = ref false
 let opt_trace_setup = ref false
 let opt_extra_env = Hashtbl.create 10
 let opt_skip_call_addr = ref []
+let opt_synth_adaptor = ref []
 let opt_skip_func_addr = ref []
 let opt_skip_call_addr_symbol = ref []
 let opt_skip_func_addr_symbol = ref []
@@ -196,6 +197,23 @@ let split_string char s =
   in
     (s1, s2)
 
+let add_delimited_info opt char s =
+  let rec loop arg_str =
+    try 
+      let delim_loc = String.index arg_str char in
+      let str1 = String.sub arg_str 0 delim_loc in
+      let str2 = String.sub arg_str (delim_loc + 1) 
+                   ((String.length arg_str) - delim_loc - 1) in
+      [str1] @ (loop str2)
+    with Not_found -> [arg_str]
+  in
+  let list_str = loop s in
+  opt := ((List.hd list_str),
+   (Int64.of_string (List.nth list_str 1)), 
+   (Int64.of_string (List.nth list_str 2)), 
+   (Int64.of_string (List.nth list_str 3)), 
+   (Int64.of_string (List.nth list_str 4))) :: !opt
+
 let add_delimited_pair opt char s =
   let (s1, s2) = split_string char s in
     opt := ((Int64.of_string s1), (Int64.of_string s2)) :: !opt
@@ -211,6 +229,10 @@ let add_delimited_num_escstr_pair opt char s =
 let add_delimited_str_num_pair opt char s =
   let (s1, s2) = split_string char s in
     opt := (s1, (Int64.of_string s2)) :: !opt
+
+let add_delimited_int64_int_pair opt char s= 
+  let (s1, s2) = split_string char s in
+    opt := ((Int64.of_string s1), (int_of_string s2)) :: !opt
 
 let opt_program_name = ref None
 let opt_start_addr = ref None
