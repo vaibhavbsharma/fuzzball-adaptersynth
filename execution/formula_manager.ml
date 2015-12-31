@@ -704,7 +704,8 @@ struct
 	if bits = 0 then
 	  List.hd expr_list
 	else
-	  let shift_amt = Int64.of_int (bits - 1) in
+	  ((*Printf.printf "formula_manager#lookup_tree bits = %d" bits;*)
+	    let shift_amt = Int64.of_int (bits - 1) in
 	  let cond_e = V.Cast(V.CAST_LOW, V.REG_1,
 			      V.BinOp(V.RSHIFT, e,
 				      V.Constant(V.Int(V.REG_8, shift_amt))))
@@ -712,7 +713,7 @@ struct
 	  let half_two = nth_tail (1 lsl (bits - 1)) expr_list in
 	    self#make_ite (D.from_symbolic cond_e) ty
 	      (self#lookup_tree e (bits - 1) ty half_two)
-	      (self#lookup_tree e (bits - 1) ty expr_list)
+	      (self#lookup_tree e (bits - 1) ty expr_list))
 
 
     val table_trees_cache = Hashtbl.create 101

@@ -113,6 +113,8 @@ class virtual fragment_machine : object
   method virtual load_long_conc  : int64 -> int64
 
   method virtual load_byte_concolic  : int64 -> int
+  method virtual load_byte_symbolic  : int64 -> Vine.exp
+  method virtual store_byte_symbolic  : int64 -> Vine.exp -> unit
   method virtual load_short_concolic : int64 -> int
   method virtual load_word_concolic  : int64 -> int64
   method virtual load_long_concolic  : int64 -> int64
@@ -161,6 +163,7 @@ class virtual fragment_machine : object
   method virtual get_fresh_symbolic : string -> int -> Vine.exp
   method virtual get_reg_symbolic : register_name -> Vine.exp
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+  method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
   method virtual run_sl : (string -> bool) -> Vine.stmt list -> string
 		  
@@ -325,6 +328,8 @@ sig
     method load_long_conc  : int64 -> int64
 
     method load_byte_concolic  : int64 -> int
+    method load_byte_symbolic  : int64 -> Vine.exp
+    method store_byte_symbolic  : int64 -> Vine.exp -> unit
     method load_short_concolic : int64 -> int
     method load_word_concolic  : int64 -> int64
     method load_long_concolic  : int64 -> int64
@@ -384,6 +389,7 @@ sig
     method get_fresh_symbolic : string -> int -> Vine.exp
     method get_reg_symbolic : register_name -> Vine.exp
     method set_reg_symbolic : register_name -> Vine.exp -> unit
+    method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     
     method private handle_load : Vine.exp -> Vine.typ -> (D.t * Vine.typ)
     method private handle_store : Vine.exp -> Vine.typ -> Vine.exp -> unit

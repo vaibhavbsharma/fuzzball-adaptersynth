@@ -114,11 +114,17 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
            else () in
          arith_loop' tree_depth "R";
          if n > 0 then arith_loop (n-1); in
+       let rec chartrans_loop n = 
+	 let var_name = "tableX" ^ (Printf.sprintf "%02x" n) in
+	 ignore(fm#get_fresh_symbolic var_name 8);
+	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
        then simple_loop ((Int64.to_int nargs2)-1)
        else if mode = "arithmetic"
             then arith_loop ((Int64.to_int nargs2)-1)
-            else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
+       else if mode = "chartrans"
+       then chartrans_loop 255
+       else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
 
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);

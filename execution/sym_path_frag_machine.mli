@@ -160,6 +160,9 @@ sig
       Fragment_machine.register_name -> Vine.exp
     method set_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp -> unit
+    method load_byte_symbolic  : int64 -> Vine.exp
+    method store_byte_symbolic  : int64 -> Vine.exp -> unit
+    method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     method set_word_reg_symbolic :
       Fragment_machine.register_name -> string -> unit
     method set_word_reg_concolic :

@@ -1130,8 +1130,8 @@ struct
 	(num_ents - 1)
       in
         if !opt_trace_tables then
-	  Printf.printf "Load with base %08Lx, size 2**%d, stride %d"
-	    cloc idx_wd stride;
+	  Printf.printf "Load with base %08Lx, size 2**%d, stride %d, idx_exp %s"
+	    cloc idx_wd stride (V.exp_to_string idx_exp);
         Some (form_man#make_table_lookup table idx_exp idx_wd ty)
 
     method private concretize_once_and_load addr_e ty =

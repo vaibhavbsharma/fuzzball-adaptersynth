@@ -344,6 +344,8 @@ class virtual fragment_machine = object
   method virtual load_long_conc  : int64 -> int64
 
   method virtual load_byte_concolic  : int64 -> int
+  method virtual load_byte_symbolic  : int64 -> Vine.exp
+  method virtual store_byte_symbolic  : int64 -> Vine.exp -> unit
   method virtual load_short_concolic : int64 -> int
   method virtual load_word_concolic  : int64 -> int64
   method virtual load_long_concolic  : int64 -> int64
@@ -392,6 +394,7 @@ class virtual fragment_machine = object
   method virtual get_fresh_symbolic : string -> int -> Vine.exp
   method virtual get_reg_symbolic : register_name -> Vine.exp
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+  method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
   method virtual run_sl : (string -> bool) -> Vine.stmt list -> string
 		  
@@ -581,7 +584,7 @@ struct
     val form_man = new FormMan.formula_manager
     method get_form_man = form_man
     
-    (* Vaibhav - changes start here *)
+    (* Added for adaptor synthesis*)
     method set_reg_symbolic reg symb_var =
       self#set_int_var (Hashtbl.find reg_to_var reg)
         (D.from_symbolic symb_var);    
@@ -597,7 +600,20 @@ struct
         | 32 -> D.to_symbolic_32 (form_man#fresh_symbolic_32 name)
         | 64 -> D.to_symbolic_64 (form_man#fresh_symbolic_64 name)
         | _ -> failwith "Bad size in on_missing_symbol"
-    (* Vaibhav - changes end here *)
+    
+    method load_byte_symbolic  addr = D.to_symbolic_8 (mem#load_byte addr)
+  
+    method store_byte_symbolic  addr b = mem#store_byte addr (D.from_symbolic b) 
+
+    method make_table_lookup table_vexp idx_exp idx_wd ty =
+      let rec map_vexp_dt_list fn l =
+	(if (List.length l) <> 0 then (fn (List.hd l)) :: 
+	    (map_vexp_dt_list fn (List.tl l)) 
+	 else [])
+      in
+      let table_dt =  map_vexp_dt_list (fun e -> D.from_symbolic e) table_vexp in
+      D.to_symbolic_8 (form_man#make_table_lookup table_dt idx_exp idx_wd ty)
+    (* End of adaptor synthesis changes*)
 
     val mutable snap = (V.VarHash.create 1, V.VarHash.create 1)
 
@@ -1951,7 +1967,7 @@ struct
 		Printf.printf "    %s is %s\n" s (D.to_string_32 v);
 	      (v, ty)
 	| V.Lval(V.Mem(memv, idx, ty)) ->
-	    self#handle_load idx ty
+	  self#handle_load idx ty
 	| V.Cast(kind, ty, e) ->
 	    let (v1, ty1) = self#eval_int_exp_ty e in
 	      self#eval_cast kind ty v1 ty1
