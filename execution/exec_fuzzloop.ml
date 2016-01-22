@@ -104,11 +104,12 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let rec arith_loop n = 
          let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
          let tree_depth = 3 in (* hardcoded for now *)
+         let val_type = 32 in (* 32- or 64-bit values *)
          let rec arith_loop' d base = 
            if d > 0
            then 
-             (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 32);
-              ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 64);
+             (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8);
+              ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) val_type);
               arith_loop' (d-1) (base ^ "0");
               arith_loop' (d-1) (base ^ "1"))
            else () in
@@ -120,7 +121,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
        then simple_loop ((Int64.to_int nargs2)-1)
-       else if mode = "arithmetic"
+       else if mode = "arithmetic_int" || mode = "arithmetic_float"
+            (* note: int and float adapators require the same variables for now *)
             then arith_loop ((Int64.to_int nargs2)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
