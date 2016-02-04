@@ -626,7 +626,7 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       (* let hex_str = Printf.sprintf "\\x%lx" *)
       let hex_str = char_of_int
                       (Int32.to_int 
-                        (Int32.shift_right 
+                        (Int32.shift_right_logical
                           (Int32.shift_left 
                             (Int64.to_int32 offset) (current_byte*8)) 
                           24)) in
