@@ -328,8 +328,7 @@ let call_replacements fm last_eip eip =
           (*** adaptor using trees of arithmetic (SSE floating point) expressions ***)
           else if adaptor_mode = "arithmetic_float" 
             then Some (fun () -> 
-              let arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in (* NOTE: not tested! *)
-              let val_type = V.REG_64 in (* 32- or 64-bit values *)
+              let arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in
               let get_ite_expr if_arg if_op if_const_type if_const then_val else_val = 
                 V.Ite(V.BinOp(if_op, if_arg, V.Constant(V.Int(if_const_type,if_const))),
                       then_val,
@@ -337,19 +336,13 @@ let call_replacements fm last_eip eip =
               let rec get_ite_arg_expr arg_val n_arg =
                 if n_arg <> 1
                 then
-                  get_ite_expr arg_val V.EQ val_type (Int64.of_int (n_arg - 1)) 
-                    (if val_type = V.REG_32
-                     then V.Cast(V.CAST_LOW, V.REG_32,
-                                 fm#get_reg_symbolic (List.nth arg_regs (n_arg - 1)))
-                     else fm#get_reg_symbolic (List.nth arg_regs (n_arg - 1)))
+                  get_ite_expr arg_val V.EQ V.REG_64 (Int64.of_int (n_arg - 1)) 
+                    (fm#get_reg_symbolic (List.nth arg_regs (n_arg - 1)))
                     (get_ite_arg_expr arg_val (n_arg - 1))
                 else 
-                  (if val_type = V.REG_32
-                     then V.Cast(V.CAST_LOW, V.REG_32,
-                                 fm#get_reg_symbolic (List.nth arg_regs 0))
-                     else fm#get_reg_symbolic (List.nth arg_regs 0)) in
+                  (fm#get_reg_symbolic (List.nth arg_regs 0)) in
               let binops = [V.FPLUS(*; V.FMINUS; V.FTIMES; V.FDIVIDE*)] in
-              let unops = [V.FNEG] in
+              let unops = [(*V.FNEG*)] in
               let num_ops = (List.length binops) + (List.length unops) in
               let rm = Vine_util.ROUND_NEAREST in
               let get_oper oper l_expr r_expr =
@@ -359,7 +352,7 @@ let call_replacements fm last_eip eip =
                   | unop::[] -> 
                       (V.FUnOp(unop, rm, l_expr))
                   | unop::tl -> 
-                      get_ite_expr oper V.EQ val_type n
+                      get_ite_expr oper V.EQ V.REG_64 n
                         (V.FUnOp(unop, rm, l_expr))
                         (get_unop tl (Int64.add n 1L)) in
                 let rec get_binop ops n =
@@ -369,8 +362,8 @@ let call_replacements fm last_eip eip =
                       if binop = V.FDIVIDE 
                       then (* (oper l_expr (if r_expr=0 then 1 else r_expr)) *)
                         V.FBinOp(binop, rm, l_expr, 
-                                 get_ite_expr r_expr V.EQ val_type 0L 
-                                   (V.Constant(V.Int(val_type, 1L))) 
+                                 get_ite_expr r_expr V.EQ V.REG_64 0L 
+                                   (V.Constant(V.Int(V.REG_64, 1L))) 
                                    r_expr)
                       else (* (oper l_expr r_expr) *)
                         V.FBinOp(binop, rm, l_expr, r_expr)
@@ -379,12 +372,12 @@ let call_replacements fm last_eip eip =
                         if binop = V.FDIVIDE 
                         then (* (oper l_expr (if r_expr=0 then 1 else r_expr)) *)
                           V.FBinOp(binop, rm, l_expr, 
-                                   get_ite_expr r_expr V.EQ val_type 0L 
-                                     (V.Constant(V.Int(val_type, 1L))) 
+                                   get_ite_expr r_expr V.EQ V.REG_64 0L 
+                                     (V.Constant(V.Int(V.REG_64, 1L))) 
                                      r_expr)
                         else (* (oper l_expr r_expr) *)
                           V.FBinOp(binop, rm, l_expr, r_expr) in
-                      get_ite_expr oper V.EQ val_type n 
+                      get_ite_expr oper V.EQ V.REG_64 n 
                         expr (get_binop tl (Int64.add n 1L)) in
                 get_binop binops 0L
               in
@@ -400,17 +393,17 @@ let call_replacements fm last_eip eip =
                     V.BinOp(
                       V.BITAND, 
                       V.UnOp(V.NOT, 
-                             V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, lower)))),
-                      V.BinOp(V.LE, node_val, V.Constant(V.Int(val_type, upper))))) in
+                             V.BinOp(V.LT, node_val, V.Constant(V.Int(V.REG_64, lower)))),
+                      V.BinOp(V.LE, node_val, V.Constant(V.Int(V.REG_64, upper))))) in
                 (* specify all possible values *)
                 let specify_vals node_type node_val vals =
                   let rec list_vals l = 
                     match l with
                     | [] -> failwith "Bad value list for arithmetic adaptor"
-                    | v::[] -> V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v)))
+                    | v::[] -> V.BinOp(V.EQ, node_val, V.Constant(V.Int(V.REG_64, v)))
                     | v::t -> V.BinOp(
                                 V.BITOR, 
-                                V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v))),
+                                V.BinOp(V.EQ, node_val, V.Constant(V.Int(V.REG_64, v))),
                                 list_vals t) in
                   V.BinOp(
                     V.BITOR,
@@ -421,21 +414,20 @@ let call_replacements fm last_eip eip =
                 *)
                 let rec zero_lower d base =
                   let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-                  let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 
-                                   (if val_type = V.REG_32 then 32 else 64) in
+                  let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 64 in
                   if d = 1 
                   then 
                     V.BinOp(
                       V.BITAND, 
                       V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-                      V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L))))
+                      V.BinOp(V.EQ, node_val, V.Constant(V.Int(V.REG_64, 0L))))
                   else
                     V.BinOp(
                       V.BITAND, 
                       V.BinOp(
                         V.BITAND, 
                         V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-                        V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L)))),
+                        V.BinOp(V.EQ, node_val, V.Constant(V.Int(V.REG_64, 0L)))),
                       V.BinOp(
                         V.BITAND, 
                         zero_lower (d-1) (base ^ "0"),
@@ -451,8 +443,7 @@ let call_replacements fm last_eip eip =
                   if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
                   else 
                     let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-                    let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 
-                                     (if val_type = V.REG_32 then 32 else 64) in
+                    let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 64 in
                      if d = 1 
                      then 
                         (* add the following conditions:
@@ -466,7 +457,7 @@ let call_replacements fm last_eip eip =
                           (V.BinOp(
                              V.BITOR,
                              V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                             V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
+                             V.BinOp(V.LT, node_val, V.Constant(V.Int(V.REG_64, out_nargs))))) :: 
                           (*(restrict_range node_type node_val 0L 10L) ::
                           (specify_vals node_type node_val [-1L; 1L; 31L]) ::*)
                           !opt_extra_conditions;
@@ -485,12 +476,12 @@ let call_replacements fm last_eip eip =
                            (V.BinOp(
                               V.BITOR,
                               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                              V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
+                              V.BinOp(V.LT, node_val, V.Constant(V.Int(V.REG_64, out_nargs))))) :: 
                            (V.BinOp(
                               V.BITOR,
                               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
                               V.BinOp(V.LT, node_val, 
-                                      V.Constant(V.Int(val_type, Int64.of_int num_ops))))) ::
+                                      V.Constant(V.Int(V.REG_64, Int64.of_int num_ops))))) ::
                            (*(restrict_range node_type node_val 0L 10L) ::
                            (specify_vals node_type node_val [-1L; 1L; 31L]) ::*)
                            !opt_extra_conditions;
@@ -510,7 +501,7 @@ let call_replacements fm last_eip eip =
                               V.BinOp(V.BITOR, 
                                       V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))), 
                                       V.BinOp(V.LT, node_val, 
-                                        V.Constant(V.Int(val_type, 
+                                        V.Constant(V.Int(V.REG_64, 
                                           Int64.of_int (List.length binops))))),
                              zero_lower (d-1) (base ^ "1"))) ::
                           !opt_extra_conditions;             

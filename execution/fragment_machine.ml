@@ -1210,6 +1210,18 @@ struct
 	   (self#get_int_var (Hashtbl.find reg_to_var rh)))
 	(D.to_string_64
 	   (self#get_int_var (Hashtbl.find reg_to_var rl)));
+	   
+	method private print_reg256 str r1 r2 r3 r4 = (* high -> low *)
+      Printf.printf "%s: " str;
+      Printf.printf "%s %s %s %s\n"
+	(D.to_string_64
+	   (self#get_int_var (Hashtbl.find reg_to_var r1)))
+	(D.to_string_64
+	   (self#get_int_var (Hashtbl.find reg_to_var r2)))
+	(D.to_string_64
+	   (self#get_int_var (Hashtbl.find reg_to_var r3)))
+	(D.to_string_64
+	   (self#get_int_var (Hashtbl.find reg_to_var r4)));
 
     method private print_x86_regs =
       self#print_reg32 "%eax" R_EAX;
@@ -1268,7 +1280,23 @@ struct
       self#print_reg1 "AF" R_AF;
       self#print_reg1 "ZF" R_ZF;
       self#print_reg1 "SF" R_SF;
-      self#print_reg1 "OF" R_OF
+      self#print_reg1 "OF" R_OF;
+      self#print_reg256 "YMM0" R_YMM0_3 R_YMM0_2 R_YMM0_1 R_YMM0_0;
+      self#print_reg256 "YMM1" R_YMM1_3 R_YMM1_2 R_YMM1_1 R_YMM1_0;
+      self#print_reg256 "YMM2" R_YMM2_3 R_YMM2_2 R_YMM2_1 R_YMM2_0;
+      self#print_reg256 "YMM3" R_YMM3_3 R_YMM3_2 R_YMM3_1 R_YMM3_0;
+      self#print_reg256 "YMM4" R_YMM4_3 R_YMM4_2 R_YMM4_1 R_YMM4_0;
+      self#print_reg256 "YMM5" R_YMM5_3 R_YMM5_2 R_YMM5_1 R_YMM5_0;
+      self#print_reg256 "YMM6" R_YMM6_3 R_YMM6_2 R_YMM6_1 R_YMM6_0;
+      self#print_reg256 "YMM7" R_YMM7_3 R_YMM7_2 R_YMM7_1 R_YMM7_0;
+      self#print_reg256 "YMM8" R_YMM8_3 R_YMM8_2 R_YMM8_1 R_YMM8_0;
+      self#print_reg256 "YMM9" R_YMM9_3 R_YMM9_2 R_YMM9_1 R_YMM9_0;
+      self#print_reg256 "YMM10" R_YMM10_3 R_YMM10_2 R_YMM10_1 R_YMM10_0;
+      self#print_reg256 "YMM11" R_YMM11_3 R_YMM11_2 R_YMM11_1 R_YMM11_0;
+      self#print_reg256 "YMM12" R_YMM12_3 R_YMM12_2 R_YMM12_1 R_YMM12_0;
+      self#print_reg256 "YMM13" R_YMM13_3 R_YMM13_2 R_YMM13_1 R_YMM13_0;
+      self#print_reg256 "YMM14" R_YMM14_3 R_YMM14_2 R_YMM14_1 R_YMM14_0;
+      self#print_reg256 "YMM15" R_YMM15_3 R_YMM15_2 R_YMM15_1 R_YMM15_0;
 
     method private print_arm_regs =
       self#print_reg32 " r0" R0;
