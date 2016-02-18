@@ -14,13 +14,14 @@ object(self)
   method private unhandle_syscall str =
     if !opt_trace_stopping then
       (Printf.printf "Not handling system call special %s\n" str;
-       fm#print_regs);
+       fm#print_syscall_regs);
     raise (UnhandledSysCall("System calls disabled"))
 
   method handle_special str : V.stmt list option =
     match str with
       | "int 0x80" -> self#unhandle_syscall str
       | "sysenter" -> self#unhandle_syscall str
+      | "syscall" -> self#unhandle_syscall str
       | _ -> None
 
   method make_snap : unit = ()

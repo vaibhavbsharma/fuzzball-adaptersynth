@@ -99,6 +99,7 @@ class virtual fragment_machine : object
   method virtual make_regs_symbolic : unit
   method virtual load_x86_user_regs : Temu_state.userRegs -> unit
   method virtual print_regs : unit
+  method virtual print_syscall_regs : unit
 
   method virtual store_byte_conc  : int64 -> int   -> unit
   method virtual store_short_conc : int64 -> int   -> unit
@@ -304,6 +305,7 @@ sig
     method make_regs_symbolic : unit
     method load_x86_user_regs : Temu_state.userRegs -> unit
     method print_regs : unit
+    method print_syscall_regs : unit
 
     method store_byte  : int64 -> D.t -> unit
     method store_short : int64 -> D.t -> unit
