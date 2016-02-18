@@ -330,6 +330,7 @@ class virtual fragment_machine = object
   method virtual make_regs_symbolic : unit
   method virtual load_x86_user_regs : Temu_state.userRegs -> unit
   method virtual print_regs : unit
+  method virtual print_syscall_regs : unit
 
   method virtual store_byte_conc  : int64 -> int   -> unit
   method virtual store_short_conc : int64 -> int   -> unit
@@ -1301,6 +1302,34 @@ struct
 	| X86 -> self#print_x86_regs
 	| X64 -> self#print_x64_regs
 	| ARM -> self#print_arm_regs
+
+    method print_syscall_regs =
+      match !opt_arch with
+	| X86 ->
+	    self#print_reg32 "%eax" R_EAX;
+	    self#print_reg32 "%ebx" R_EBX;
+	    self#print_reg32 "%ecx" R_ECX;
+	    self#print_reg32 "%edx" R_EDX;
+	    self#print_reg32 "%esi" R_ESI;
+	    self#print_reg32 "%edi" R_EDI;
+	    self#print_reg32 "%ebp" R_EBP;
+	| X64 ->
+	    self#print_reg64 "%rax" R_RAX;
+	    self#print_reg64 "%rdi" R_RDI;
+	    self#print_reg64 "%rsi" R_RSI;
+	    self#print_reg64 "%rdx" R_RDX;
+	    self#print_reg64 "%r10" R_R10;
+	    self#print_reg64 "%r8"  R_R8;
+	    self#print_reg64 "%r9"  R_R9;
+	| ARM ->
+	    self#print_reg32 " r7" R7;
+	    self#print_reg32 " r0" R0;
+	    self#print_reg32 " r1" R1;
+	    self#print_reg32 " r2" R2;
+	    self#print_reg32 " r3" R3;
+	    self#print_reg32 " r4" R4;
+	    self#print_reg32 " r5" R5;
+	    self#print_reg32 " r6" R6;
 
     method private simplify_reg32 r =
       let var = Hashtbl.find reg_to_var r in
