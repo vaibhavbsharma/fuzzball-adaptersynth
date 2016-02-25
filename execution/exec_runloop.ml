@@ -620,23 +620,6 @@ let decode_insns_cached fm gamma eip =
   with_trans_cache eip (fun () -> decode_insns fm gamma eip bb_size true)
 
 let rec runloop (fm : fragment_machine) eip asmir_gamma until =
-  let rec get_offset_as_hex_array offset arr current_byte =
-    (if current_byte < 0 then arr
-    else
-      (* let hex_str = Printf.sprintf "\\x%lx" *)
-      let hex_str = char_of_int
-                      (Int32.to_int 
-                        (Int32.shift_right_logical
-                          (Int32.shift_left 
-                            (Int64.to_int32 offset) (current_byte*8)) 
-                          24)) in
-      (* Printf.printf "%s\n" hex_str; *)
-      if hex_str <> '\x00'  then 
-        get_offset_as_hex_array offset 
-          (Array.append [|hex_str|] arr) (current_byte-1)
-      else arr
-    );
-  in
   let rec loop last_eip eip is_final_loop num_insns_executed =
     (let old_count =
        (try
@@ -652,26 +635,37 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog
 	| Some thunk ->
-	    let fake_insn = match (!opt_arch, 
-                                   (Int64.logand eip 1L), thunk ()) with
-	      | (X86, _,_) -> [|'\xc3'|] (* ret *)
-	      | (X64, _,None) -> [|'\xc3'|] (* ret *)
-	      | (X64, _,Some in_addr) ->  (* Jump to the inner function *)
-                (*Printf.printf "eip %Lx:jumping to adapter %Lx \n" eip in_addr;*)
-                let off = (Int64.sub in_addr eip) in
-                let off_arr = (get_offset_as_hex_array off [||] 3) in
-                let off_1 = (Int64.sub off 
-                           (Int64.of_int ((Array.length off_arr)+1))) in
-                let off_arr_1 = (get_offset_as_hex_array off_1 [||] 3) in
-                (* Array.iter 
-                  ( function ele -> Printf.printf "%s\n" ele) off_arr_1; *)
-                Array.append [|'\xeb'|] off_arr_1
-	      | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
-	      | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
-	      | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
-	    in
-	      decode_insn asmir_gamma eip fake_insn
-	      (* decode_insn asmir_gamma eip fake_ret *)
+	  let fake_insn = match (!opt_arch, 
+                                 (Int64.logand eip 1L), thunk ()) with
+	    | (X86, _,_) -> [|'\xc3'|] (* ret *)
+	    | (X64, _,None) -> [|'\xc3'|] (* ret *)
+	    | (X64, _,Some in_addr) ->  (* Jump to the inner function *)
+              let temp = (Int64.sub in_addr eip) in
+	      let offset = (Int64.sub temp 5L) in
+	      let offset_byte_0 = (Int64.logand offset 255L) in
+	      let offset_byte_1 = 
+		  (Int64.shift_right_logical 
+		     (Int64.logand offset (Int64.shift_left 255L 8)) 8) in
+	      let offset_byte_2 = 
+		(Int64.shift_right_logical 
+		   (Int64.logand offset (Int64.shift_left 255L 16)) 16) in
+	      let offset_byte_3 = 
+		(Int64.shift_right_logical 
+		   (Int64.logand offset (Int64.shift_left 255L 24)) 24) in
+              let offset_char_arr = [|(char_of_int (Int64.to_int offset_byte_0));
+				      (char_of_int (Int64.to_int offset_byte_1));
+				      (char_of_int (Int64.to_int offset_byte_2));
+				      (char_of_int (Int64.to_int offset_byte_3))|] in
+	      (*Printf.printf "eip %Lx:jumping to adapter %Lx using offset %Lx\n" 
+		eip in_addr offset;*)
+              (*Array.iter 
+                ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
+	      Array.append [|'\xe9'|] offset_char_arr
+	    | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
+	    | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
+	    | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
+	  in
+	  decode_insn asmir_gamma eip fake_insn
       in
 	if !opt_trace_insns then
 	  print_insns eip prog' None '\n';
