@@ -83,6 +83,7 @@ let call_replacements fm last_eip eip =
               else
                 (fm#get_reg_symbolic (List.nth arg_regs 0))
             in
+	    let symbolic_args = ref [] in
             let rec loop n =
               let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
               let var_is_const = 
@@ -96,10 +97,13 @@ let call_replacements fm last_eip eip =
                   V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
                   V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
               :: !opt_extra_conditions;
-              fm#set_reg_symbolic (List.nth arg_regs n) arg;
+	      symbolic_args := arg :: !symbolic_args;
               if n > 0 then loop (n-1); 
             in
             loop ((Int64.to_int in_nargs)-1);
+	    List.iteri (fun index expr ->
+			fm#set_reg_symbolic (List.nth arg_regs index) expr;) 
+	      !symbolic_args;
             (Some in_addr))
           (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
