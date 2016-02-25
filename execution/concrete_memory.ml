@@ -282,12 +282,17 @@ class string_maybe_memory = object(self)
 
   method private maybe_get_pages addr = 
     let page = Int64.to_int (Int64.shift_right addr 12) and
-	idx = Int64.to_int (Int64.logand addr 0xfffL) in
-      match (mem.(page), bitmaps.(page)) with
-	| (Some page_str, Some bitmap) -> Some (page_str, bitmap, idx)
-	| (None, None) -> None
-	| _ -> failwith "mem vs. bitmaps inconsistency in string_maybe_memory"
-
+	idx = Int64.to_int (Int64.logand addr 0xfffL) and
+	large_const = Int64.shift_left (Int64.sub (Int64.shift_left 1L 32) 1L) 32 in
+    (* We dont support 64-bit addresses yet *)
+    if (Int64.logand addr large_const) <> 0L then
+      (Printf.printf "page=%x idx=%x\n" page idx;
+       raise UnsupportedAddress;);
+    match (mem.(page), bitmaps.(page)) with
+    | (Some page_str, Some bitmap) -> Some (page_str, bitmap, idx)
+    | (None, None) -> None
+    | _ -> failwith "mem vs. bitmaps inconsistency in string_maybe_memory"
+      
   method private get_pages addr = 
     let page = Int64.to_int (Int64.shift_right addr 12) and
 	idx = Int64.to_int (Int64.logand addr 0xfffL) in
