@@ -18,6 +18,8 @@ sig
     method fresh_symbolic_32 : string -> D.t
     method fresh_symbolic_64 : string -> D.t
 
+    method add_special_ec_var : Vine.var -> Vine.exp -> unit
+    method rewrite_special_ec_vars: Vine.exp -> Vine.exp
     method get_input_vars : Vine.var list
 
     method fresh_region_base : string -> D.t
