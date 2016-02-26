@@ -36,6 +36,14 @@ let call_replacements fm last_eip eip =
          else ret)
       None l
   in
+  let lookup_simple_len_info targ l = 
+    List.fold_left
+      (fun ret (addr1, val1, addr2, val2, len) ->
+	if ((canon_eip addr1) = (canon_eip targ)) then
+	  Some (val1,addr2,val2,len) 
+	else ret)
+      None l
+  in
     match ((lookup eip      !opt_skip_func_addr),
 	   (lookup eip      !opt_skip_func_addr_symbol),
 	   (lookup eip      !opt_skip_func_addr_region),
@@ -43,25 +51,26 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_symbol),
 	   (lookup last_eip !opt_skip_call_addr_symbol_once),
 	   (lookup last_eip !opt_skip_call_addr_region),
-	   (lookup_info last_eip !opt_synth_adaptor))
+	   (lookup_info last_eip !opt_synth_adaptor),
+	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor))
     with
-      | (None, None, None, None, None, None, None, None) -> None
-      | (Some sfa_val, None, None, None, None, None, None, None) ->
+      | (None, None, None, None, None, None, None, None, None) -> None
+      | (Some sfa_val, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_var ret_reg sfa_val; None)
-      | (None, Some sfas_sym, None, None, None, None, None, None) ->
+      | (None, Some sfas_sym, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_symbolic ret_reg sfas_sym; None)
-      | (None, None, Some sfar_sym, None, None, None, None, None) ->
+      | (None, None, Some sfar_sym, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg sfar_sym; None)
-      | (None, None, None, Some cfa_val, None, None, None, None) ->
+      | (None, None, None, Some cfa_val, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_var ret_reg cfa_val; None)
-      | (None, None, None, None, Some cfas_sym, None, None, None) ->
+      | (None, None, None, None, Some cfas_sym, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_symbolic ret_reg cfas_sym; None)
-      | (None, None, None, None, None, Some cfaso_sym, None, None) ->
+      | (None, None, None, None, None, Some cfaso_sym, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_symbolic ret_reg cfaso_sym; None)
-      | (None, None, None, None, None, None, Some cfar_sym, None) ->
+      | (None, None, None, None, None, None, Some cfar_sym, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
-          Some (adaptor_mode,out_nargs,in_addr,in_nargs)) ->
+          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None) ->
           (*** simple adaptor ***)
           if adaptor_mode = "simple" 
           then Some (fun () -> 
@@ -101,7 +110,7 @@ let call_replacements fm last_eip eip =
             in
             loop ((Int64.to_int in_nargs)-1);
             (Some in_addr))
-          (*** adaptor using trees of arithmetic (integer) expressions ***)
+	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
             then Some (fun () -> 
               let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in (* assumes X86_64 *)
@@ -528,6 +537,117 @@ let call_replacements fm last_eip eip =
 	  else Some (fun () ->
             Printf.printf "unsupported adaptor";
             (Some in_addr))
+      | (None, None, None, None, None, None, None, None, 
+	 Some (out_nargs, in_addr, in_nargs, max_depth)) ->
+	  (* an adaptor that tries permutations of arguments as well as 
+	     permutations of length of other arguments
+	     var_type is used as follows:
+	     1: a constant value in var_val is used
+	     0: the argument corresponding to var_val is plugged in
+	     any other value: the length of the argument corresponding 
+	     to var_val is plugged in*)
+         Some (fun () -> 
+	   (*Printf.printf "Running simple+len adaptor in call_replacements\n";*)
+	   (* Assuming we are running on X86_64 *)
+           let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+	   (*let lower_bound = 0L in
+	     let upper_bound = (Int64.sub (Int64.shift_left 1L 31) 1L) in*)
+           let get_ite_expr if_arg if_op if_const_type if_const 
+               then_val else_val = 
+             V.Ite(
+               V.BinOp(if_op,if_arg,V.Constant(V.Int(if_const_type, if_const))),
+               then_val,
+               else_val)
+           in
+           let rec get_ite_arg_expr arg_val n_arg =
+             if n_arg <> 1L then
+               get_ite_expr arg_val V.EQ V.REG_64 (Int64.sub n_arg 1L) 
+                 (fm#get_reg_symbolic 
+                    (List.nth arg_regs ((Int64.to_int n_arg)-1)))
+                 (get_ite_arg_expr arg_val (Int64.sub n_arg 1L))
+             else
+               (fm#get_reg_symbolic (List.nth arg_regs 0))
+           in
+	   let rec get_len_expr n_arg pos =
+	     let base_addr = fm#get_long_var 
+	       (List.nth arg_regs (Int64.to_int n_arg)) in
+             (*Printf.printf 
+	       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n" 
+		n_arg pos base_addr;*)
+	     let b = (fm#load_byte_symbolic (Int64.add base_addr pos)) in
+	     if pos < max_depth then
+	       get_ite_expr b V.EQ V.REG_8 0L 
+		 (V.Constant(V.Int(V.REG_64,0L)))
+		 (V.BinOp(V.PLUS,V.Constant(V.Int(V.REG_64,1L)),
+			  (get_len_expr n_arg (Int64.succ pos))))
+	     else
+	       get_ite_expr b V.EQ V.REG_8 0L
+		 (V.Constant(V.Int(V.REG_64,0L)))
+		 (V.Constant(V.Int(V.REG_64,1L)))
+	   in
+	   let rec get_ite_len_expr arg_val n_arg =
+	     if n_arg <> 1L then
+	       get_ite_expr arg_val V.EQ V.REG_64 (Int64.sub n_arg 1L)
+		 (get_len_expr (Int64.sub n_arg 1L) 0L)
+		 (get_ite_len_expr arg_val (Int64.sub n_arg 1L))
+	     else 
+		(get_len_expr 0L 0L)
+	   in
+	   (*let restrict_range node_type node_val lower upper =
+             V.BinOp(
+             V.BITOR,
+             V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
+             V.BinOp(
+             V.BITAND, 
+             V.UnOp(V.NOT, 
+             V.BinOp(V.LT, node_val, V.Constant(V.Int(V.REG_64, lower)))),
+             V.BinOp(V.LE, node_val, V.Constant(V.Int(V.REG_64, upper)))))
+	     in*)
+           let symbolic_args = ref [] in
+	   let rec loop n =
+             let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+	     (*Printf.printf "loop var_name = %s\n" var_name;*)
+             let var_type = 
+               fm#get_fresh_symbolic (var_name^"_type") 8 in
+             let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+             let arg = get_ite_expr var_type V.EQ V.REG_8 1L var_val 
+	       (get_ite_expr var_type V.EQ V.REG_8 0L (get_ite_arg_expr var_val out_nargs)
+		  (get_ite_len_expr var_val out_nargs)) in
+	     (*Printf.printf "call_replacements thunk() exp=%s\n" (V.exp_to_string arg);*)
+             opt_extra_conditions :=
+               V.BinOp(
+                 V.BITOR,
+                 V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
+                 V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	     (*:: (restrict_range var_type var_val lower_bound upper_bound)*)
+             :: !opt_extra_conditions;
+	     symbolic_args := arg :: !symbolic_args;
+             if n > 0 then loop (n-1); 
+           in
+           loop ((Int64.to_int in_nargs)-1);
+	   (*Printf.printf "symbolic_args length=%d\n" (List.length !symbolic_args);*)
+	   List.iteri (fun index expr ->
+	     fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
+	   let rec decision_loop n = 
+             let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+	     (*Printf.printf "decision_loop var_name = %s\n" var_name;*)
+             let var_type = 
+               fm#get_fresh_symbolic (var_name^"_type") 8 in
+	     let b1 = fm#query_condition (V.BinOp(
+	       V.BITAND,
+	       V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,0L))),
+	       V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L))))) (0x6c00+n*10+1) in
+	     (*Printf.printf "Chose b1 = %B\n" b1;*)
+	     if b1 <> true then
+	       ((*let b2 = *)
+		 ignore(fm#query_condition (
+		 V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L)))) (0x6c00+n*10))
+		(*in
+		  Printf.printf "Chose b2 = %B\n" b2;*));
+	     if n > 0 then decision_loop (n-1);
+	   in
+	   decision_loop ((Int64.to_int in_nargs)-1);
+           (Some in_addr))
       | _ -> failwith "Contradictory replacement options"
 
 let loop_detect = Hashtbl.create 1000
@@ -583,23 +703,6 @@ let decode_insns_cached fm gamma eip =
   with_trans_cache eip (fun () -> decode_insns fm gamma eip bb_size true)
 
 let rec runloop (fm : fragment_machine) eip asmir_gamma until =
-  let rec get_offset_as_hex_array offset arr current_byte =
-    (if current_byte < 0 then arr
-    else
-      (* let hex_str = Printf.sprintf "\\x%lx" *)
-      let hex_str = char_of_int
-                      (Int32.to_int 
-                        (Int32.shift_right_logical
-                          (Int32.shift_left 
-                            (Int64.to_int32 offset) (current_byte*8)) 
-                          24)) in
-      (* Printf.printf "%s\n" hex_str; *)
-      if hex_str <> '\x00'  then 
-        get_offset_as_hex_array offset 
-          (Array.append [|hex_str|] arr) (current_byte-1)
-      else arr
-    );
-  in
   let rec loop last_eip eip is_final_loop num_insns_executed =
     (let old_count =
        (try
@@ -615,26 +718,37 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog
 	| Some thunk ->
-	    let fake_insn = match (!opt_arch, 
-                                   (Int64.logand eip 1L), thunk ()) with
-	      | (X86, _,_) -> [|'\xc3'|] (* ret *)
-	      | (X64, _,None) -> [|'\xc3'|] (* ret *)
-	      | (X64, _,Some in_addr) ->  (* Jump to the inner function *)
-                (*Printf.printf "eip %Lx:jumping to adapter %Lx \n" eip in_addr;*)
-                let off = (Int64.sub in_addr eip) in
-                let off_arr = (get_offset_as_hex_array off [||] 3) in
-                let off_1 = (Int64.sub off 
-                           (Int64.of_int ((Array.length off_arr)+1))) in
-                let off_arr_1 = (get_offset_as_hex_array off_1 [||] 3) in
-                (* Array.iter 
-                  ( function ele -> Printf.printf "%s\n" ele) off_arr_1; *)
-                Array.append [|'\xeb'|] off_arr_1
-	      | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
-	      | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
-	      | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
-	    in
-	      decode_insn asmir_gamma eip fake_insn
-	      (* decode_insn asmir_gamma eip fake_ret *)
+	  let fake_insn = match (!opt_arch, 
+                                 (Int64.logand eip 1L), thunk ()) with
+	    | (X86, _,_) -> [|'\xc3'|] (* ret *)
+	    | (X64, _,None) -> [|'\xc3'|] (* ret *)
+	    | (X64, _,Some in_addr) ->  (* Jump to the inner function *)
+              let temp = (Int64.sub in_addr eip) in
+	      let offset = (Int64.sub temp 5L) in
+	      let offset_byte_0 = (Int64.logand offset 255L) in
+	      let offset_byte_1 = 
+		(Int64.shift_right_logical 
+		   (Int64.logand offset (Int64.shift_left 255L 8)) 8) in
+	      let offset_byte_2 = 
+		(Int64.shift_right_logical 
+		   (Int64.logand offset (Int64.shift_left 255L 16)) 16) in
+	      let offset_byte_3 = 
+		(Int64.shift_right_logical 
+		   (Int64.logand offset (Int64.shift_left 255L 24)) 24) in
+              let offset_char_arr = [|(char_of_int (Int64.to_int offset_byte_0));
+				      (char_of_int (Int64.to_int offset_byte_1));
+				      (char_of_int (Int64.to_int offset_byte_2));
+				      (char_of_int (Int64.to_int offset_byte_3))|] in
+	      (*Printf.printf "eip %Lx:jumping to adapter %Lx using offset %Lx\n" 
+		eip in_addr offset;*)
+              (*Array.iter 
+                ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
+	      Array.append [|'\xe9'|] offset_char_arr
+	    | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
+	    | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
+	    | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
+	  in
+	  decode_insn asmir_gamma eip fake_insn
       in
 	if !opt_trace_insns then
 	  print_insns eip prog' None '\n';

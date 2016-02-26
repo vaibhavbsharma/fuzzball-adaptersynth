@@ -199,10 +199,32 @@ struct
       if path_cond = [] && !opt_extra_conditions <> [] then
 	List.iter
 	  (fun cond ->
-	     (* Similar to self#add_to_path_cond, but without the call
-		to ensure_extra_conditions. *)
-	     path_cond <- cond :: path_cond;
-	     self#push_cond_to_qe cond)
+	    (match cond with
+	    | V.BinOp(V.EQ,V.Lval(V.Temp(var_name)),
+		      V.Constant(V.Int(V.REG_8,const_val))) ->
+	      (*Printf.printf "ensure_extra_conditions found exp of type 1\n";*)
+	      form_man#add_special_ec_var var_name 
+		(V.Constant(V.Int(V.REG_8,const_val)))
+	    | V.BinOp(V.EQ,V.Lval(V.Temp(var_name)),
+		      V.Constant(V.Int(V.REG_64,const_val))) ->
+	      (*Printf.printf "ensure_extra_conditions found exp of type 2\n";*)
+	      form_man#add_special_ec_var var_name 
+		(V.Constant(V.Int(V.REG_64,const_val)))
+	    | V.BinOp(V.EQ,V.Constant(V.Int(V.REG_8,const_val)),
+		      V.Lval(V.Temp(var_name))) ->
+	      (*Printf.printf "ensure_extra_conditions found exp of type 3\n";*)
+	      form_man#add_special_ec_var var_name 
+		(V.Constant(V.Int(V.REG_8,const_val)))
+	    | V.BinOp(V.EQ,V.Constant(V.Int(V.REG_64,const_val)),
+		      V.Lval(V.Temp(var_name))) ->
+	      (*Printf.printf "ensure_extra_conditions found exp of type 4\n";*)
+	      form_man#add_special_ec_var var_name 
+		(V.Constant(V.Int(V.REG_64,const_val)))
+	    | _ -> ());
+	    (* Similar to self#add_to_path_cond, but without the call
+	       to ensure_extra_conditions. *)
+	    path_cond <- cond :: path_cond;
+	    self#push_cond_to_qe cond)
 	  (List.rev !opt_extra_conditions)
 
     method get_path_cond =
@@ -248,6 +270,13 @@ struct
 
     method query_with_path_cond cond verbose =
       self#query_with_path_cond_wcache cond verbose true
+
+    method query_condition cond_e ident = 
+      dt#start_new_query_binary;
+      let b = self#extend_pc_random cond_e false ident in
+      let _ = dt#check_last_choices in
+      dt#count_query;
+      b
 
     method private query_with_path_cond_wcache cond verbose with_cache =
       self#ensure_extra_conditions;
@@ -422,6 +451,7 @@ struct
        0x68yy Memory long concretize
        0x6ayy Misc. concretize
        0x6byy Binop concretize
+       0x6cyy Adaptor expression concretize, yy is argnum*10+(type!=0 && type!=1)
        0x7100 on_missing_random
        0x81yy SRFM load, base choice
        0x82yy SRFM load, offset concretize, yy is bit or 0x80 + try

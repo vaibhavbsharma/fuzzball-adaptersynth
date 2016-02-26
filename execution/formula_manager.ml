@@ -135,6 +135,15 @@ struct
 
     method get_input_vars = Hashtbl.fold (fun s v l -> v :: l) input_vars []
 
+    val special_ec_vars = V.VarHash.create 0
+    method add_special_ec_var var_name var_val_exp =
+      V.VarHash.replace special_ec_vars var_name 
+	(D.from_symbolic var_val_exp);
+      (*Printf.printf "add_special_ec_var added exp=%s\n"
+	(V.exp_to_string var_val_exp);
+      Printf.printf "add_special_ec_var special_ec_vars.length=%d\n"
+	(V.VarHash.length special_ec_vars);*)
+
     val region_base_vars = Hashtbl.create 30
 
     method fresh_region_base s =
@@ -303,16 +312,49 @@ struct
 	      V.Lval(V.Temp(self#mem_var region_str ty2 addr)))
 	| _ -> failwith "Bad expression in rewrite_mem_expr"
 
-    method rewrite_for_solver e =
+    (* subexpression cache *)
+    val subexpr_to_temp_var_info = Hashtbl.create 1001
+    val temp_var_num_to_subexpr = Hashtbl.create 1001
+    val mutable temp_var_num = 0
+
+    val temp_var_num_evaled = Hashtbl.create 1001
+
+    method rewrite_special_ec_vars e =
+      (*Printf.printf "rewrite_special_ec_vars before loop=%s\n" (V.exp_to_string e);*)
       let rec loop e =
+	(*Printf.printf "rewrite_special_ec_vars within loop=%s\n" (V.exp_to_string e);*)
+	match e with
+	  | V.BinOp(op, e1, e2) -> V.BinOp(op, (loop e1), (loop e2))
+	  | V.Lval(V.Temp(var)) when V.VarHash.mem special_ec_vars var -> 
+	    ((*Printf.printf "rewrite_special_ec_vars V.Lval(V.Temp(_)) \
+when special_ec_vars\n"; *)
+	     (D.to_symbolic_64 (V.VarHash.find special_ec_vars var)))
+	  | V.Ite(ce, te, fe) ->
+	      V.Ite((loop ce), (loop te), (loop fe))
+	  | _ -> e
+      in
+      let ret = loop e in
+      (*Printf.printf "rewrite_special_ec_vars after loop=%s\n" (V.exp_to_string ret);*)
+      ret
+
+    method rewrite_for_solver e =
+      (*Printf.printf "rewrite_for_solver before loop=%s\n" (V.exp_to_string e);*)
+      let rec loop e =
+	(*Printf.printf "rewrite_for_solver within loop=%s\n" (V.exp_to_string e);*)
 	match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, (loop e1), (loop e2))
 	  | V.FBinOp(op, rm, e1, e2) -> V.FBinOp(op, rm, (loop e1), (loop e2))
 	  | V.UnOp(op, e1) -> V.UnOp(op, (loop e1))
 	  | V.FUnOp(op, rm, e1) -> V.FUnOp(op, rm, (loop e1))
-	  | V.Constant(_) -> e
-	  | V.Lval(V.Temp(_)) -> e
-	  | V.Lval(V.Mem(_, _, _)) -> self#rewrite_mem_expr e
+	  | V.Constant(_) -> 
+	    ((*Printf.printf "rewrite_for_solver V.Constant(_)\n";*)
+	     e)
+	  | V.Lval(V.Temp(_)) -> 
+	    ((*Printf.printf "rewrite_for_solver V.Lval(V.Temp(_))\n"; *)
+	     e)
+	  | V.Lval(V.Mem(_, _, _)) -> 
+	    ((*Printf.printf "rewrite_for_solver V.Lval(V.Mem(_,_,_))\n";*)
+	     self#rewrite_mem_expr e)
 	  | V.Name(_) -> e
 	  | V.Cast(kind, ty, e1) -> V.Cast(kind, ty, (loop e1))
 	  | V.FCast(kind, rm, ty, e1) -> V.FCast(kind, rm, ty, (loop e1))
@@ -324,7 +366,9 @@ struct
 	  | V.Ite(ce, te, fe) ->
 	      V.Ite((loop ce), (loop te), (loop fe))
       in
-	loop e
+      let ret = loop e in
+      (*Printf.printf "rewrite_for_solver after loop=%s\n" (V.exp_to_string ret);*)
+      ret
 
     method get_mem_axioms =
       let of_type ty ((n,s,ty'),e) = (ty = ty') in
@@ -412,13 +456,6 @@ struct
 	      D.from_concrete_64 (Hashtbl.find valuation d)
 
 	  | _ -> failwith "unexpected lval expr in eval_var"
-
-    (* subexpression cache *)
-    val subexpr_to_temp_var_info = Hashtbl.create 1001
-    val temp_var_num_to_subexpr = Hashtbl.create 1001
-    val mutable temp_var_num = 0
-
-    val temp_var_num_evaled = Hashtbl.create 1001
 
     method eval_expr e =
       let rec loop e =
@@ -597,6 +634,8 @@ struct
 	  Hashtbl.find temp_vars_unweak var
 
     method private make_temp_var e ty =
+      (*Printf.printf "formula_manager.ml#make_temp_var e=%s\n"
+	(V.exp_to_string e);*)
       let cleanup_temp_var (n, s, t) =
 	let (e_enc, _) = Hashtbl.find temp_var_num_to_subexpr n in
 	  Hashtbl.remove temp_var_num_to_subexpr n;
@@ -632,6 +671,8 @@ struct
     method private simplify (v:D.t) ty =
       D.inside_symbolic
 	(fun e ->
+	  (*Printf.printf "formula_manager.ml#simplify exp=%s\n"
+	    (V.exp_to_string e);*)
 	   let e' = simplify_fp e in
 	     (* if e <> e' then
 		Printf.printf "Simplifying %s -> %s\n"
@@ -649,8 +690,10 @@ struct
     method private tempify (v:D.t) ty =
       D.inside_symbolic
 	(fun e ->
-	   let e' = simplify_fp e in
-	     V.Lval(V.Temp(self#make_temp_var e' ty))
+	  (*Printf.printf "formula_manager.ml#tempify e=%s\n"
+	    (V.exp_to_string e);*)
+	  let e' = simplify_fp e in
+	  V.Lval(V.Temp(self#make_temp_var e' ty))
 	) v
 
     method simplify1  e = self#simplify e V.REG_1
@@ -662,7 +705,15 @@ struct
     method simplify_with_callback f (v:D.t) ty =
       D.inside_symbolic
 	(fun e ->
-	   let e2 = simplify_fp e in
+	  (*Printf.printf "formula_manager.ml#simplify_with_callback e=%s\n"
+	    (V.exp_to_string e);*)
+	  let e_replaced = self#rewrite_special_ec_vars e in
+	  (*Printf.printf "formula_manager.ml#simplify_with_callback e_replaced=%s\n"
+	    (V.exp_to_string e_replaced);*)
+	  let e2 = simplify_fp e_replaced in
+	  (*Printf.printf "formula_manager.ml#simplify_with_callback e2=%s\n"
+	    (V.exp_to_string e2);*)
+	  (*let e2 = simplify_fp e in*)
 	     match e2 with
 	       | V.Constant(_) -> e2
 	       | _ -> 
@@ -672,7 +723,7 @@ struct
 			  (if expr_size e2 < 10 then
 			     e2
 			   else
-			     V.Lval(V.Temp(self#make_temp_var e2 ty))))
+			      (V.Lval(V.Temp(self#make_temp_var e2 ty)))))
 	) v
 
     method make_ite cond_v ty v_true v_false =
