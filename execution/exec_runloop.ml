@@ -200,7 +200,7 @@ let call_replacements fm last_eip eip =
                       but it will work fine if you uncomment it.*)
                 
                 (* create a restricted range for constant values *)
-                let restrict_range node_type node_val lower upper =
+                (*let restrict_range node_type node_val lower upper =
                   V.BinOp(
                     V.BITOR,
                     V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
@@ -208,8 +208,8 @@ let call_replacements fm last_eip eip =
                       V.BITAND, 
                       V.UnOp(V.NOT, 
                              V.BinOp(V.SLT, node_val, V.Constant(V.Int(val_type, lower)))),
-                      V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in
-                (*(* specify all possible values *)
+                      V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in*)
+                (* specify all possible values *)
                 let specify_vals node_type node_val vals =
                   let rec list_vals l = 
                     match l with
@@ -223,7 +223,7 @@ let call_replacements fm last_eip eip =
                     V.BITOR,
                     V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
                     (* note: for implementation reasons, the vals list must always contain 0 *)
-                    list_vals (0L::vals)) in *)
+                    list_vals (0L::vals)) in
                 
                 
                 let rec zero_lower d base =
@@ -274,8 +274,8 @@ let call_replacements fm last_eip eip =
                              V.BITOR,
                              V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
                              V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                          (restrict_range node_type node_val (-10L) 10L) :: 
-                          (*(specify_vals node_type node_val [-1L; 1L; 31L]) ::*)
+                          (*(restrict_range node_type node_val (-10L) 10L) :: *)
+                          (specify_vals node_type node_val [1L; 2L; 3L]) ::
                           !opt_extra_conditions;
                         get_ite_expr node_type V.EQ V.REG_8 0L 
                           node_val 
@@ -298,8 +298,8 @@ let call_replacements fm last_eip eip =
                               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
                               V.BinOp(V.LT, node_val, 
                                       V.Constant(V.Int(val_type, Int64.of_int num_ops))))) ::
-                           (restrict_range node_type node_val (-10L) 10L) ::
-                           (*(specify_vals node_type node_val [-1L; 1L; 31L]) ::*)
+                           (*(restrict_range node_type node_val (-10L) 10L) ::*)
+                           (specify_vals node_type node_val [1L; 2L; 3L]) ::
                            !opt_extra_conditions;
                         (* - require all lower branches to be zero when the node
                              type is 0 or 1 (constant or variable)
