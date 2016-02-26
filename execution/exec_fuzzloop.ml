@@ -107,7 +107,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
          let val_type = 32 in (* 32- or 64-bit values *)
          let rec arith_loop' d base = 
            if d > 0
-           then (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8);
+           then (ignore(fm#get_fresh_symbolic var_name val_type);
+                 ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8);
                  ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) val_type);
                  arith_loop' (d-1) (base ^ "0");
                  arith_loop' (d-1) (base ^ "1"))
@@ -117,11 +118,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let rec arith_loop_float n = 
          let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
          let tree_depth = 2 in (* hardcoded for now *)
-         let val_type = 64 in (* 32- or 64-bit values *)
          let rec arith_loop' d base = 
            if d > 0
            then (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8);
-                 ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) val_type);
+                 ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 32);
                  arith_loop' (d-1) (base ^ "0");
                  arith_loop' (d-1) (base ^ "1"))
            else () in
