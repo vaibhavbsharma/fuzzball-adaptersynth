@@ -87,6 +87,7 @@ val opt_trace_setup : bool ref
 val opt_extra_env : (string, string) Hashtbl.t
 val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
+val opt_synth_simplelen_adaptor : (int64 * int64 * int64 * int64 * int64) list ref
 val opt_skip_func_addr : (int64 * int64) list ref
 val opt_skip_call_addr_symbol : (int64 * string) list ref
 val opt_skip_func_addr_symbol : (int64 * string) list ref
@@ -172,6 +173,8 @@ val add_delimited_pair :
   (int64 * int64) list ref -> char -> string -> unit
 val add_delimited_info :
   (string * int64 * int64 * int64 * int64) list ref -> char -> string -> unit
+val add_delimited_simplelen_info :
+  (int64 * int64 * int64 * int64 * int64) list ref -> char -> string -> unit
 val add_delimited_num_str_pair :
   (int64 * string) list ref -> char -> string -> unit
 val add_delimited_num_escstr_pair :

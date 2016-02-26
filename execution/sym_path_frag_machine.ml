@@ -451,6 +451,7 @@ struct
        0x68yy Memory long concretize
        0x6ayy Misc. concretize
        0x6byy Binop concretize
+       0x6cyy Adaptor expression concretize, yy is argnum*10+(type!=0 && type!=1)
        0x7100 on_missing_random
        0x81yy SRFM load, base choice
        0x82yy SRFM load, offset concretize, yy is bit or 0x80 + try

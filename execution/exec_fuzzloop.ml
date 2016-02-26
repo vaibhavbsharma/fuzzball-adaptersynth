@@ -94,14 +94,19 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	    extra_setup := setup);
      fm#start_symbolic;
      
-     (if (List.length !opt_synth_adaptor) <> 0 then
+     let rec simple_loop n type_name =
+       let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+       ignore(fm#get_fresh_symbolic (var_name^type_name) 8);
+       ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
+       if n > 0 then simple_loop (n-1) type_name; in
+     let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
+      let (_,_,_,nargs2,_) = List.hd !opt_synth_simplelen_adaptor in
+      (*Printf.printf "Running simple+len adaptor in exec_fuzzloop\n";*)
+      simple_loop ((Int64.to_int nargs2)-1) "_type")
+     in
+     (if ((List.length !opt_synth_adaptor) <> 0) then
        let (mode,_,_,_,nargs2) = List.hd !opt_synth_adaptor in 
-       let rec simple_loop n =
-         let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-         ignore(fm#get_fresh_symbolic (var_name^"_is_const") 1);
-         ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
-         if n > 0 then simple_loop (n-1); in
-       let rec arith_loop_int n = 
+              let rec arith_loop_int n = 
          let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
          let tree_depth = 3 in (* hardcoded for now *)
          let val_type = 32 in (* 32- or 64-bit values *)
@@ -132,7 +137,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ignore(fm#get_fresh_symbolic var_name 8);
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
-       then simple_loop ((Int64.to_int nargs2)-1)
+       then simple_loop ((Int64.to_int nargs2)-1) "_is_const"
        else if mode = "arithmetic_int" 
             then arith_loop_int ((Int64.to_int nargs2)-1)
        else if mode = "arithmetic_float"
@@ -140,7 +145,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else if mode = "chartrans"
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
-
+     
+     
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);
      symbolic_init ();
@@ -168,6 +174,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		  | DeepPath -> stop "on too-deep path"
 		  | SymbolicJump -> stop "at symbolic jump"
 		  | NullDereference -> stop "at null deref"
+		  | UnsupportedAddress -> stop "at access to unsupported address"
 		  | JumpToNull -> stop "at jump to null"
 		  | DivideByZero -> stop "at division by zero"
 		  | TooManyIterations -> stop "after too many loop iterations"
