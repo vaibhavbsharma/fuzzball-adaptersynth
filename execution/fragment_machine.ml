@@ -331,6 +331,8 @@ class virtual fragment_machine = object
   method virtual load_x86_user_regs : Temu_state.userRegs -> unit
   method virtual print_regs : unit
   method virtual print_syscall_regs : unit
+  method virtual printable_word_reg : register_name -> string
+  method virtual printable_long_reg : register_name -> string
 
   method virtual store_byte_conc  : int64 -> int   -> unit
   method virtual store_short_conc : int64 -> int   -> unit
@@ -397,6 +399,9 @@ class virtual fragment_machine = object
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
+  method virtual set_long_reg_symbolic : register_name -> string -> unit
+  method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
+
   method virtual run_sl : (string -> bool) -> Vine.stmt list -> string
 		  
   method virtual run : unit -> string
@@ -1260,11 +1265,15 @@ struct
       self#set_short_var R_GS (Int32.to_int regs.Temu_state.xgs);
       self#set_short_var R_SS (Int32.to_int regs.Temu_state.xss)
 
+    method printable_word_reg r =
+      D.to_string_32 (self#get_int_var (Hashtbl.find reg_to_var r))
+
+    method printable_long_reg r =
+      D.to_string_64 (self#get_int_var (Hashtbl.find reg_to_var r))
+
     method private print_reg32 str r = 
 	Printf.printf "%s: " str;
-	Printf.printf "%s\n"
-	  (D.to_string_32 
-	     (self#get_int_var (Hashtbl.find reg_to_var r)))
+	Printf.printf "%s\n" (self#printable_word_reg r)
      
     method private print_reg1 str r = 
 	Printf.printf "%s: " str;
@@ -1274,9 +1283,7 @@ struct
 
     method private print_reg64 str r =
 	Printf.printf "%s: " str;
-	Printf.printf "%s\n"
-	  (D.to_string_64
-	     (self#get_int_var (Hashtbl.find reg_to_var r)))
+	Printf.printf "%s\n" (self#printable_long_reg r)
 
     method private print_x87_fpreg idx reg tag =
       let val_d = self#get_int_var (Hashtbl.find reg_to_var reg) in
@@ -1752,6 +1759,10 @@ struct
       self#set_int_var (Hashtbl.find reg_to_var reg)
 	(form_man#fresh_symbolic_32 s);
 
+    method set_long_reg_symbolic reg s =
+      self#set_int_var (Hashtbl.find reg_to_var reg)
+	(form_man#fresh_symbolic_64 s);
+
     method set_word_reg_concolic reg s i64 =
       self#set_int_var (Hashtbl.find reg_to_var reg)
 	(form_man#make_concolic_32 s i64)
@@ -1760,6 +1771,10 @@ struct
       
     method set_word_reg_fresh_symbolic reg s =
       self#set_word_reg_symbolic reg (s ^ "_" ^ (string_of_int symbol_uniq)); 
+      symbol_uniq <- symbol_uniq + 1
+
+    method set_long_reg_fresh_symbolic reg s =
+      self#set_long_reg_symbolic reg (s ^ "_" ^ (string_of_int symbol_uniq));
       symbol_uniq <- symbol_uniq + 1
 
     method set_word_reg_fresh_region reg s =

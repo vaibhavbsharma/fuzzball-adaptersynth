@@ -100,6 +100,8 @@ sig
     method load_x86_user_regs : Temu_state.userRegs -> unit
     method print_regs : unit
     method print_syscall_regs : unit
+    method printable_word_reg : Fragment_machine.register_name -> string
+    method printable_long_reg : Fragment_machine.register_name -> string
     method store_byte  : int64 -> D.t -> unit
     method store_short : int64 -> D.t -> unit
     method store_word  : int64 -> D.t -> unit
@@ -173,6 +175,10 @@ sig
     method set_word_reg_fresh_symbolic :
       Fragment_machine.register_name -> string -> unit
     method set_word_reg_fresh_region : 
+      Fragment_machine.register_name -> string -> unit
+    method set_long_reg_symbolic :
+      Fragment_machine.register_name -> string -> unit
+    method set_long_reg_fresh_symbolic :
       Fragment_machine.register_name -> string -> unit
     method private handle_load : Vine.exp -> Vine.typ -> (D.t * Vine.typ)
     method private handle_store : Vine.exp -> Vine.typ -> Vine.exp -> unit
