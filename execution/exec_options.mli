@@ -99,6 +99,7 @@ val opt_trace_unique_eips : bool ref
 val opt_trace_ir : bool ref
 val opt_trace_orig_ir : bool ref
 val opt_trace_iterations : bool ref
+val opt_trace_completed_iterations : bool ref
 val opt_coverage_stats : bool ref
 val opt_gc_stats : bool ref
 val opt_solver_stats : bool ref

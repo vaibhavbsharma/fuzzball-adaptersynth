@@ -121,6 +121,7 @@ let opt_trace_unique_eips = ref false
 let opt_trace_ir = ref false
 let opt_trace_orig_ir = ref false
 let opt_trace_iterations = ref false
+let opt_trace_completed_iterations = ref false
 let opt_coverage_stats = ref false
 let opt_gc_stats = ref false
 let opt_solver_stats = ref false

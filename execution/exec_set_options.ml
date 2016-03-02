@@ -483,6 +483,8 @@ let cmdline_opts =
      " Print Vine IR as produced by Asmir");
     ("-trace-iterations", Arg.Set(opt_trace_iterations),
      " Print iteration count");
+    ("-trace-completed-iterations", Arg.Set(opt_trace_completed_iterations),
+     " Print iteration count at completion");
     ("-trace-loads", Arg.Set(opt_trace_loads),
      " Print each memory load");
     ("-trace-stores", Arg.Set(opt_trace_stores),

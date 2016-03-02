@@ -38,6 +38,8 @@ let loop_w_stats count fn =
 		     (ctime -. old_ctime) (ctime -. start_ctime));
 		(Printf.printf "Wall time %f sec, %f total\n"
 		   (wtime -. old_wtime) (wtime -. start_wtime)));
+	     if !opt_trace_completed_iterations then
+	       Printf.printf "Iteration %Ld completed\n%!" !iter;
 	     flush stdout;
 	     match !opt_total_timeout with
 	       | None -> ()
