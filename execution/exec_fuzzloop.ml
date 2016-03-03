@@ -96,15 +96,15 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	    extra_setup := setup);
      fm#start_symbolic;
      
-     let rec simple_loop n type_name =
+     let rec simple_loop n type_name type_size =
        let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-       ignore(fm#get_fresh_symbolic (var_name^type_name) 8);
+       ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);
        ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
-       if n > 0 then simple_loop (n-1) type_name; in
+       if n > 0 then simple_loop (n-1) type_name type_size; in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
       let (_,_,_,nargs2,_) = List.hd !opt_synth_simplelen_adaptor in
       (*Printf.printf "Running simple+len adaptor in exec_fuzzloop\n";*)
-      simple_loop ((Int64.to_int nargs2)-1) "_type")
+      simple_loop ((Int64.to_int nargs2)-1) "_type" 8) 
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
        let (mode,_,_,_,nargs2) = List.hd !opt_synth_adaptor in 
@@ -139,7 +139,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ignore(fm#get_fresh_symbolic var_name 8);
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
-       then simple_loop ((Int64.to_int nargs2)-1) "_is_const"
+       then simple_loop ((Int64.to_int nargs2)-1) "_is_const" 1
        else if mode = "arithmetic_int" 
             then arith_loop_int ((Int64.to_int nargs2)-1)
        else if mode = "arithmetic_float"
