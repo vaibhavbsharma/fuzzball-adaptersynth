@@ -108,7 +108,8 @@ let call_replacements fm last_eip eip =
               fm#set_reg_symbolic (List.nth arg_regs n) arg;
               if n > 0 then loop (n-1); 
             in
-            loop ((Int64.to_int in_nargs)-1);
+            if in_nargs > 0L then 
+	      loop ((Int64.to_int in_nargs)-1);
             (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
