@@ -96,18 +96,28 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	    extra_setup := setup);
      fm#start_symbolic;
      
-     let rec simple_loop n type_name type_size =
+     let rec simple_loop n out_nargs type_name type_size =
        let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-       ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);
+       (*let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in*)
        ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
-       if n > 0 then simple_loop (n-1) type_name type_size; in
+       (*let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in*)
+       ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);
+       (*if out_nargs > 0L then 
+	 (opt_extra_conditions :=
+	    V.BinOp(
+	      V.BITOR,
+	      V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_1,1L))),
+	      V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	  :: !opt_extra_conditions;);*)
+       (*Printf.printf "opt_extra_condition.length = %d\n" (List.length !opt_extra_conditions);*)
+       if n > 0 then simple_loop (n-1) out_nargs type_name type_size; in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
-      let (_,_,_,nargs2,_) = List.hd !opt_synth_simplelen_adaptor in
+      (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adaptor in
       (*Printf.printf "Running simple+len adaptor in exec_fuzzloop\n";*)
-      simple_loop ((Int64.to_int nargs2)-1) "_type" 8) 
+      simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
-       let (mode,_,_,_,nargs2) = List.hd !opt_synth_adaptor in 
+       let (mode,_,out_nargs,_,in_nargs) = List.hd !opt_synth_adaptor in 
               let rec arith_loop_int n = 
          let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
          let tree_depth = 3 in (* hardcoded for now *)
@@ -139,11 +149,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ignore(fm#get_fresh_symbolic var_name 8);
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
-       then simple_loop ((Int64.to_int nargs2)-1) "_is_const" 1
+       then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
        else if mode = "arithmetic_int" 
-            then arith_loop_int ((Int64.to_int nargs2)-1)
+            then arith_loop_int ((Int64.to_int in_nargs)-1)
        else if mode = "arithmetic_float"
-            then arith_loop_float ((Int64.to_int nargs2)-1)
+            then arith_loop_float ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
