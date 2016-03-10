@@ -2974,6 +2974,7 @@ object(self)
 	 | (X86, 56) -> (* mpx *)
 	     uh "Unhandled Linux system call mpx (56)"
 	 | (X64, 26) (* msync *) 
+	 | (X64, 28) (* madvise *)
 	 | (X64, 56) -> (* clone *)
 	   (* return a fresh symbolic variable *)
 	   let rec read_regs n =
@@ -2983,7 +2984,13 @@ object(self)
 	       (read_regs (n - 1)) @ [(fm#printable_long_reg arg_regs.(n-1))]
 	   in
 	   let (name, nargs) = 
-	     if syscall_num = 26 then ("sys_msync",3) else ("sys_clone",4)
+	     match syscall_num with 
+	     | 26 -> ("sys_msync", 3)
+	     | 28 -> ("sys_madvise", 3)
+	     | 56 -> ("sys_clone", 4)
+	     | _ -> 
+	       Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
+	       uh "Unhandled Linux system call (%d)"
 	   in 
            let args = read_regs (if syscall_num = 26 then 3 else 4) in
 	   if !opt_trace_syscalls then
