@@ -2973,6 +2973,19 @@ object(self)
 	 | (ARM, 56) -> uh "No mpx (56) syscall in Linux/ARM (E)ABI"
 	 | (X86, 56) -> (* mpx *)
 	     uh "Unhandled Linux system call mpx (56)"
+	 | (X64, 56) -> (* clone *)
+	   (*uh "Unhandled Linux system call sys_clone (56)"*)
+	   let arg_regs = [| R_RDI; R_RSI; R_RDX; R_R10; R_R8; R_R9 |] in
+	   let rec read_regs n =
+	     match n with
+	     | 0 -> []
+	     | _ ->
+	       (read_regs (n - 1)) @ [(fm#printable_long_reg arg_regs.(n-1))]
+	   in
+           let args = read_regs 4 in
+	   if !opt_trace_syscalls then
+	     Printf.printf "sys_clone(%s)\n" (String.concat ", " args);
+	   fm#set_long_reg_fresh_symbolic R_RAX "sys_clone"
 	 | ((X86|ARM), 57) -> (* setpgid *)
 	     uh "Unhandled Linux system call setpgid (57)"
 	 | (ARM, 58) -> uh "No ulimit (58) syscall in Linux/ARM (E)ABI"
