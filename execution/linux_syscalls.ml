@@ -2990,13 +2990,13 @@ object(self)
 	   in
 	   let (name, nargs) = 
 	     match syscall_num with 
-	     | 26 -> ("sys_msync", 3)
-	     | 28 -> ("sys_madvise", 3)
-	     | 56 -> ("sys_clone", 4)
-	     | 149 -> ("sys_mlock", 2)
-	     | 150 -> ("sys_munlock", 2)
-	     | 151 -> ("sys_mlockall", 1)
-	     | 152 -> ("sys_munlockall", 0)
+	     | 26 -> ("msync", 3)
+	     | 28 -> ("madvise", 3)
+	     | 56 -> ("clone", 4)
+	     | 149 -> ("mlock", 2)
+	     | 150 -> ("munlock", 2)
+	     | 151 -> ("mlockall", 1)
+	     | 152 -> ("munlockall", 0)
 	     | 216 -> ("remap_file_pages", 5)
 	     | _ -> 
 	       Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
@@ -3005,7 +3005,7 @@ object(self)
            let args = read_regs (if syscall_num = 26 then 3 else 4) in
 	   if !opt_trace_syscalls then
 	     Printf.printf "%s(%s)\n" name (String.concat ", " args);
-	   fm#set_long_reg_fresh_symbolic ret_reg "syscall_result"
+	   fm#set_long_reg_fresh_symbolic ret_reg (name^"_result") (*"syscall_result"*)
 	 | ((X86|ARM), 57) -> (* setpgid *)
 	     uh "Unhandled Linux system call setpgid (57)"
 	 | (ARM, 58) -> uh "No ulimit (58) syscall in Linux/ARM (E)ABI"
