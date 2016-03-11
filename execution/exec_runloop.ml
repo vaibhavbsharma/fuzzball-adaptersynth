@@ -94,17 +94,20 @@ let call_replacements fm last_eip eip =
             in
             let rec loop n =
               let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-              let var_is_const = 
-                fm#get_fresh_symbolic (var_name^"_is_const") 1 in
               let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
-              let arg = get_ite_expr var_is_const V.NEQ V.REG_1 0L 
-                var_val (get_ite_arg_expr var_val out_nargs) in
-              opt_extra_conditions :=
-                V.BinOp(
-                  V.BITOR,
-                  V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
-                  V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-              :: !opt_extra_conditions;
+              let arg =  
+		(if out_nargs = 0L then var_val 
+		 else ( 
+		   let var_is_const = 
+                     fm#get_fresh_symbolic (var_name^"_is_const") 1 in
+		   opt_extra_conditions :=  
+		    V.BinOp(
+                      V.BITOR,
+                      V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
+                      V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+		   :: !opt_extra_conditions;
+		   get_ite_expr var_is_const V.NEQ V.REG_1 0L  
+		     var_val (get_ite_arg_expr var_val out_nargs))) in
               fm#set_reg_symbolic (List.nth arg_regs n) arg;
               if n > 0 then loop (n-1); 
             in
