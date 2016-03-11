@@ -2975,7 +2975,12 @@ object(self)
 	     uh "Unhandled Linux system call mpx (56)"
 	 | (X64, 26) (* msync *) 
 	 | (X64, 28) (* madvise *)
-	 | (X64, 56) -> (* clone *)
+	 | (X64, 56) (* clone *)
+	 | (X64, 149) (* mlock *)
+	 | (X64, 150) (* munlock *)
+	 | (X64, 151) (* mlockall *)
+	 | (X64, 152) (* munlockall *)
+	 | (X64, 216) (* remap_file_pages *) ->
 	   (* return a fresh symbolic variable *)
 	   let rec read_regs n =
 	     match n with
@@ -2988,6 +2993,11 @@ object(self)
 	     | 26 -> ("sys_msync", 3)
 	     | 28 -> ("sys_madvise", 3)
 	     | 56 -> ("sys_clone", 4)
+	     | 149 -> ("sys_mlock", 2)
+	     | 150 -> ("sys_munlock", 2)
+	     | 151 -> ("sys_mlockall", 1)
+	     | 152 -> ("sys_munlockall", 0)
+	     | 216 -> ("remap_file_pages", 5)
 	     | _ -> 
 	       Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
 	       uh "Unhandled Linux system call (%d)"
@@ -3907,7 +3917,8 @@ object(self)
 	 | (X86, 217) -> (* pivot_root *)
 	     uh "Unhandled Linux system call pivot_root"
 	 | (ARM, 219) -> uh "Check whether ARM mincore syscall matches x86"
-	 | (X86, 218) -> (* mincore *)
+	 | (X86, 218) (* mincore *) 
+         | (X64, 27) ->  
 	     let (ebx, ecx, edx) = read_3_regs () in
 	     let addr = ebx and
 		 length = Int64.to_int ecx and
