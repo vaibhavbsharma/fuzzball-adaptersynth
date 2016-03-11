@@ -2981,7 +2981,6 @@ object(self)
 	 | (X64, 151) (* mlockall *)
 	 | (X64, 152) (* munlockall *)
 	 | (X64, 216) (* remap_file_pages *) ->
-	   (* return a fresh symbolic variable *)
 	   let rec read_regs n =
 	     match n with
 	     | 0 -> []
@@ -3002,10 +3001,10 @@ object(self)
 	       Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
 	       uh "Unhandled Linux system call (%d)"
 	   in 
-           let args = read_regs (if syscall_num = 26 then 3 else 4) in
+           let args = read_regs nargs in
 	   if !opt_trace_syscalls then
 	     Printf.printf "%s(%s)\n" name (String.concat ", " args);
-	   fm#set_long_reg_fresh_symbolic ret_reg (name^"_result") (*"syscall_result"*)
+	   self#put_errno Unix.ENOSYS;
 	 | ((X86|ARM), 57) -> (* setpgid *)
 	     uh "Unhandled Linux system call setpgid (57)"
 	 | (ARM, 58) -> uh "No ulimit (58) syscall in Linux/ARM (E)ABI"
