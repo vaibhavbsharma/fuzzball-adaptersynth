@@ -134,10 +134,10 @@ let call_replacements fm last_eip eip =
                      then V.Cast(V.CAST_LOW, V.REG_32,
                                  fm#get_reg_symbolic (List.nth arg_regs 0))
                      else fm#get_reg_symbolic (List.nth arg_regs 0)) in
-              let binops = [V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR;
+              let binops = [V.PLUS; (*V.MINUS;*) V.TIMES; (*V.BITAND; V.BITOR; V.XOR;
                             V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD; V.LSHIFT; 
-                            V.RSHIFT; V.ARSHIFT] in
-              let unops = [V.NEG; V.NOT] in
+                            V.RSHIFT; V.ARSHIFT*)] in
+              let unops = [(*V.NEG; V.NOT*)] in
               let special_ops1 = [V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD] in
               let special_ops2 = [V.LSHIFT; V.RSHIFT; V.ARSHIFT] in
               let num_ops = (List.length binops) + (List.length unops) in
@@ -209,7 +209,7 @@ let call_replacements fm last_eip eip =
                       but it will work fine if you uncomment it.*)
                 
                 (* create a restricted range for constant values *)
-                (*let restrict_range node_type node_val lower upper =
+                let restrict_range node_type node_val lower upper =
                   V.BinOp(
                     V.BITOR,
                     V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
@@ -217,7 +217,7 @@ let call_replacements fm last_eip eip =
                       V.BITAND, 
                       V.UnOp(V.NOT, 
                              V.BinOp(V.SLT, node_val, V.Constant(V.Int(val_type, lower)))),
-                      V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in*)
+                      V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in
                 (* specify all possible values *)
                 (*let specify_vals node_type node_val vals =
                   let rec list_vals l = 
@@ -283,7 +283,7 @@ let call_replacements fm last_eip eip =
                              V.BITOR,
                              V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
                              V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                          (*(restrict_range node_type node_val 0L 10L) ::*)
+                          (restrict_range node_type node_val 0L 10L) ::
                           (*(specify_vals node_type node_val [1L; 2L; 3L]) ::*)
                           !opt_extra_conditions;
                         get_ite_expr node_type V.EQ V.REG_8 0L 
@@ -307,7 +307,7 @@ let call_replacements fm last_eip eip =
                               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
                               V.BinOp(V.LT, node_val, 
                                       V.Constant(V.Int(val_type, Int64.of_int num_ops))))) ::
-                           (*(restrict_range node_type node_val 0L 10L) ::*)
+                           (restrict_range node_type node_val 0L 10L) ::
                            (*(specify_vals node_type node_val [1L; 2L; 3L]) :: *)
                            !opt_extra_conditions;
                         (* - require all lower branches to be zero when the node
@@ -329,7 +329,7 @@ let call_replacements fm last_eip eip =
                                         V.Constant(V.Int(val_type, 
                                           Int64.of_int (List.length binops))))),
                              zero_lower (d-1) (base ^ "1"))) ::
-                          !opt_extra_conditions;             
+                          !opt_extra_conditions;      
                         let left_expr = build_tree (d-1) (base ^ "0") in
                         let right_expr = build_tree (d-1) (base ^ "1") in
                         get_ite_expr node_type V.EQ V.REG_8 0L 
