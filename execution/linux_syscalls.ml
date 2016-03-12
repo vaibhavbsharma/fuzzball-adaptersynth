@@ -3004,7 +3004,10 @@ object(self)
            let args = read_regs nargs in
 	   if !opt_trace_syscalls then
 	     Printf.printf "%s(%s)\n" name (String.concat ", " args);
-	   self#put_errno Unix.ENOSYS;
+	   (if !opt_ret_zero_missing_x64_syscalls = true then 
+	     put_return 0L
+	   else 
+	     self#put_errno Unix.ENOSYS);
 	 | ((X86|ARM), 57) -> (* setpgid *)
 	     uh "Unhandled Linux system call setpgid (57)"
 	 | (ARM, 58) -> uh "No ulimit (58) syscall in Linux/ARM (E)ABI"
@@ -4538,8 +4541,10 @@ object(self)
 	     Printf.printf "Unknown Linux/ARM system call %d\n" syscall_num;
 	     uh "Unhandled Linux system call"
 	 | (X64, _) ->
-	     Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
-	     uh "Unhandled Linux system call");
+	   Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
+	   if !opt_ret_zero_missing_x64_syscalls = true then 
+	     put_return 0L
+	   else self#put_errno Unix.ENOSYS);
     if !opt_trace_syscalls then
       let ret_val = match !opt_arch with
 	| (X86|ARM) -> fm#get_word_var ret_reg

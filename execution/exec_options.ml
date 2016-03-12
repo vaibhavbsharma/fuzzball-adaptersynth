@@ -92,6 +92,7 @@ let opt_trace_callstack = ref false
 let opt_trace_sym_addrs = ref false
 let opt_trace_sym_addr_details = ref false
 let opt_trace_syscalls = ref false
+let opt_ret_zero_missing_x64_syscalls = ref false
 let opt_trace_detailed_ranges = ref []
 let opt_extra_conditions = ref []
 let opt_tracepoints = ref []
