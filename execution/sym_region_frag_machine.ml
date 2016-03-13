@@ -423,6 +423,12 @@ struct
 	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
 	     | _,_ -> AmbiguousExpr(e))
 
+      | V.BinOp(V.XOR, e1, e2)
+	->
+	  (match (classify_term form_man e1), (classify_term form_man e2) with
+	     | (ExprOffset(_)|ConstantOffset(_)),
+	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
+	     | _,_ -> AmbiguousExpr(e))
 
 (*       | V.BinOp(V.BITAND, _, _) *)
 (*       | V.BinOp(V.BITOR, _, _) (* XXX happens in Windows 7, don't know why *) *)
