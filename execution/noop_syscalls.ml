@@ -1096,8 +1096,42 @@ object(self)
       else
 	let (num_args, name) = syscalls.(syscall_num) in
 	let args = read_regs num_args in
+	let args' =
+	  (match (name, args) with
+	     | ("open", [fd; flags; mode]) ->
+		 let flags_i = Int64.to_int (get_reg_i arg_regs.(1)) in
+		   if (flags_i land 0o100) = 0 then
+		     [fd; flags]
+		   else
+		     (* O_CREAT set *)
+		     [fd; flags; mode]
+	     | ("fcntl", [fd; cmd; arg]) ->
+		 let cmd_i = get_reg_i arg_regs.(1) in
+		   (match cmd_i with
+		      | 1L -> [fd; cmd] (* F_GETFD *)
+		      | 3L -> [fd; cmd] (* F_GETFL *)
+		      | 9L -> [fd; cmd] (* F_GETOWN *)
+		      | 11L -> [fd; cmd] (* F_GETSIG *)
+		      | 1025L -> [fd; cmd] (* F_GETLEASE *)
+		      | 1032L -> [fd; cmd] (* F_GETPIPE_SZ *)
+		      | _ -> [fd; cmd; arg])
+	     | ("futex", [uaddr; op; val1; timeout; uaddr2; val3]) ->
+		 let op_i = Int64.to_int (get_reg_i arg_regs.(1)) in
+		 let skip = "0 /* unused */" in
+		 let (timeout', uaddr2', val3') =
+		   match op_i with
+		     | (0|128) -> (timeout, skip, skip) (* FUTEX_WAIT *)
+		     | (1|129) -> (skip, skip, skip) (* FUTEX_WAKE *)
+		     | (2|130) -> (skip, skip, skip) (* FUTEX_FD *)
+		     | (3|131) -> (skip, uaddr2, skip) (* FUTEX_REQUEUE *)
+		     | (4|132) -> (skip, uaddr2, val3) (* FUTEX_CMP_REQUEUE *)
+		     | _ -> (timeout, uaddr2, val3)
+		 in
+		   [uaddr; op; val1; timeout'; uaddr2'; val3']
+	     | (_, _) -> args)
+	in
 	  if !opt_trace_syscalls then
-	    Printf.printf "%s(%s)\n" name (String.concat ", " args);
+	    Printf.printf "%s(%s)\n" name (String.concat ", " args');
 	  if name = "_exit" || name = "exit_group" then
 	    let status = get_reg_i arg_regs.(0) in
 	      raise (SimulatedExit(status))
