@@ -70,6 +70,7 @@ val opt_trace_callstack : bool ref
 val opt_trace_sym_addrs : bool ref
 val opt_trace_sym_addr_details : bool ref
 val opt_trace_syscalls : bool ref
+val opt_ret_zero_missing_x64_syscalls : bool ref
 val opt_trace_detailed_ranges : (int64 * int64) list ref
 val opt_extra_conditions : Vine.exp list ref
 val opt_tracepoints : (int64 * string * Vine.exp) list ref
@@ -138,6 +139,7 @@ val opt_trace_offset_limit : bool ref
 val opt_no_table_store : bool ref
 val opt_implied_value_conc : bool ref
 val opt_trace_ivc : bool ref
+val opt_ite_ivc : bool ref
 val opt_periodic_stats : int64 option ref
 val opt_trace_global_ce_cache : bool ref
 val opt_trace_working_ce_cache : bool ref

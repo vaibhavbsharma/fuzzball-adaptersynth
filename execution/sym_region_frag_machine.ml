@@ -343,9 +343,11 @@ struct
 	  -> ExprOffset(e)
       | V.BinOp(V.TIMES, _, _)
 	  -> ExprOffset(e)
-      | e when (narrow_bitwidth form_man e) < 23
+      | e when (narrow_bitwidth form_man e)
+	  < (if reg_addr () == V.REG_32 then 23 else 40)
 	  -> ExprOffset(e)
-      | e when (narrow_bitwidth_signed form_man e) < 23
+      | e when (narrow_bitwidth_signed form_man e)
+	  < (if reg_addr () == V.REG_32 then 23 else 40)
 	  -> ExprOffset(e)
       | V.BinOp(V.ARSHIFT, _, _)
 	  -> ExprOffset(e)
@@ -407,6 +409,11 @@ struct
 	  when (fix_u32 off) >= 0xffffff00L
 	    ->
 	  (classify_term form_man x)
+      | V.BinOp(V.BITAND, x, V.Constant(V.Int(V.REG_64, off)))
+	  when off >= 0xffffffffffffff00L
+	    ->
+	  (classify_term form_man x)
+
       (* Addition inside another operation (top-level addition should
 	 be handled by split_terms) *)
       | V.BinOp(V.PLUS, e1, e2)
@@ -416,6 +423,12 @@ struct
 	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
 	     | _,_ -> AmbiguousExpr(e))
 
+      | V.BinOp(V.XOR, e1, e2)
+	->
+	  (match (classify_term form_man e1), (classify_term form_man e2) with
+	     | (ExprOffset(_)|ConstantOffset(_)),
+	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
+	     | _,_ -> AmbiguousExpr(e))
 
 (*       | V.BinOp(V.BITAND, _, _) *)
 (*       | V.BinOp(V.BITOR, _, _) (* XXX happens in Windows 7, don't know why *) *)

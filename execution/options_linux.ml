@@ -56,6 +56,8 @@ let linux_cmdline_opts =
      " Simulate Linux system calls as having no effect");
     ("-trace-syscalls", Arg.Set(opt_trace_syscalls),
      " Print systems calls (like strace)");
+    ("-return-zero-missing-x64-syscalls", Arg.Set(opt_ret_zero_missing_x64_syscalls),
+     " Return zero for missing X64 system calls");
     ("-prefix-out", Arg.String
        (fun s -> opt_prefix_out := Some s),
      "prefix Add a distinguishing prefix before the program's writes");
