@@ -56,6 +56,14 @@ let linux_cmdline_opts =
      " Simulate Linux system calls as having no effect");
     ("-trace-syscalls", Arg.Set(opt_trace_syscalls),
      " Print systems calls (like strace)");
+    ("-match-syscalls-in-addr-range", Arg.String
+       (add_delimited_simplelen_info opt_match_syscalls_addr_range ':'),
+     " addr1_start:addr1_end:addr2_start:addr2_end:prune" ^ 
+       " Print system call numbers in address ranges specified by addr1_start, addr1_end," ^
+       " and addr2_start, addr2_end, and if prune is set to 1 then" ^
+       " raise DisqualifiedPath exception if" ^
+       " the sequence of system calls in the 2nd address range diverges from" ^
+       " the sequence of system calls seen in the 1st address range");
     ("-return-zero-missing-x64-syscalls", Arg.Set(opt_ret_zero_missing_x64_syscalls),
      " Return zero for missing X64 system calls");
     ("-prefix-out", Arg.String

@@ -511,6 +511,12 @@ class virtual fragment_machine = object
   method virtual load_long_concretize  : int64 -> bool -> string -> int64
 
   method virtual make_sink_region : string -> int64 -> unit
+  
+  val mutable in_f1_range = false
+  method virtual get_in_f1_range : unit -> bool
+  val mutable in_f2_range = false
+  method virtual get_in_f2_range : unit -> bool
+  val mutable range1_syscalls  = [0L]
 end
 
 module FragmentMachineFunctor =
@@ -585,6 +591,11 @@ struct
 
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
+    val mutable in_f1_range = false
+    method get_in_f1_range () = in_f1_range
+    val mutable in_f2_range = false
+    method get_in_f2_range () = in_f2_range
+    val mutable range1_syscalls = [0L]
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
     val mutable frag = ([], [])
@@ -686,6 +697,24 @@ struct
 	 print_string "\n"; *)
       List.iter (fun fn -> (fn (self :> fragment_machine) eip))
 	extra_eip_hooks;
+      List.iter (
+	fun (start1,end1,start2,end2,prune) ->
+	  if eip = start1 then 
+	    (in_f1_range <- true)
+	  else if eip = end1 then 
+	    (in_f1_range <- false);
+	  if eip = start2 then 
+	    (in_f2_range <- true)
+	  else if eip = end2 then 
+	    (in_f2_range <- false);
+      (*in_f2_range = (if eip = start2 then true else if eip = end2 then false);*)
+      (*in_f1_range <- 
+	(match eip with
+	| start1 -> true
+	| end1 -> false
+	| _ -> in_f1_range);*)
+      ) 
+	!opt_match_syscalls_addr_range;
       self#watchpoint
 
     method get_eip =

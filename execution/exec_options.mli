@@ -70,6 +70,7 @@ val opt_trace_callstack : bool ref
 val opt_trace_sym_addrs : bool ref
 val opt_trace_sym_addr_details : bool ref
 val opt_trace_syscalls : bool ref
+val opt_match_syscalls_addr_range : (int64 * int64 * int64 * int64 * int64) list ref
 val opt_ret_zero_missing_x64_syscalls : bool ref
 val opt_trace_detailed_ranges : (int64 * int64) list ref
 val opt_extra_conditions : Vine.exp list ref

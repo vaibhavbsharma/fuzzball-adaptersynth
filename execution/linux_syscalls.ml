@@ -2698,6 +2698,9 @@ object(self)
 	   r6 = get_reg arg_regs.(6) in
 	 (r0, r1, r2, r3, r4, r5, r6)
      in
+     if (fm#get_in_f1_range ()) = true then Printf.printf "f1:syscall(%d)\n" syscall_num;
+     if (fm#get_in_f2_range ()) = true then Printf.printf "f2:syscall(%d)\n" syscall_num;
+       (*fm#range1_syscalls := fm#range1_syscalls :: [(Int64.of_int syscall_num)];*)
        ignore(0, read_7_regs);
        match (!opt_arch, syscall_num) with 
 	 | ((X86|ARM), 0) -> (* restart_syscall *)

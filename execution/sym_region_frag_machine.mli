@@ -256,6 +256,11 @@ sig
     method get_form_man :
       Formula_manager.FormulaManagerFunctor(D).formula_manager
     val reg_to_var :(Fragment_machine.register_name, Vine.var) Hashtbl.t
+    val in_f1_range: bool
+    method get_in_f1_range: unit -> bool
+    val in_f2_range: bool
+    method get_in_f2_range: unit -> bool
+    val range1_syscalls: int64 list
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory
   end
