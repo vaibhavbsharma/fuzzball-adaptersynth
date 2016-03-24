@@ -236,6 +236,22 @@ let add_delimited_info opt char s =
    (Int64.of_string (List.nth list_str 3)), 
    (Int64.of_string (List.nth list_str 4))) :: !opt
 
+let add_delimited_info_4 opt char s =
+  let rec loop arg_str =
+    try 
+      let delim_loc = String.index arg_str char in
+      let str1 = String.sub arg_str 0 delim_loc in
+      let str2 = String.sub arg_str (delim_loc + 1) 
+                   ((String.length arg_str) - delim_loc - 1) in
+      [str1] @ (loop str2)
+    with Not_found -> [arg_str]
+  in
+  let list_str = loop s in
+  opt := ((Int64.of_string (List.nth list_str 0)), 
+   (Int64.of_string (List.nth list_str 1)), 
+   (Int64.of_string (List.nth list_str 2)), 
+   (Int64.of_string (List.nth list_str 3))) :: !opt
+
 let add_delimited_pair opt char s =
   let (s1, s2) = split_string char s in
     opt := ((Int64.of_string s1), (Int64.of_string s2)) :: !opt

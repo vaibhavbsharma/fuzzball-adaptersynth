@@ -206,7 +206,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		  | Signal("USR1") -> stop "on SIGUSR1"
 		  (* | NotConcrete(_) -> () (* shouldn't happen *)
 		     | Simplify_failure(_) -> () (* shouldn't happen *)*)
-	       ); 
+	       );
+	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
+		 fm#reset_syscalls ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then
 		   Printf.printf "Coverage increased to %d on %Ld\n"
