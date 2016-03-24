@@ -606,9 +606,10 @@ struct
       (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);*)
     
     method check_f2_syscall syscall_num = 
-      if (List.nth (List.rev f1_syscalls) f2_syscalls_num) = syscall_num then
-	(f2_syscalls_num <- 1 + f2_syscalls_num;
-	 true)
+      f2_syscalls_num <- 1 + f2_syscalls_num;
+      if ((List.length f1_syscalls) > f2_syscalls_num) &&
+	(List.nth (List.rev f1_syscalls) f2_syscalls_num) = syscall_num then
+	true
       else false
 
     method reset_syscalls = 
