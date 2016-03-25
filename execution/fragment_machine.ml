@@ -602,19 +602,22 @@ struct
     method get_in_f2_range () = in_f2_range
     
     method add_f1_syscall syscall_num = 
-      f1_syscalls <- syscall_num::f1_syscalls ;
+      f1_syscalls <- f1_syscalls@[syscall_num] ;
       (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);*)
     
     method check_f2_syscall syscall_num = 
       f2_syscalls_num <- 1 + f2_syscalls_num;
-      if ((List.length f1_syscalls) > f2_syscalls_num) &&
-	(List.nth (List.rev f1_syscalls) f2_syscalls_num) = syscall_num then
+      (*Printf.printf "f2_syscalls_num = %d\n" f2_syscalls_num;*)
+      if ((List.length f1_syscalls) >= f2_syscalls_num) &&
+	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
 	true
       else false
 
     method reset_syscalls = 
       f1_syscalls <- [];
       f2_syscalls_num <- 0;
+      in_f1_range <- false;
+      in_f2_range <- false;
  
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
@@ -1687,6 +1690,8 @@ struct
 	 move_hash t temps);
       fuzz_finish_reasons <- [];
       disqualified <- false;
+      if (List.length !opt_match_syscalls_addr_range) <> 0 then
+	self#reset_syscalls ;
       List.iter (fun h -> h#reset) special_handler_list
 
     method add_special_handler (h:special_handler) =

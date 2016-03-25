@@ -2704,7 +2704,9 @@ object(self)
      );
      if (fm#get_in_f2_range ()) = true then (
        (*Printf.printf "f2:syscall(%d)\n" syscall_num;*)
-       if fm#check_f2_syscall syscall_num = false then raise DisqualifiedPath;
+       if fm#check_f2_syscall syscall_num = false then (
+	 (*Printf.printf "linux_syscalls raising DisqualifiedPath\n";*)
+	 raise DisqualifiedPath;);
      );
        ignore(0, read_7_regs);
        match (!opt_arch, syscall_num) with 
