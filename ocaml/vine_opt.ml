@@ -432,6 +432,10 @@ let rec constant_fold ctx e =
 	    Constant(Int(ty2, s2)))
 	when ty1 = ty2 && s1 >= 0L && s2 >= 0L ->
 	BinOp(ARSHIFT, x, (Constant(Int(ty1, (Int64.add s1 s2)))))
+    | BinOp(BITAND,BinOp(BITOR,e,Constant(Int(_,or_const))),
+	    Constant(Int(and_const_type,and_const))) 
+	when (Int64.logand or_const and_const) = 0L ->
+      BinOp(BITAND,e,Constant(Int(and_const_type,and_const)))
     (* byte & 0xffffff00 = 0 *)
     | BinOp(BITAND,
 	    Cast(CAST_UNSIGNED, REG_32, e),
