@@ -111,6 +111,7 @@ let opt_extra_env = Hashtbl.create 10
 let opt_skip_call_addr = ref []
 let opt_synth_adaptor = ref []
 let opt_synth_simplelen_adaptor = ref []
+let synth_extra_conditions = ref []
 let opt_skip_func_addr = ref []
 let opt_skip_call_addr_symbol = ref []
 let opt_skip_func_addr_symbol = ref []

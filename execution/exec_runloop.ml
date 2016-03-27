@@ -137,13 +137,12 @@ let call_replacements fm last_eip eip =
                      then V.Cast(V.CAST_LOW, V.REG_32,
                                  fm#get_reg_symbolic (List.nth arg_regs 0))
                      else fm#get_reg_symbolic (List.nth arg_regs 0)) in
-              let binops = [V.PLUS; (*V.MINUS;*) V.TIMES; (*V.BITAND; V.BITOR; V.XOR;
-                            V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD; V.LSHIFT; 
+              let binops = [V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR;
+                            (*V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD; V.LSHIFT; 
                             V.RSHIFT; V.ARSHIFT*)] in
-              let unops = [(*V.NEG; V.NOT*)] in
+              let unops = [V.NEG; V.NOT] in
               let special_ops1 = [V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD] in
               let special_ops2 = [V.LSHIFT; V.RSHIFT; V.ARSHIFT] in
-              let num_ops = (List.length binops) + (List.length unops) in
               let get_oper oper l_expr r_expr =
                 let rec get_unop ops n =
                   match ops with 
@@ -198,148 +197,25 @@ let call_replacements fm last_eip eip =
               in
               let rec main_loop n =
                 let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-                (*let var = fm#get_fresh_symbolic var_name 32 in
-                let _ = (* add a couple extra restrictions to the input vals *)
-                        (opt_extra_conditions := 
-                           (V.UnOp(
-                              V.NOT, 
-                              V.BinOp(V.SLT, var, V.Constant(V.Int(V.REG_32, -715827883L))))) ::
-                           (V.BinOp(V.SLE, var, V.Constant(V.Int(V.REG_32, 715827882L)))) ::
-                           !opt_extra_conditions) in*)
-                let tree_depth = 3 in (* hardcoded for now *)
-                (*
-                NOTE: this code is commented out to prevent 'unused X' warnings,
-                      but it will work fine if you uncomment it.*)
-                
-                (* create a restricted range for constant values *)
-                let restrict_range node_type node_val lower upper =
-                  V.BinOp(
-                    V.BITOR,
-                    V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-                    V.BinOp(
-                      V.BITAND, 
-                      V.UnOp(V.NOT, 
-                             V.BinOp(V.SLT, node_val, V.Constant(V.Int(val_type, lower)))),
-                      V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in
-                (* specify all possible values *)
-                (*let specify_vals node_type node_val vals =
-                  let rec list_vals l = 
-                    match l with
-                    | [] -> failwith "Bad value list for arithmetic adaptor"
-                    | v::[] -> V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v)))
-                    | v::t -> V.BinOp(
-                                V.BITOR, 
-                                V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v))),
-                                list_vals t) in 
-                  V.BinOp(
-                    V.BITOR,
-                    V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-                    (* note: for implementation reasons, the vals list must always contain 0 *)
-                    list_vals (0L::vals)) in*)
-                
-                
-                let rec zero_lower d base =
-                  let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-                  let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 
-                                   (if val_type = V.REG_32 then 32 else 64) in
-                  if d = 1 
-                  then 
-                    V.BinOp(
-                      V.BITAND, 
-                      V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-                      V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L))))
-                  else
-                    V.BinOp(
-                      V.BITAND, 
-                      V.BinOp(
-                        V.BITAND, 
-                        V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-                        V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L)))),
-                      V.BinOp(
-                        V.BITAND, 
-                        zero_lower (d-1) (base ^ "0"),
-                        zero_lower (d-1) (base ^ "1"))) in
-                (* type_X - the type of this node
-                            0 -> constant value (= val_X)
-                            1 -> the argument at position val_X
-                            2 -> an integer operation (= val_X)
-                   Here 'X' is a string consisting of 'R' (for 'root') followed
-                   by some number of 0's and 1's corresponding to the path to
-                   the node (0 for left and 1 for right) *)
+                let tree_depth = 2 in (* hardcoded for now *)
                 let rec build_tree d base =
                   if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
                   else 
                     let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
                     let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 
                                      (if val_type = V.REG_32 then 32 else 64) in
-                     if d = 1 
-                     then 
-                        (* add the following conditions:
-                           - type <= 1
-                           - if type = 1, then val < (# of arguments)
-                           - if type = 0, then val must be in the specified range,
-                             or be one of the specified values
-                         note: shouldn't have an operator at a leaf *)
-                       (opt_extra_conditions := 
-                          (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 1L)))) ::
-                          (V.BinOp(
-                             V.BITOR,
-                             V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                             V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                          (restrict_range node_type node_val 0L 10L) ::
-                          (*(specify_vals node_type node_val [1L; 2L; 3L]) ::*)
-                          !opt_extra_conditions;
-                        get_ite_expr node_type V.EQ V.REG_8 0L 
-                          node_val 
-                          (get_ite_arg_expr node_val (Int64.to_int out_nargs)))
-                      else
-                        (* add the following conditions:
-                           - type <= 2
-                           - if type = 1, then val < (# of arguments)
-                           - if type = 2, then val < (# of operators)
-                           - if type = 0, then val must be in the specified range,
-                             or be one of the specified values *)
-                        (opt_extra_conditions := 
-                           (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 2L)))) ::
-                           (V.BinOp(
-                              V.BITOR,
-                              V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                              V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                           (V.BinOp(
-                              V.BITOR,
-                              V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
-                              V.BinOp(V.LT, node_val, 
-                                      V.Constant(V.Int(val_type, Int64.of_int num_ops))))) ::
-                           (restrict_range node_type node_val 0L 10L) ::
-                           (*(specify_vals node_type node_val [1L; 2L; 3L]) :: *)
-                           !opt_extra_conditions;
-                        (* - require all lower branches to be zero when the node
-                             type is 0 or 1 (constant or variable)
-                           - require the right branch to be zero when the node 
-                             type is 2 and the value is >= # bin ops (unary operator) *)
-                        opt_extra_conditions :=
-                        (V.BinOp(
-                              V.BITOR,
-                              V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
-                              V.BinOp(V.BITAND, 
-                                      zero_lower (d-1) (base ^ "0"), 
-                                      zero_lower (d-1) (base ^ "1")))) ::
-                        (V.BinOp(
-                              V.BITOR,
-                              V.BinOp(V.BITOR, 
-                                      V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))), 
-                                      V.BinOp(V.LT, node_val, 
-                                        V.Constant(V.Int(val_type, 
-                                          Int64.of_int (List.length binops))))),
-                             zero_lower (d-1) (base ^ "1"))) ::
-                          !opt_extra_conditions;      
-                        let left_expr = build_tree (d-1) (base ^ "0") in
-                        let right_expr = build_tree (d-1) (base ^ "1") in
-                        get_ite_expr node_type V.EQ V.REG_8 0L 
-                          node_val 
-                          (get_ite_expr node_type V.EQ V.REG_8 1L
-                             (get_ite_arg_expr node_val (Int64.to_int out_nargs)) 
-                             (get_oper node_val left_expr right_expr))) in
+                    if d = 1 
+                    then get_ite_expr node_type V.EQ V.REG_8 0L 
+                           node_val 
+                           (get_ite_arg_expr node_val (Int64.to_int out_nargs))
+                    else
+                      let left_expr = build_tree (d-1) (base ^ "0") in
+                      let right_expr = build_tree (d-1) (base ^ "1") in
+                      get_ite_expr node_type V.EQ V.REG_8 0L 
+                        node_val 
+                        (get_ite_expr node_type V.EQ V.REG_8 1L
+                           (get_ite_arg_expr node_val (Int64.to_int out_nargs)) 
+                           (get_oper node_val left_expr right_expr)) in
                 let expr = build_tree tree_depth "R" in
                 fm#set_reg_symbolic (List.nth arg_regs n) expr;
                 if n > 0 then main_loop (n-1); 

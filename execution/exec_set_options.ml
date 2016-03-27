@@ -766,7 +766,9 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
 	   !opt_target_region_formula_strings;
        opt_extra_conditions := !opt_extra_conditions @ 
 	 List.map (fun s -> fm#parse_symbolic_expr s)
-	   !opt_extra_condition_strings)
+	   !opt_extra_condition_strings;
+	 opt_extra_conditions := !opt_extra_conditions
+       @ !synth_extra_conditions)
 
 let decide_start_addrs () =
   let (start_addr, fuzz_start) = match
