@@ -511,6 +511,12 @@ class virtual fragment_machine = object
   method virtual load_long_concretize  : int64 -> bool -> string -> int64
 
   method virtual make_sink_region : string -> int64 -> unit
+  
+  method virtual get_in_f1_range : unit -> bool
+  method virtual get_in_f2_range : unit -> bool
+  method virtual add_f1_syscall: int -> unit
+  method virtual check_f2_syscall: int -> bool
+  method virtual reset_syscalls: unit
 end
 
 module FragmentMachineFunctor =
@@ -585,6 +591,34 @@ struct
 
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
+    
+    val mutable in_f1_range = false
+    val mutable in_f2_range = false
+    val mutable f1_syscalls:(int list) = []
+    val mutable f2_syscalls_num = 0
+    
+    method get_in_f1_range () = in_f1_range 
+    
+    method get_in_f2_range () = in_f2_range
+    
+    method add_f1_syscall syscall_num = 
+      f1_syscalls <- f1_syscalls@[syscall_num] ;
+      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);*)
+    
+    method check_f2_syscall syscall_num = 
+      f2_syscalls_num <- 1 + f2_syscalls_num;
+      (*Printf.printf "f2_syscalls_num = %d\n" f2_syscalls_num;*)
+      if ((List.length f1_syscalls) >= f2_syscalls_num) &&
+	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
+	true
+      else false
+
+    method reset_syscalls = 
+      f1_syscalls <- [];
+      f2_syscalls_num <- 0;
+      in_f1_range <- false;
+      in_f2_range <- false;
+ 
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
     val mutable frag = ([], [])
@@ -686,6 +720,19 @@ struct
 	 print_string "\n"; *)
       List.iter (fun fn -> (fn (self :> fragment_machine) eip))
 	extra_eip_hooks;
+      List.iter (
+	fun (start1,end1,start2,end2) ->
+	  if eip = start1 then 
+	    (in_f1_range <- true)
+	  else if eip = end1 then 
+	    (in_f1_range <- false;
+	    (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*));
+	  if eip = start2 then 
+	    (in_f2_range <- true)
+	  else if eip = end2 then 
+	    (in_f2_range <- false);
+      ) 
+	!opt_match_syscalls_addr_range;
       self#watchpoint
 
     method get_eip =
@@ -1643,6 +1690,8 @@ struct
 	 move_hash t temps);
       fuzz_finish_reasons <- [];
       disqualified <- false;
+      if (List.length !opt_match_syscalls_addr_range) <> 0 then
+	self#reset_syscalls ;
       List.iter (fun h -> h#reset) special_handler_list
 
     method add_special_handler (h:special_handler) =

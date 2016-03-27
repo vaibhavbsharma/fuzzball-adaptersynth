@@ -279,6 +279,12 @@ class virtual fragment_machine : object
   method virtual load_long_concretize  : int64 -> bool -> string -> int64
 
   method virtual make_sink_region : string -> int64 -> unit
+  
+  method virtual get_in_f1_range: unit -> bool
+  method virtual get_in_f2_range: unit -> bool
+  method virtual add_f1_syscall: int -> unit
+  method virtual check_f2_syscall: int -> bool
+  method virtual reset_syscalls: unit
 end
 
 module FragmentMachineFunctor :
@@ -329,6 +335,16 @@ sig
 
     method store_page_conc  : int64 -> string -> unit
 
+    val mutable in_f1_range: bool
+    val mutable in_f2_range: bool
+    val mutable f1_syscalls: int list
+    val mutable f2_syscalls_num: int 
+    method get_in_f1_range: unit -> bool
+    method get_in_f2_range: unit -> bool
+    method add_f1_syscall: int -> unit
+    method check_f2_syscall: int -> bool
+    method reset_syscalls: unit
+    
     method private load_byte  : int64 -> D.t
     method private load_short : int64 -> D.t
     method private load_word  : int64 -> D.t
@@ -513,7 +529,6 @@ sig
     val reg_to_var : (register_name, Vine.var) Hashtbl.t
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory
-
     method get_path_cond : Vine.exp list
     method set_query_engine : Query_engine.query_engine -> unit
     method query_with_path_cond : Vine.exp -> bool
