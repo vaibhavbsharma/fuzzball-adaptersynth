@@ -118,129 +118,6 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
        let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
-       let rec arith_loop_int n = 
-         let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-         let tree_depth = 2 in (* hardcoded for now *)
-         let val_type = V.REG_32 in (* 32- or 64-bit values *)
-         let var = fm#get_fresh_symbolic var_name 32 in
-         let _ = synth_extra_conditions := 
-                     (V.UnOp(
-                        V.NOT, 
-                        V.BinOp(V.SLT, var, V.Constant(V.Int(V.REG_32, 0L))))) ::
-                     (V.BinOp(V.SLE, var, V.Constant(V.Int(V.REG_32, 255L)))) ::
-                     !synth_extra_conditions in
-         let rec zero_lower d base =
-           let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-           let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
-                            (if val_type = V.REG_32 then 32 else 64) in
-           if d = 1 
-           then 
-             V.BinOp(
-               V.BITAND, 
-               V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-               V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L))))
-           else
-             V.BinOp(
-               V.BITAND, 
-               V.BinOp(
-                 V.BITAND, 
-                 V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))), 
-                 V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, 0L)))),
-               V.BinOp(
-                 V.BITAND, 
-                 zero_lower (d-1) (base ^ "0"),
-                 zero_lower (d-1) (base ^ "1"))) in
-         (*let restrict_range node_type node_val lower upper =
-           V.BinOp(
-             V.BITOR,
-             V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-             V.BinOp(
-               V.BITAND, 
-               V.UnOp(V.NOT, 
-                      V.BinOp(V.SLT, node_val, V.Constant(V.Int(val_type, lower)))),
-               V.BinOp(V.SLE, node_val, V.Constant(V.Int(val_type, upper))))) in*)
-         (*let specify_vals node_type node_val vals =
-           let rec list_vals l = 
-             match l with
-             | [] -> failwith "Bad value list for arithmetic adaptor"
-             | v::[] -> V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v)))
-             | v::t -> V.BinOp(
-                         V.BITOR, 
-                         V.BinOp(V.EQ, node_val, V.Constant(V.Int(val_type, v))),
-                         list_vals t) in 
-           V.BinOp(
-             V.BITOR,
-             V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-             (* note: for implementation reasons, the vals list must always contain 0 *)
-             list_vals (0L::vals)) in*)
-         let rec arith_loop' d base = 
-           if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
-           else 
-             let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-             let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
-                              (if val_type = V.REG_32 then 32 else 64) in
-               if d = 1
-               then 
-                 (* add the following conditions:
-                     - type <= 1
-                     - if type = 1, then val < (# of arguments)
-                     - if type = 0, then val must be in the specified range,
-                       or be one of the specified values
-                     note: shouldn't have an operator at a leaf *)
-                 synth_extra_conditions := 
-                   (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 1L)))) ::
-                   (V.BinOp(
-                      V.BITOR,
-                      V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                      V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                   (*(restrict_range node_type node_val 0L 5L) ::*)
-                   (*(specify_vals node_type node_val [1L; 2L; 3L]) ::*)
-                   !synth_extra_conditions
-               else
-                 (* add the following conditions:
-                     - type <= 2
-                     - if type = 1, then val < (# of arguments)
-                     - if type = 2, then val < (# of operators)
-                     - if type = 0, then val must be in the specified range,
-                       or be one of the specified values
-                     - ALSO, require all lower branches to be zero when the node
-                       type is 0 or 1 (constant or variable) and require the right 
-                       branch to be zero when the node type is 2 and the value 
-                       corresponds to a unary operator *)
-                 (synth_extra_conditions := 
-                   (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 2L)))) ::
-                   (V.BinOp(
-                      V.BITOR,
-                      V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-                      V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
-                   (V.BinOp(
-                      V.BITOR,
-                      V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
-                      V.BinOp(V.LT, node_val, 
-                              V.Constant(V.Int(val_type, 8L(*Int64.of_int num_ops*)))))) ::
-                   (*(restrict_range node_type node_val 0L 5L) ::*)
-                   (*(specify_vals node_type node_val [1L; 2L; 3L]) :: *)
-                   (V.BinOp(
-                      V.BITOR,
-                      V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 2L))),
-                      V.BinOp(V.BITAND, 
-                                zero_lower (d-1) (base ^ "0"), 
-                                zero_lower (d-1) (base ^ "1")))) ::
-                   (V.BinOp(
-                      V.BITOR,
-                      V.BinOp(
-                        V.BITOR, 
-                        V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 2L))), 
-                        V.BinOp(V.LT, node_val, 
-                                V.Constant(V.Int(val_type, 6L
-                                  (*Int64.of_int (List.length binops)*))))),
-                      zero_lower (d-1) (base ^ "1"))) ::
-                   !synth_extra_conditions;
-                   arith_loop' (d-1) (base ^ "0");
-                   arith_loop' (d-1) (base ^ "1"))
-            in
-         arith_loop' tree_depth "R";
-         if n > 0 then arith_loop_int (n-1); in
        let rec arith_loop_float n = 
          let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
          let tree_depth = 2 in (* hardcoded for now *)
@@ -260,7 +137,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        if mode = "simple" 
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
        else if mode = "arithmetic_int" 
-            then arith_loop_int ((Int64.to_int in_nargs)-1)
+            then Adaptor_synthesis.arithmetic_int_extra_conditions
+                   fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "arithmetic_float"
             then arith_loop_float ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
