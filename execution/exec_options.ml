@@ -192,6 +192,7 @@ let opt_skip_untainted = ref false
 let opt_arch = ref X86
 let opt_trace_stmts = ref false
 let opt_trace_eval = ref false
+let opt_track_sym_usage = ref false
 
 let asmir_arch () =
   asmir_arch_of_execution_arch !opt_arch

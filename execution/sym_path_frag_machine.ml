@@ -636,6 +636,8 @@ struct
 		if !opt_trace_conditions then 
 		  Printf.printf "Symbolic branch condition (0x%08Lx) %s\n"
 		    (self#get_eip) (V.exp_to_string e);
+		if !opt_track_sym_usage then
+		  form_man#check_sym_usage e "branch condition";
 		if !opt_concrete_path then
 		  self#eval_bool_exp_conc_path e ident
 		else 
@@ -707,6 +709,8 @@ struct
 	    if !opt_trace_conditions then 
 	      Printf.printf "Symbolic branch condition (0x%08Lx) %s\n"
 		(self#get_eip) (V.exp_to_string e);
+	    if !opt_track_sym_usage then
+	      form_man#check_sym_usage e "branch condition";
 	    if !opt_concrete_path then
 	      let (b, _) = self#eval_bool_exp_conc_path e ident in
 		b

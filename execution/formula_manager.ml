@@ -726,6 +726,70 @@ when special_ec_vars\n"; *)
 			      (V.Lval(V.Temp(self#make_temp_var e2 ty)))))
 	) v
 
+    val usage_tracked_syms = V.VarHash.create 31
+
+    method fresh_symbolic_tracked_32 s =
+      let v = self#fresh_symbolic_var s V.REG_32 in
+	V.VarHash.replace usage_tracked_syms v v;
+	D.from_symbolic (V.Lval(V.Temp(v)))
+
+    method fresh_symbolic_tracked_64 s =
+      let v = self#fresh_symbolic_var s V.REG_64 in
+	V.VarHash.replace usage_tracked_syms v v;
+	D.from_symbolic (V.Lval(V.Temp(v)))
+
+    val cached_sym_usage = V.VarHash.create 1001
+
+    method private find_sym_usage e =
+      let union = Vine_util.list_union in
+      let rec loop e =
+	match e with
+	  | V.Lval(V.Temp(var)) ->
+	      (try
+		 V.VarHash.find cached_sym_usage var
+	       with Not_found ->
+		 let usage =
+		   try
+		     [V.VarHash.find usage_tracked_syms var]
+		   with Not_found ->
+		     if_expr_temp self var
+		       (fun e -> loop e) [] (fun _ -> ())
+		 in
+		   V.VarHash.replace cached_sym_usage var usage;
+		   usage)
+	  | V.BinOp(_, e1, e2) -> union (loop e1) (loop e2)
+	  | V.FBinOp(_, _, e1, e2) -> union (loop e1) (loop e2)
+	  | V.UnOp(_, e1) -> loop e1
+	  | V.FUnOp(_, _, e1) -> loop e1
+	  | V.Constant(_) -> []
+	  | V.Lval(V.Mem(_, e1, _)) -> loop e1
+	  | V.Name(_) -> []
+	  | V.Cast(_, _, e1) -> loop e1
+	  | V.FCast(_, _, _, e1) -> loop e1
+	  | V.Unknown(_) -> []
+	  | V.Let(_, e1, e2) -> union (loop e1) (loop e2)
+	  | V.Ite(e1, e2, e3) -> union (loop e1) (union (loop e2) (loop e3))
+      in
+	loop e
+
+    method check_sym_usage e str =
+      let usage = self#find_sym_usage e in
+	if usage <> [] then
+	  Printf.printf "Use of %s in %s\n"
+	    (String.concat ", " (List.map (fun v -> V.var_to_string v) usage))
+	    str;
+
+    method check_sym_usage_d v ty str =
+      let e = match ty with
+	| V.REG_1  -> D.to_symbolic_1  v
+	| V.REG_8  -> D.to_symbolic_8  v
+	| V.REG_16 -> D.to_symbolic_16 v
+	| V.REG_32 -> D.to_symbolic_32 v
+	| V.REG_64 -> D.to_symbolic_64 v
+	| _ -> failwith "Unexpected type in check_sym_usage_d"
+      in
+	self#check_sym_usage e str
+
     method make_ite cond_v ty v_true v_false =
       let cond_v'  = self#tempify  cond_v  V.REG_1 and
 	  v_true'  = self#simplify v_true  ty      and
