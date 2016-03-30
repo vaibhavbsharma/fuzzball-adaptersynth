@@ -833,7 +833,11 @@ struct
 	   if eip = eip' then
 	     let str = self#eval_expr_to_string expr in
 	       Printf.printf "At %08Lx, %s is %s\n"
-		 eip e_str str)
+		 eip e_str str;
+	       if !opt_track_sym_usage then
+		 let e = self#eval_expr_to_symbolic_expr expr in
+		   form_man#check_sym_usage e "tracepoint"
+		     false self#query_relevance)
 	!opt_tracepoints;
       List.iter
 	(fun (eip', e_str, expr) ->
