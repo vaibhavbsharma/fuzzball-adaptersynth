@@ -602,7 +602,8 @@ struct
 	  Printf.printf "%s concrete value 0x%Lx for %s\n"
 	    verb bits (V.exp_to_string e);
 	if !opt_track_sym_usage then
-	  form_man#check_sym_usage e "concretized value" false;
+	  form_man#check_sym_usage e "concretized value"
+	    false self#query_relevance;
 	self#add_to_path_cond (V.BinOp(V.EQ, e, (const bits)));
 	bits
 
@@ -794,7 +795,8 @@ struct
 	      Printf.printf "Symbolic address %s @ (0x%Lx)\n"
 		(V.exp_to_string e) eip;
 	    if !opt_track_sym_usage then
-	      form_man#check_sym_usage e "symbolic address" false;
+	      form_man#check_sym_usage e "symbolic address"
+		false self#query_relevance;
 	    if !opt_concrete_path then
 	      self#eval_addr_exp_region_conc_path e ident
 	    else
@@ -1292,7 +1294,10 @@ struct
 	      Printf.printf " (%Ld @ %08Lx)" (D.get_tag v) location_id);
 	   Printf.printf "\n"));
 	if !opt_track_sym_usage then
-	  form_man#check_sym_usage_d v ty "loaded value" false;
+	  (let stack_off = Int64.sub addr self#get_esp in
+	   let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
+	     form_man#check_sym_usage_d v ty "loaded value"
+	       is_stack self#query_relevance);
 	if r = Some 0 && (Int64.abs (fix_s32 addr)) < 4096L then
 	  raise NullDereference;
 	(v, ty)
@@ -1586,7 +1591,8 @@ struct
 	if !opt_track_sym_usage then
 	  let stack_off = Int64.sub addr self#get_esp in
 	  let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
-	    form_man#check_sym_usage_d value ty "stored value" is_stack;
+	    form_man#check_sym_usage_d value ty "stored value"
+	      is_stack self#query_relevance;
 	(match (self#started_symbolic, !opt_target_region_start, r) with
 	   | (true, Some from, Some 0) ->
 	       (match self#target_store_condition addr from value ty with

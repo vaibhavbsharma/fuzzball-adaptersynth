@@ -78,6 +78,7 @@ sig
       -> (bool * Query_engine.sat_assign)
     method query_condition : Vine.exp -> int -> bool
     method query_unique_value : Vine.exp -> Vine.typ -> int64 option
+    method query_relevance : Vine.var -> Vine.exp -> bool
     method follow_or_random : bool 
     method query_with_pc_choice : Vine.exp -> bool -> int -> (unit -> bool)
       -> (bool * Vine.exp)
