@@ -772,14 +772,20 @@ when special_ec_vars\n"; *)
       in
 	loop e
 
-    method check_sym_usage e str =
-      let usage = self#find_sym_usage e in
-	if usage <> [] then
-	  Printf.printf "Use of %s in %s\n"
-	    (String.concat ", " (List.map (fun v -> V.var_to_string v) usage))
-	    str;
+    method check_sym_usage e str skip_if_simple =
+      match (skip_if_simple, e) with
+	| (true, V.Lval(V.Temp(var)))
+	    when V.VarHash.mem usage_tracked_syms var ->
+	    Printf.printf "Ignoring simple occurrence in %s\n" str
+	| _ ->
+	    let usage = self#find_sym_usage e in
+	      if usage <> [] then
+		let uses_str = (String.concat ", "
+				  (List.map V.var_to_string usage))
+		in
+		  Printf.printf "Occurrence of %s in %s\n" uses_str str
 
-    method check_sym_usage_d v ty str =
+    method check_sym_usage_d v ty str skip_if_simple =
       let e = match ty with
 	| V.REG_1  -> D.to_symbolic_1  v
 	| V.REG_8  -> D.to_symbolic_8  v
@@ -788,7 +794,7 @@ when special_ec_vars\n"; *)
 	| V.REG_64 -> D.to_symbolic_64 v
 	| _ -> failwith "Unexpected type in check_sym_usage_d"
       in
-	self#check_sym_usage e str
+	self#check_sym_usage e str skip_if_simple
 
     method make_ite cond_v ty v_true v_false =
       let cond_v'  = self#tempify  cond_v  V.REG_1 and

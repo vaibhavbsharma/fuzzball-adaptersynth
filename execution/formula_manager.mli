@@ -73,8 +73,8 @@ sig
     method fresh_symbolic_tracked_32 : string -> D.t
     method fresh_symbolic_tracked_64 : string -> D.t
 
-    method check_sym_usage : Vine.exp -> string -> unit
-    method check_sym_usage_d : D.t -> Vine.typ -> string -> unit
+    method check_sym_usage : Vine.exp -> string -> bool -> unit
+    method check_sym_usage_d : D.t -> Vine.typ -> string -> bool -> unit
 
     method make_ite : D.t -> Vine.typ -> D.t -> D.t -> D.t
 
