@@ -118,18 +118,6 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
        let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
-       let rec arith_loop_float n = 
-         let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-         let tree_depth = 2 in (* hardcoded for now *)
-         let rec arith_loop' d base = 
-           if d > 0
-           then (ignore(fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8);
-                 ignore(fm#get_fresh_symbolic (var_name ^ "_val_" ^ base) 32);
-                 arith_loop' (d-1) (base ^ "0");
-                 arith_loop' (d-1) (base ^ "1"))
-           else () in
-         arith_loop' tree_depth "R";
-         if n > 0 then arith_loop_float (n-1); in
        let rec chartrans_loop n = 
 	 let var_name = "tableX" ^ (Printf.sprintf "%02x" n) in
 	 ignore(fm#get_fresh_symbolic var_name 8);
@@ -140,7 +128,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
             then Adaptor_synthesis.arithmetic_int_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "arithmetic_float"
-            then arith_loop_float ((Int64.to_int in_nargs)-1)
+            then (*arith_loop_float ((Int64.to_int in_nargs)-1)*)
+                 Adaptor_synthesis.arithmetic_float_extra_conditions
+                   fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
