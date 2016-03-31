@@ -408,6 +408,17 @@ struct
 		 Printf.printf "Unique!\n%!";
 	       Some v)
 
+    method query_relevance v exp =
+      let exp' = form_man#prime_var_in_exp v exp in
+      let neq_e = V.BinOp(V.NEQ, exp, exp') in
+      let (is_sat, ce) = self#query_with_path_cond neq_e true in
+	if is_sat then
+	  Printf.printf "Relevance of %s confirmed by query\n"
+	    (V.var_to_string v)
+	else
+	  Printf.printf "Irrelevant according to query\n";
+	is_sat
+
     method private check_concolic_value exp ty =
       let conc_val = form_man#eval_expr exp in
       let conc_e = V.Constant(V.Int(ty, conc_val)) in
@@ -636,6 +647,9 @@ struct
 		if !opt_trace_conditions then 
 		  Printf.printf "Symbolic branch condition (0x%08Lx) %s\n"
 		    (self#get_eip) (V.exp_to_string e);
+		if !opt_track_sym_usage then
+		  form_man#check_sym_usage e "branch condition"
+		    false self#query_relevance;
 		if !opt_concrete_path then
 		  self#eval_bool_exp_conc_path e ident
 		else 
@@ -707,6 +721,9 @@ struct
 	    if !opt_trace_conditions then 
 	      Printf.printf "Symbolic branch condition (0x%08Lx) %s\n"
 		(self#get_eip) (V.exp_to_string e);
+	    if !opt_track_sym_usage then
+	      form_man#check_sym_usage e "branch condition"
+		false self#query_relevance;
 	    if !opt_concrete_path then
 	      let (b, _) = self#eval_bool_exp_conc_path e ident in
 		b
@@ -816,7 +833,11 @@ struct
 	   if eip = eip' then
 	     let str = self#eval_expr_to_string expr in
 	       Printf.printf "At %08Lx, %s is %s\n"
-		 eip e_str str)
+		 eip e_str str;
+	       if !opt_track_sym_usage then
+		 let e = self#eval_expr_to_symbolic_expr expr in
+		   form_man#check_sym_usage e "tracepoint"
+		     false self#query_relevance)
 	!opt_tracepoints;
       List.iter
 	(fun (eip', e_str, expr) ->

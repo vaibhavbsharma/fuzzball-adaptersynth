@@ -70,6 +70,16 @@ sig
     method simplify_with_callback :
       (Vine.exp -> Vine.typ -> Vine.exp option) -> D.t -> Vine.typ -> D.t
 
+    method fresh_symbolic_tracked_32 : string -> D.t
+    method fresh_symbolic_tracked_64 : string -> D.t
+
+    method check_sym_usage : Vine.exp -> string -> bool ->
+      (Vine.var -> Vine.exp -> bool) -> unit
+    method check_sym_usage_d : D.t -> Vine.typ -> string -> bool ->
+      (Vine.var -> Vine.exp -> bool) -> unit
+
+    method prime_var_in_exp : Vine.var -> Vine.exp -> Vine.exp
+
     method make_ite : D.t -> Vine.typ -> D.t -> D.t -> D.t
 
     method make_table_lookup : (D.t list) -> Vine.exp -> int -> Vine.typ -> D.t

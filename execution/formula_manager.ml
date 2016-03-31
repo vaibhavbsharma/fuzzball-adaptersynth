@@ -687,14 +687,14 @@ when special_ec_vars\n"; *)
 	       V.Lval(V.Temp(self#make_temp_var e' ty))
 	) v
 
+    method private tempify_e e ty =
+      (*Printf.printf "formula_manager.ml#tempify e=%s\n"
+	(V.exp_to_string e);*)
+      let e' = simplify_fp e in
+	V.Lval(V.Temp(self#make_temp_var e' ty))
+
     method private tempify (v:D.t) ty =
-      D.inside_symbolic
-	(fun e ->
-	  (*Printf.printf "formula_manager.ml#tempify e=%s\n"
-	    (V.exp_to_string e);*)
-	  let e' = simplify_fp e in
-	  V.Lval(V.Temp(self#make_temp_var e' ty))
-	) v
+      D.inside_symbolic (fun e -> self#tempify_e e ty) v
 
     method simplify1  e = self#simplify e V.REG_1
     method simplify8  e = self#simplify e V.REG_8
@@ -725,6 +725,121 @@ when special_ec_vars\n"; *)
 			   else
 			      (V.Lval(V.Temp(self#make_temp_var e2 ty)))))
 	) v
+
+    val usage_tracked_syms = V.VarHash.create 31
+
+    method fresh_symbolic_tracked_32 s =
+      let v = self#fresh_symbolic_var s V.REG_32 in
+	V.VarHash.replace usage_tracked_syms v v;
+	D.from_symbolic (V.Lval(V.Temp(v)))
+
+    method fresh_symbolic_tracked_64 s =
+      let v = self#fresh_symbolic_var s V.REG_64 in
+	V.VarHash.replace usage_tracked_syms v v;
+	D.from_symbolic (V.Lval(V.Temp(v)))
+
+    val cached_sym_usage = V.VarHash.create 1001
+
+    method private find_sym_usage e =
+      let union = Vine_util.list_union in
+      let rec loop e =
+	match e with
+	  | V.Lval(V.Temp(var)) ->
+	      (try
+		 V.VarHash.find cached_sym_usage var
+	       with Not_found ->
+		 let usage =
+		   try
+		     [V.VarHash.find usage_tracked_syms var]
+		   with Not_found ->
+		     if_expr_temp self var
+		       (fun e -> loop e) [] (fun _ -> ())
+		 in
+		   V.VarHash.replace cached_sym_usage var usage;
+		   usage)
+	  | V.BinOp(_, e1, e2) -> union (loop e1) (loop e2)
+	  | V.FBinOp(_, _, e1, e2) -> union (loop e1) (loop e2)
+	  | V.UnOp(_, e1) -> loop e1
+	  | V.FUnOp(_, _, e1) -> loop e1
+	  | V.Constant(_) -> []
+	  | V.Lval(V.Mem(_, e1, _)) -> loop e1
+	  | V.Name(_) -> []
+	  | V.Cast(_, _, e1) -> loop e1
+	  | V.FCast(_, _, _, e1) -> loop e1
+	  | V.Unknown(_) -> []
+	  | V.Let(_, e1, e2) -> union (loop e1) (loop e2)
+	  | V.Ite(e1, e2, e3) -> union (loop e1) (union (loop e2) (loop e3))
+      in
+	loop e
+
+    val usage_seen = V.VarHash.create 31
+
+    method check_sym_usage e str skip_if_simple query_cb =
+      match (skip_if_simple, e) with
+	| (true, V.Lval(V.Temp(var)))
+	    when V.VarHash.mem usage_tracked_syms var ->
+	    Printf.printf "Ignoring simple occurrence in %s\n" str
+	| _ ->
+	    let usage = self#find_sym_usage e in
+	      if usage <> [] then
+		let uses_str = (String.concat ", "
+				  (List.map V.var_to_string usage))
+		in
+		  Printf.printf "Occurrence of %s in %s\n" uses_str str;
+		  List.iter
+		    (fun v ->
+		       if not (V.VarHash.mem usage_seen v) then
+			 if query_cb v e then
+			   (Printf.printf "First use of %s\n"
+			      (V.var_to_string v);
+			    V.VarHash.replace usage_seen v true)
+		    ) usage
+
+    method check_sym_usage_d v ty str skip_if_simple query_cb =
+      let e = match ty with
+	| V.REG_1  -> D.to_symbolic_1  v
+	| V.REG_8  -> D.to_symbolic_8  v
+	| V.REG_16 -> D.to_symbolic_16 v
+	| V.REG_32 -> D.to_symbolic_32 v
+	| V.REG_64 -> D.to_symbolic_64 v
+	| _ -> failwith "Unexpected type in check_sym_usage_d"
+      in
+	self#check_sym_usage e str skip_if_simple query_cb
+
+    val primed_syms = V.VarHash.create 31
+
+    method private prime_var v =
+      try
+	V.VarHash.find primed_syms v
+      with Not_found ->
+	let (n, s, ty) = v in
+	let v' = V.newvar (s ^ "_prime") ty in
+	  V.VarHash.replace primed_syms v v';
+	  v'
+
+    method prime_var_in_exp v e =
+      let v' = self#prime_var v in
+      let rec loop e =
+	match e with
+	  | V.Lval(V.Temp(var)) when var = v ->
+	      V.Lval(V.Temp(v'))
+	  | V.Lval(V.Temp((_, _, vty) as var)) ->
+	      if_expr_temp self var
+		(fun e -> self#tempify_e (loop e) vty) e (fun _ -> ())
+	  | V.BinOp(op, e1, e2) -> V.BinOp(op, (loop e1), (loop e2))
+	  | V.FBinOp(op, rm, e1, e2) -> V.FBinOp(op, rm, (loop e1), (loop e2))
+	  | V.UnOp(op, e1) -> V.UnOp(op, (loop e1))
+	  | V.FUnOp(op, rm, e1) -> V.FUnOp(op, rm, (loop e1))
+	  | V.Constant(_) -> e
+	  | V.Lval(V.Mem(v, e1, t)) -> V.Lval(V.Mem(v, (loop e1), t))
+	  | V.Name(_) -> e
+	  | V.Cast(ct, ty, e1) -> V.Cast(ct, ty, (loop e1))
+	  | V.FCast(ct, ty, rm, e1) -> V.FCast(ct, ty, rm, (loop e1))
+	  | V.Unknown(_) -> e
+	  | V.Let(v, e1, e2) -> V.Let(v, (loop e1), (loop e2))
+	  | V.Ite(e1, e2, e3) -> V.Ite((loop e1), (loop e2), (loop e3))
+      in
+	loop e
 
     method make_ite cond_v ty v_true v_false =
       let cond_v'  = self#tempify  cond_v  V.REG_1 and

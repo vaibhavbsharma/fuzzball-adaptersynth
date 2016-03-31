@@ -319,6 +319,8 @@ let explore_cmdline_opts =
      " Print operation of PRNG 'random' choices");
     ("-trace-sym-addr-details", Arg.Set(opt_trace_sym_addr_details),
      " Print even more about symbolic address values");
+    ("-track-sym-usage", Arg.Set(opt_track_sym_usage),
+     " Print uses of symbolic registers");
     ("-coverage-stats", Arg.Set(opt_coverage_stats),
      " Print pseudo-BB coverage statistics");
     ("-offset-strategy", Arg.String

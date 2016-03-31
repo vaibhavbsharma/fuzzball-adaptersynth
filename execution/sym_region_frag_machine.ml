@@ -601,6 +601,9 @@ struct
 	if !opt_trace_sym_addrs then
 	  Printf.printf "%s concrete value 0x%Lx for %s\n"
 	    verb bits (V.exp_to_string e);
+	if !opt_track_sym_usage then
+	  form_man#check_sym_usage e "concretized value"
+	    false self#query_relevance;
 	self#add_to_path_cond (V.BinOp(V.EQ, e, (const bits)));
 	bits
 
@@ -791,6 +794,9 @@ struct
 	    if !opt_trace_sym_addrs then
 	      Printf.printf "Symbolic address %s @ (0x%Lx)\n"
 		(V.exp_to_string e) eip;
+	    if !opt_track_sym_usage then
+	      form_man#check_sym_usage e "symbolic address"
+		false self#query_relevance;
 	    if !opt_concrete_path then
 	      self#eval_addr_exp_region_conc_path e ident
 	    else
@@ -1260,7 +1266,22 @@ struct
 	  match self#decide_wd "Load" off_exp cloc with
 	    | None -> None
 	    | Some wd -> self#table_load cloc off_exp wd ty
-	    
+
+    method private get_esp_conc_base =
+      let (reg, ty) = match !opt_arch with
+	| X86 -> (R_ESP, V.REG_32)
+	| X64 -> (R_RSP, V.REG_64)
+	| ARM -> (R13, V.REG_32)
+      in
+      let e = match ty with
+	| V.REG_32 -> D.to_symbolic_32 (self#get_word_var_d reg)
+	| V.REG_64 -> D.to_symbolic_64 (self#get_long_var_d reg)
+	| _ -> failwith "Unexpected SP type in get_esp_conc_base"
+      in
+      let (cbases, _, _, _, _) = classify_terms e form_man in
+      let cbase = List.fold_left Int64.add 0L cbases in
+	cbase
+
     method private handle_load addr_e ty =
       if !opt_trace_offset_limit then
 	Printf.printf "Loading from... %s\n" (V.exp_to_string addr_e);
@@ -1287,6 +1308,11 @@ struct
 	   (if !opt_use_tags then
 	      Printf.printf " (%Ld @ %08Lx)" (D.get_tag v) location_id);
 	   Printf.printf "\n"));
+	if !opt_track_sym_usage then
+	  (let stack_off = Int64.sub addr self#get_esp_conc_base in
+	   let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
+	     form_man#check_sym_usage_d v ty "loaded value"
+	       is_stack self#query_relevance);
 	if r = Some 0 && (Int64.abs (fix_s32 addr)) < 4096L then
 	  raise NullDereference;
 	(v, ty)
@@ -1577,6 +1603,11 @@ struct
 	     (if !opt_use_tags then
 		Printf.printf " (%Ld @ %08Lx)" (D.get_tag value) location_id);
 	     Printf.printf "\n");
+	if !opt_track_sym_usage then
+	  let stack_off = Int64.sub addr self#get_esp_conc_base in
+	  let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
+	    form_man#check_sym_usage_d value ty "stored value"
+	      is_stack self#query_relevance;
 	(match (self#started_symbolic, !opt_target_region_start, r) with
 	   | (true, Some from, Some 0) ->
 	       (match self#target_store_condition addr from value ty with
