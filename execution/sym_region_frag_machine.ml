@@ -1604,10 +1604,10 @@ struct
 		Printf.printf " (%Ld @ %08Lx)" (D.get_tag value) location_id);
 	     Printf.printf "\n");
 	if !opt_track_sym_usage then
-	  let stack_off = Int64.sub addr self#get_esp_conc_base in
-	  let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
-	    form_man#check_sym_usage_d value ty "stored value"
-	      is_stack self#query_relevance;
+	  (let stack_off = Int64.sub addr self#get_esp_conc_base in
+	   let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
+	     form_man#check_sym_usage_d value ty "stored value"
+	       is_stack self#query_relevance);
 	(match (self#started_symbolic, !opt_target_region_start, r) with
 	   | (true, Some from, Some 0) ->
 	       (match self#target_store_condition addr from value ty with
