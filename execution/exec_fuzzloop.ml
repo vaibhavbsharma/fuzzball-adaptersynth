@@ -185,6 +185,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		     | Simplify_failure(_) -> () (* shouldn't happen *)*)
 	       );
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
+		 if (fm#match_syscalls ()) <> true then
+		   (* too late to raise DisqualifiedPath *)
+		   let stop_eip = fm#get_eip in
+		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;
+	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then

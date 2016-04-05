@@ -258,6 +258,7 @@ sig
     val mutable f2_syscalls_num: int 
     method add_f1_syscall: int -> unit
     method check_f2_syscall: int -> bool
+    method match_syscalls: unit -> bool
     method reset_syscalls: unit
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory

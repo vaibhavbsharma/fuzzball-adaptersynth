@@ -284,6 +284,7 @@ class virtual fragment_machine : object
   method virtual get_in_f2_range: unit -> bool
   method virtual add_f1_syscall: int -> unit
   method virtual check_f2_syscall: int -> bool
+  method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
 end
 
@@ -343,6 +344,7 @@ sig
     method get_in_f2_range: unit -> bool
     method add_f1_syscall: int -> unit
     method check_f2_syscall: int -> bool
+    method match_syscalls: unit -> bool
     method reset_syscalls: unit
     
     method private load_byte  : int64 -> D.t

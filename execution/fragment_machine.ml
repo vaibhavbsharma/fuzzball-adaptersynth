@@ -516,6 +516,7 @@ class virtual fragment_machine = object
   method virtual get_in_f2_range : unit -> bool
   method virtual add_f1_syscall: int -> unit
   method virtual check_f2_syscall: int -> bool
+  method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
 end
 
@@ -612,6 +613,11 @@ struct
 	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
 	true
       else false
+
+    method match_syscalls () =
+      if ((List.length f1_syscalls) <> f2_syscalls_num) then
+	false
+      else true
 
     method reset_syscalls = 
       f1_syscalls <- [];
