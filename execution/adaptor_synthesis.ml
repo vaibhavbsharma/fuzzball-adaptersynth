@@ -13,12 +13,12 @@ let get_ite_expr arg op const_type const then_val else_val =
         then_val,
         else_val)
 
-let rec get_ite_arg_expr fm arg regs n =
+let rec get_ite_arg_expr fm arg regs n ty =
   if n = 1L
   then fm#get_reg_symbolic (List.nth regs 0) 
-  else get_ite_expr arg V.EQ V.REG_32 (Int64.sub n 1L) 
+  else get_ite_expr arg V.EQ ty (Int64.sub n 1L) 
          (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
-         (get_ite_arg_expr fm arg regs (Int64.sub n 1L))
+         (get_ite_arg_expr fm arg regs (Int64.sub n 1L) ty)
 
 (* build an arithmetic expression tree; this function is a little messy because 
    it takes so many arguments, but it's useful to reuse code between the integer 
@@ -33,7 +33,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth =
       if d = 1 
       then get_ite_expr node_type V.EQ V.REG_8 0L 
              node_val 
-             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs in
+             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs V.REG_32 in
               if val_type = V.REG_32 
               then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
               else reg_expr)
@@ -43,7 +43,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth =
         get_ite_expr node_type V.EQ V.REG_8 0L 
           node_val 
           (get_ite_expr node_type V.EQ V.REG_8 1L
-             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs in
+             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs V.REG_32 in
               if val_type = V.REG_32 
               then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
               else reg_expr) 
@@ -165,7 +165,7 @@ let int_unops = [V.NEG; V.NOT]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' *)
-let int_restrict_constant_range = None
+let int_restrict_constant_range = Some (-10L, 10L)
 let int_restrict_constant_list = None
 (* restrict the counterexamples generated; int_restrict_counterexample_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_counterexample_list 
@@ -435,3 +435,31 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
   
 
 
+(* Simple adaptor code starts here *)
+
+let simple_adaptor fm out_nargs in_nargs =
+  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let rec main_loop n =
+    let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+    let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let arg =  
+      (if out_nargs = 0L then var_val 
+       else ( 
+	 let var_is_const = 
+           fm#get_fresh_symbolic (var_name^"_is_const") 1 in
+	 opt_extra_conditions :=  
+	   V.BinOp(
+             V.BITOR,
+             V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
+             V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	 :: !opt_extra_conditions;
+	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
+	   var_val (get_ite_arg_expr fm var_val arg_regs out_nargs V.REG_64))) in
+    (*Printf.printf "setting arg=%s\n" (V.exp_to_string arg);*)
+    fm#set_reg_symbolic (List.nth arg_regs n) arg;
+    if n > 0 then main_loop (n-1); 
+  in
+  if in_nargs > 0L then 
+    main_loop ((Int64.to_int in_nargs)-1)
+
+(* Simple adaptor code ends here *)
