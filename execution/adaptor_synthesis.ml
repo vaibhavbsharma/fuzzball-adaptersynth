@@ -169,7 +169,7 @@ let int_unops = [(*V.NEG; V.NOT*)]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' *)
-let int_restrict_constant_range = Some (0L, 127L)
+let int_restrict_constant_range = Some (-10L, 10L)
 let int_restrict_constant_list = None
 (* restrict the counterexamples generated; int_restrict_counterexample_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_counterexample_list 
@@ -437,5 +437,31 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
     restrict_const_node float_binops float_unops float_arith_depth;
   if n > 0 then arithmetic_float_extra_conditions fm out_nargs (n-1) else ()  
   
+(*** simple adaptor ***)
 
+let simple_adaptor fm out_nargs in_nargs =
+  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let rec main_loop n =
+    let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+    let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let arg =  
+      (if out_nargs = 0L then var_val 
+       else ( 
+	 let var_is_const = 
+           fm#get_fresh_symbolic (var_name^"_is_const") 1 in
+	 opt_extra_conditions :=  
+	   V.BinOp(
+             V.BITOR,
+             V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
+             V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	 :: !opt_extra_conditions;
+	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
+	   var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs))) in
+    (*Printf.printf "setting arg=%s\n" (V.exp_to_string arg);*)
+    fm#set_reg_symbolic (List.nth arg_regs n) arg;
+    if n > 0 then main_loop (n-1); 
+  in
+  if in_nargs > 0L then 
+    main_loop ((Int64.to_int in_nargs)-1)
 
+(* Simple adaptor code ends here *)

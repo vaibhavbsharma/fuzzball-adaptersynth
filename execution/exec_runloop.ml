@@ -74,45 +74,7 @@ let call_replacements fm last_eip eip =
           (*** simple adaptor ***)
           if adaptor_mode = "simple" 
           then Some (fun () -> 
-		(* Assuming we are running on X86_64 *)
-            let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
-            let get_ite_expr if_arg if_op if_const_type if_const 
-                then_val else_val = 
-              V.Ite(
-                V.BinOp(if_op,if_arg,V.Constant(V.Int(if_const_type, if_const))),
-                then_val,
-                else_val)
-            in
-            let rec get_ite_arg_expr arg_val n_arg =
-              if n_arg <> 1L then
-                get_ite_expr arg_val V.EQ V.REG_64 (Int64.sub n_arg 1L) 
-                  (fm#get_reg_symbolic 
-                     (List.nth arg_regs ((Int64.to_int n_arg)-1)))
-                  (get_ite_arg_expr arg_val (Int64.sub n_arg 1L))
-              else
-                (fm#get_reg_symbolic (List.nth arg_regs 0))
-            in
-            let rec loop n =
-              let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-              let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
-              let arg =  
-		(if out_nargs = 0L then var_val 
-		 else ( 
-		   let var_is_const = 
-                     fm#get_fresh_symbolic (var_name^"_is_const") 1 in
-		   opt_extra_conditions :=  
-		    V.BinOp(
-                      V.BITOR,
-                      V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
-                      V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-		   :: !opt_extra_conditions;
-		   get_ite_expr var_is_const V.NEQ V.REG_1 0L  
-		     var_val (get_ite_arg_expr var_val out_nargs))) in
-              fm#set_reg_symbolic (List.nth arg_regs n) arg;
-              if n > 0 then loop (n-1); 
-            in
-            if in_nargs > 0L then 
-	      loop ((Int64.to_int in_nargs)-1);
+	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
             (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 

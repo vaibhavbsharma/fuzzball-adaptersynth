@@ -1,0 +1,26 @@
+Index: priv/guest_amd64_toIR.c
+===================================================================
+--- priv/guest_amd64_toIR.c	(revision 3206)
++++ priv/guest_amd64_toIR.c	(working copy)
+@@ -8231,16 +8231,16 @@
+ 
+    /* The main computation, guarding against zero. */
+    assign( dst64,
+-           IRExpr_ITE( 
+-              mkexpr(srcB),
++           //IRExpr_ITE( 
++	   //mkexpr(srcB),
+               /* src != 0 */
+               fwds ? unop(Iop_Ctz64, mkexpr(src64))
+                    : binop(Iop_Sub64, 
+                            mkU64(63), 
+-                           unop(Iop_Clz64, mkexpr(src64))),
++                           unop(Iop_Clz64, mkexpr(src64)))//,
+               /* src == 0 -- leave dst unchanged */
+-              widenUto64( getIRegG( sz, pfx, modrm ) )
+-           )
++              //widenUto64( getIRegG( sz, pfx, modrm ) )
++           //)
+          );
+ 
+    if (sz == 2)
