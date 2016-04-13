@@ -9,16 +9,20 @@ open Exec_options;;
 (*** general helper code used in multiple adaptors ***)
 
 let get_ite_expr arg op const_type const then_val else_val = 
+  (*let _ = Printf.printf "\n" in
+  let _ = V.pp_exp print_string then_val in
+  let _ = V.pp_exp print_string else_val in
+  let _ = Printf.printf "\n" in*)
   V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
         then_val,
         else_val)
 
-let rec get_ite_arg_expr fm arg regs n =
+let rec get_ite_arg_expr fm arg_idx idx_type regs n =
   if n = 1L
   then fm#get_reg_symbolic (List.nth regs 0) 
-  else get_ite_expr arg V.EQ V.REG_32 (Int64.sub n 1L) 
+  else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
          (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
-         (get_ite_arg_expr fm arg regs (Int64.sub n 1L))
+         (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
 
 (* build an arithmetic expression tree; this function is a little messy because 
    it takes so many arguments, but it's useful to reuse code between the integer 
@@ -33,7 +37,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth =
       if d = 1 
       then get_ite_expr node_type V.EQ V.REG_8 0L 
              node_val 
-             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs in
+             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
               if val_type = V.REG_32 
               then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
               else reg_expr)
@@ -43,7 +47,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth =
         get_ite_expr node_type V.EQ V.REG_8 0L 
           node_val 
           (get_ite_expr node_type V.EQ V.REG_8 1L
-             (let reg_expr = get_ite_arg_expr fm node_val arg_regs out_nargs in
+             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
               if val_type = V.REG_32 
               then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
               else reg_expr) 
@@ -153,19 +157,19 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 3
+let int_arith_depth = 4
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
    V.NEG; V.NOT *)
-let int_binops = [V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR]
-let int_unops = [V.NEG; V.NOT]
+let int_binops = [V.PLUS; (*V.BITAND; V.BITOR;*) V.XOR; (*V.LSHIFT; V.RSHIFT;*) V.ARSHIFT;]
+let int_unops = [(*V.NEG; V.NOT*)]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' *)
-let int_restrict_constant_range = None
+let int_restrict_constant_range = Some (0L, 127L)
 let int_restrict_constant_list = None
 (* restrict the counterexamples generated; int_restrict_counterexample_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_counterexample_list 
@@ -315,7 +319,7 @@ let float_restrict_constant_list = None
    should be 'None' or 'Some (lower, upper)' and float_restrict_counterexample_list 
    should be 'None' or 'Some [v1; v2; ...; vn]'; same note as above: these may
    not be very useful *)
-let float_restrict_counterexample_range = None
+let float_restrict_counterexample_range = Some (0.0, 0.5)
 let float_restrict_counterexample_list = None
 
 (* creates symbolic variables representing the adaptor function and encodes

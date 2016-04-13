@@ -128,8 +128,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
             then Adaptor_synthesis.arithmetic_int_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "arithmetic_float"
-            then (*arith_loop_float ((Int64.to_int in_nargs)-1)*)
-                 Adaptor_synthesis.arithmetic_float_extra_conditions
+            then Adaptor_synthesis.arithmetic_float_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
