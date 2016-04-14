@@ -9,10 +9,6 @@ open Exec_options;;
 (*** general helper code used in multiple adaptors ***)
 
 let get_ite_expr arg op const_type const then_val else_val = 
-  (*let _ = Printf.printf "\n" in
-  let _ = V.pp_exp print_string then_val in
-  let _ = V.pp_exp print_string else_val in
-  let _ = Printf.printf "\n" in*)
   V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
         then_val,
         else_val)
@@ -23,6 +19,28 @@ let rec get_ite_arg_expr fm arg_idx idx_type regs n =
   else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
          (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
          (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
+
+(* build an expression that restricts v to be in a certain range; the lower 
+   and upper bounds are inclusive *)
+let restrict_range v v_type lower upper =
+  V.BinOp(V.BITAND, 
+          V.UnOp(
+            V.NOT, 
+            V.BinOp(V.SLT, v, V.Constant(V.Int(v_type, lower)))),
+          V.BinOp(V.SLE, v, V.Constant(V.Int(v_type, upper))))
+
+(* build an expression that restricts v to be one of a specified list *)
+let rec specify_vals v v_type vals =
+match vals with
+| [] -> failwith "Bad value list for arithmetic adaptor"
+| v'::[] -> 
+    V.BinOp(V.BITOR, 
+            V.BinOp(V.EQ, v, V.Constant(V.Int(v_type, v'))),
+            V.BinOp(V.EQ, v, V.Constant(V.Int(v_type, 0L))))
+| v'::t -> 
+    V.BinOp(V.BITOR, 
+            V.BinOp(V.EQ, v, V.Constant(V.Int(v_type, v'))),
+            specify_vals v v_type t)
 
 (* build an arithmetic expression tree; this function is a little messy because 
    it takes so many arguments, but it's useful to reuse code between the integer 
@@ -157,25 +175,30 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 4
+let int_arith_depth = 3
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
    V.NEG; V.NOT *)
-let int_binops = [V.PLUS; (*V.BITAND; V.BITOR;*) V.XOR; (*V.LSHIFT; V.RSHIFT;*) V.ARSHIFT;]
-let int_unops = [(*V.NEG; V.NOT*)]
+let int_binops = [V.PLUS; V.TIMES]
+let int_unops = []
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
-   should be 'None' or 'Some [v1; v2; ...; vn]' *)
-let int_restrict_constant_range = Some (-10L, 10L)
+   should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
+   zero if used) *)
+let int_restrict_constant_range = Some (0L, 20L)
 let int_restrict_constant_list = None
-(* restrict the counterexamples generated; int_restrict_counterexample_range
-   should be 'None' or 'Some (lower, upper)' and int_restrict_counterexample_list 
-   should be 'None' or 'Some [v1; v2; ...; vn]' *)
-let int_restrict_counterexample_range = None
-let int_restrict_counterexample_list = None
+(* restrict the input and output of the adaptor (input restrictions reflect
+   f1 preconditions and output restrictions reflect f2 preconditions)
+   int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
+   int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
+   this list must contain zero if used) *)
+let int_restrict_input_range = Some (0L, 1920L)
+let int_restrict_input_list = None
+let int_restrict_output_range = None (* TODO *)
+let int_restrict_output_list = None (* TODO *)
 
 (* creates symbolic variables representing the adaptor function and encodes
    the rules for applying the adaptor function; this function is called in 
@@ -224,13 +247,20 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
           else get_ite_expr node_value V.EQ int_val_type n
                  expr (binop_expr tl (Int64.add n 1L)) in
     binop_expr int_binops 0L in
-  let rec main_loop n =
+  (* we store symbolic expressions representing adaptors in a list and then 
+     later call set_reg_symbolic on each expression in that list *)
+  let symbolic_exprs = ref [] in
+  let rec get_exprs n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    fm#set_reg_symbolic (List.nth arg_regs n) 
+    symbolic_exprs :=
       (get_arithmetic_expr fm var_name arg_regs int_val_type out_nargs 
-         get_oper_expr int_arith_depth);
-    if n > 0 then main_loop (n-1) else () in
-  main_loop ((Int64.to_int in_nargs) - 1)
+         get_oper_expr int_arith_depth) :: !symbolic_exprs;
+    if n > 0 then get_exprs (n-1) else () in
+  (get_exprs ((Int64.to_int in_nargs) - 1);
+   List.iteri 
+     (fun idx expr ->
+        fm#set_reg_symbolic (List.nth arg_regs idx) expr) !symbolic_exprs)
+  
 
 (* adds extra conditions on the input variables and associated 
    adaptor variables; this function is called in exec_fuzzloop *)
@@ -238,28 +268,6 @@ let rec arithmetic_int_extra_conditions fm out_nargs n =
   let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
   let var = fm#get_fresh_symbolic var_name 
               (if int_val_type = V.REG_32 then 32 else 64) in
-  (* restrict a value to be in a certain range; the lower and upper bounds 
-     are inclusive *)
-  let restrict_range v lower upper =
-    V.BinOp(V.BITAND, 
-            V.UnOp(
-              V.NOT, 
-              V.BinOp(V.SLT, v, V.Constant(V.Int(int_val_type, lower)))),
-            V.BinOp(V.SLE, v, V.Constant(V.Int(int_val_type, upper)))) in
-  (* restrict a value to be one of a specified list
-     NOTE: for implementation reasons, we always add 0L to the list of 
-           possible values *)
-  let rec specify_vals v vals =
-    match vals with
-    | [] -> failwith "Bad value list for arithmetic adaptor"
-    | v'::[] -> 
-        V.BinOp(V.BITOR, 
-                V.BinOp(V.EQ, v, V.Constant(V.Int(int_val_type, v'))),
-                V.BinOp(V.EQ, v, V.Constant(V.Int(int_val_type, 0L))))
-    | v'::t -> 
-        V.BinOp(V.BITOR, 
-                V.BinOp(V.EQ, v, V.Constant(V.Int(int_val_type, v'))),
-                specify_vals v t) in
   (* restrict the value of a constant node to be in a specified range or 
      one of a specified value *)
   let restrict_const_node node_type node_val =
@@ -271,25 +279,24 @@ let rec arithmetic_int_extra_conditions fm out_nargs n =
              V.BinOp(
                V.BITOR,
                V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-               specify_vals node_val l))
+               specify_vals node_val int_val_type l))
     | Some (lower, upper) ->
         V.BinOp(
           V.BITOR,
           V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
-          restrict_range node_val lower upper) in
-  (* restrict the value of the input variable to be in a specified range 
-     or one of a specified value *)
+          restrict_range node_val int_val_type lower upper) in
+  (* restrict input to the adaptor *)
   let restrict_input input =
-    match int_restrict_counterexample_range with
+    match int_restrict_input_range with
     | None -> 
-        (match int_restrict_counterexample_list with
+        (match int_restrict_input_list with
          | None -> V.exp_true
-         | Some l -> specify_vals input l)
-    | Some (lower, upper) -> restrict_range input lower upper in
+         | Some l -> specify_vals input int_val_type l)
+    | Some (lower, upper) -> 
+        restrict_range input int_val_type lower upper in
   (* restrict the generated counterexamples *)
   let _ = synth_extra_conditions := 
-            (restrict_input var) ::
-            !synth_extra_conditions in
+    (restrict_input var) :: !synth_extra_conditions in
   add_arithmetic_tree_conditions fm var_name int_val_type out_nargs 
     restrict_const_node int_binops int_unops int_arith_depth;
   if n > 0 then arithmetic_int_extra_conditions fm out_nargs (n-1) else ()
@@ -358,13 +365,19 @@ let arithmetic_float_adaptor fm out_nargs in_nargs =
           else get_ite_expr node_value V.EQ float_val_type n
                  expr (binop_expr tl (Int64.add n 1L)) in
     binop_expr float_binops 0L in
-  let rec main_loop n =
+  (* we store symbolic expressions representing adaptors in a list and then 
+     later call set_reg_symbolic on each expression in that list *)
+  let symbolic_exprs = ref [] in
+  let rec get_exprs n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    fm#set_reg_symbolic (List.nth arg_regs n)
+    symbolic_exprs :=
       (get_arithmetic_expr fm var_name arg_regs float_val_type out_nargs 
-         get_oper_expr float_arith_depth);
-    if n > 0 then main_loop (n-1) else () in
-  main_loop ((Int64.to_int in_nargs) - 1)
+         get_oper_expr float_arith_depth) :: !symbolic_exprs;
+    if n > 0 then get_exprs (n-1) else () in
+  (get_exprs ((Int64.to_int in_nargs) - 1);
+   List.iteri 
+     (fun idx expr ->
+        fm#set_reg_symbolic (List.nth arg_regs idx) expr) !symbolic_exprs)
   
 (* adds extra conditions on the input variables and associated adaptor 
    variables; this function is called in exec_fuzzloop; note that we use 
