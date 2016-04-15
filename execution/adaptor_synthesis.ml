@@ -457,11 +457,15 @@ let simple_adaptor fm out_nargs in_nargs =
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let var_is_const = fm#get_fresh_symbolic (var_name^"_is_const") 1 in
     let arg =  
-      (if out_nargs = 0L then var_val 
+      (if out_nargs = 0L then (
+	opt_extra_conditions :=  
+             V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L)))
+	 :: !opt_extra_conditions;
+	var_val
+       ) 
        else ( 
-	 let var_is_const = 
-           fm#get_fresh_symbolic (var_name^"_is_const") 1 in
 	 opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,

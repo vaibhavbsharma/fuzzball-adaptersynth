@@ -511,13 +511,15 @@ class virtual fragment_machine = object
   method virtual load_long_concretize  : int64 -> bool -> string -> int64
 
   method virtual make_sink_region : string -> int64 -> unit
-  
-  method virtual get_in_f1_range : unit -> bool
-  method virtual get_in_f2_range : unit -> bool
-  method virtual add_f1_syscall: int -> unit
+ 
+  method virtual get_in_f1_range: unit -> bool
+  method virtual get_in_f2_range: unit -> bool
+  method virtual add_f1_syscall_with_args: int -> int64 list -> unit
   method virtual check_f2_syscall: int -> bool
+  method virtual check_f2_syscall_args: int64 list -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
+
 end
 
 module FragmentMachineFunctor =
@@ -597,14 +599,18 @@ struct
     val mutable in_f2_range = false
     val mutable f1_syscalls:(int list) = []
     val mutable f2_syscalls_num = 0
-    
+    val mutable f1_syscalls_args:(int64 list) = []
+    val mutable f2_syscalls_arg_num = 0
+ 
     method get_in_f1_range () = in_f1_range 
     
     method get_in_f2_range () = in_f2_range
     
-    method add_f1_syscall syscall_num = 
+    method add_f1_syscall_with_args syscall_num arg_list = 
       f1_syscalls <- f1_syscalls@[syscall_num] ;
-      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);*)
+      f1_syscalls_args <- f1_syscalls_args@arg_list;
+      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);
+      Printf.printf "f1_syscalls_args length = %d\n" (List.length f1_syscalls_args);*)
     
     method check_f2_syscall syscall_num = 
       f2_syscalls_num <- 1 + f2_syscalls_num;
@@ -613,6 +619,37 @@ struct
 	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
 	true
       else false
+	
+    (* returns true if f2 syscall args diverge from f1 *)
+    method check_f2_syscall_args arg_list =
+      (*for i = 0 to (List.length f1_syscalls_args)-1 do
+	Printf.printf "f1_syscalls_args[%d] = %Ld\n" i (List.nth f1_syscalls_args i);
+      done;
+      for i = 0 to (List.length arg_list)-1 do
+	Printf.printf "arg_list[%d] = %Ld\n" i (List.nth arg_list i);
+      done; *)
+      let start_ind = f2_syscalls_arg_num in
+      let end_ind = (f2_syscalls_arg_num + (List.length arg_list)) in
+      let ret = 
+	if ((List.length f1_syscalls_args) >= (start_ind+end_ind)) then
+	  (
+	    let is_diverge = ref false in
+	    for i = start_ind to (end_ind-1) do
+	      if (List.nth f1_syscalls_args i) <> (List.nth arg_list (i-start_ind)) then
+		(
+		  is_diverge := true;
+		  Printf.printf "diverged on arg%d %Ld vs %Ld\n" i 
+		    (List.nth f1_syscalls_args i)
+		    (List.nth arg_list (i-start_ind));
+		)
+	    done;
+	    !is_diverge
+	  )
+	else 
+	  false 
+      in
+      f2_syscalls_arg_num <- f2_syscalls_arg_num + (List.length arg_list);
+      ret
 
     method match_syscalls () =
       if ((List.length f1_syscalls) <> f2_syscalls_num) then
@@ -624,6 +661,8 @@ struct
       f2_syscalls_num <- 0;
       in_f1_range <- false;
       in_f2_range <- false;
+      f1_syscalls_args <- [];
+      f2_syscalls_arg_num <- 0;
  
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
