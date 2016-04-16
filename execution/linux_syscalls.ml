@@ -2698,29 +2698,51 @@ object(self)
 	   r6 = get_reg arg_regs.(6) in
 	 (r0, r1, r2, r3, r4, r5, r6)
      in
+     let read_1_reg_sym () = fm#get_reg_symbolic arg_regs.(0) in
+     let read_2_regs_sym () =
+       let ebx = read_1_reg_sym () and
+	   ecx = fm#get_reg_symbolic arg_regs.(1) in
+	 (ebx, ecx) in
+     let read_3_regs_sym () = 
+       let (ebx, ecx) = read_2_regs_sym () and
+	   edx = fm#get_reg_symbolic arg_regs.(2) in
+	 (ebx, ecx, edx) in
+     let read_4_regs_sym () =
+       let (ebx, ecx, edx) = read_3_regs_sym () and
+	   esi = fm#get_reg_symbolic arg_regs.(3) in
+	 (ebx, ecx, edx, esi) in
+     let read_5_regs_sym () =
+       let (ebx, ecx, edx, esi) = read_4_regs_sym () and
+	   edi = fm#get_reg_symbolic arg_regs.(4) in
+	 (ebx, ecx, edx, esi, edi) in
+     let read_6_regs_sym () =
+       let (ebx, ecx, edx, esi, edi) = read_5_regs_sym () and
+	   ebp = fm#get_reg_symbolic arg_regs.(5) in
+	 (ebx, ecx, edx, esi, edi, ebp) 
+     in
      if (fm#get_in_f1_range ()) = true then (
        Printf.printf "f1:syscall(%d)\n" syscall_num;
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       Printf.printf "Unknown Linux/x86-64 system call %d %s(%d)\n" 
+       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
 	 syscall_num name num_args;
        let arg_list = 
 	 (if num_args = 1 then
-	     let arg1 = read_1_reg () in
+	     let arg1 = read_1_reg_sym () in
 	     [arg1]
 	  else if num_args = 2 then
-	    let (arg1, arg2) = read_2_regs () in
+	    let (arg1, arg2) = read_2_regs_sym () in
 	    [arg1; arg2]
 	  else if num_args = 3 then
-	    let (arg1, arg2, arg3) = read_3_regs () in
+	    let (arg1, arg2, arg3) = read_3_regs_sym () in
 	    [arg1; arg2; arg3]
 	  else if num_args = 4 then
-	    let (arg1, arg2, arg3, arg4) = read_4_regs () in
+	    let (arg1, arg2, arg3, arg4) = read_4_regs_sym () in
 	    [arg1; arg2; arg3; arg4]
 	  else if num_args = 5 then
-	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs () in
+	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs_sym () in
 		[arg1; arg2; arg3; arg4; arg5]
 	  else if num_args = 6 then
-	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs () in
+	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs_sym () in
 	    [arg1; arg2; arg3; arg4; arg5; arg6]
 	  else [])
        in
@@ -2735,26 +2757,26 @@ object(self)
 	 Printf.printf "linux_syscalls:syscall divergence: raising DisqualifiedPath\n";
 	 raise DisqualifiedPath;);
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       Printf.printf "Unknown Linux/x86-64 system call %d %s(%d)\n" 
+       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
 	 syscall_num name num_args;
        let arg_list = 
 	 (if num_args = 1 then
-	     let arg1 = read_1_reg () in
+	     let arg1 = read_1_reg_sym () in
 	     [arg1]
 	  else if num_args = 2 then
-	    let (arg1, arg2) = read_2_regs () in
+	    let (arg1, arg2) = read_2_regs_sym () in
 	    [arg1; arg2]
 	  else if num_args = 3 then
-	    let (arg1, arg2, arg3) = read_3_regs () in
+	    let (arg1, arg2, arg3) = read_3_regs_sym () in
 	    [arg1; arg2; arg3]
 	  else if num_args = 4 then
-	    let (arg1, arg2, arg3, arg4) = read_4_regs () in
+	    let (arg1, arg2, arg3, arg4) = read_4_regs_sym () in
 	    [arg1; arg2; arg3; arg4]
 	  else if num_args = 5 then
-	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs () in
+	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs_sym () in
 	    [arg1; arg2; arg3; arg4; arg5]
 	  else if num_args = 6 then
-	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs () in
+	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs_sym () in
 	    [arg1; arg2; arg3; arg4; arg5; arg6]
 	  else [])
        in

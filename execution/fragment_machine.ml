@@ -514,9 +514,9 @@ class virtual fragment_machine = object
  
   method virtual get_in_f1_range: unit -> bool
   method virtual get_in_f2_range: unit -> bool
-  method virtual add_f1_syscall_with_args: int -> int64 list -> unit
+  method virtual add_f1_syscall_with_args: int -> Vine.exp list -> unit
   method virtual check_f2_syscall: int -> bool
-  method virtual check_f2_syscall_args: int64 list -> bool
+  method virtual check_f2_syscall_args: Vine.exp list -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
 
@@ -595,11 +595,14 @@ struct
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
     
+    val form_man = new FormMan.formula_manager
+    method get_form_man = form_man
+    
     val mutable in_f1_range = false
     val mutable in_f2_range = false
     val mutable f1_syscalls:(int list) = []
     val mutable f2_syscalls_num = 0
-    val mutable f1_syscalls_args:(int64 list) = []
+    val mutable f1_syscalls_args:(Vine.exp list) = []
     val mutable f2_syscalls_arg_num = 0
  
     method get_in_f1_range () = in_f1_range 
@@ -631,22 +634,32 @@ struct
       let start_ind = f2_syscalls_arg_num in
       let end_ind = (f2_syscalls_arg_num + (List.length arg_list)) in
       let ret = 
-	if ((List.length f1_syscalls_args) >= (start_ind+end_ind)) then
+	if ((List.length f1_syscalls_args) >= end_ind) then
 	  (
 	    let is_diverge = ref false in
 	    for i = start_ind to (end_ind-1) do
-	      if (List.nth f1_syscalls_args i) <> (List.nth arg_list (i-start_ind)) then
-		(
-		  is_diverge := true;
-		  Printf.printf "diverged on arg%d %Ld vs %Ld\n" i 
-		    (List.nth f1_syscalls_args i)
-		    (List.nth arg_list (i-start_ind));
-		)
+	      let arg1_exp = (D.to_symbolic_64 (form_man#simplify64 (D.from_symbolic (List.nth f1_syscalls_args i)))) in
+	      let arg2_exp = (D.to_symbolic_64 (form_man#simplify64 (D.from_symbolic (List.nth arg_list (i-start_ind))))) in
+	      Printf.printf "f1_arg_exp = %s f2_arg_exp = %s\n" 
+		(V.exp_to_string arg1_exp)
+		(V.exp_to_string arg2_exp);
+	      let b1 = self#query_condition (V.BinOp(V.NEQ,arg1_exp,arg2_exp))
+		(0x6c00+i*10+1) 
+	      in
+	      if b1 = true then (
+		is_diverge := true;
+		Printf.printf "diverged on arg%d %s vs %s\n" i 
+		  (V.exp_to_string arg1_exp) 
+		  (V.exp_to_string arg2_exp);
+	      )
 	    done;
 	    !is_diverge
 	  )
-	else 
-	  false 
+	else (
+	  Printf.printf "f1_syscalls_args.length = %d start_ind+end_ind = %d\n"
+	    (List.length f1_syscalls_args) end_ind;
+	  false
+	) 
       in
       f2_syscalls_arg_num <- f2_syscalls_arg_num + (List.length arg_list);
       ret
@@ -669,8 +682,6 @@ struct
     val mutable frag = ([], [])
     val mutable insns = []
 
-    val form_man = new FormMan.formula_manager
-    method get_form_man = form_man
     
     (* Added for adaptor synthesis*)
     method set_reg_symbolic reg symb_var =

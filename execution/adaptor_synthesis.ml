@@ -454,6 +454,7 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 
 let simple_adaptor fm out_nargs in_nargs =
   let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let symbolic_args = ref [] in
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
@@ -474,11 +475,14 @@ let simple_adaptor fm out_nargs in_nargs =
 	 :: !opt_extra_conditions;
 	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
 	   var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs))) in
-    (*Printf.printf "setting arg=%s\n" (V.exp_to_string arg);*)
-    fm#set_reg_symbolic (List.nth arg_regs n) arg;
+    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+    symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
-  if in_nargs > 0L then 
-    main_loop ((Int64.to_int in_nargs)-1)
+  if in_nargs > 0L then  (
+    main_loop ((Int64.to_int in_nargs)-1);
+    List.iteri (fun index expr ->
+	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
+  )
 
 (* Simple adaptor code ends here *)

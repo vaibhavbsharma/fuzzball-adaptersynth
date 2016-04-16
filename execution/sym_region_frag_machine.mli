@@ -261,14 +261,14 @@ sig
     val mutable in_f1_range: bool
     val mutable in_f2_range: bool
     val mutable f1_syscalls: int list
-    val mutable f1_syscalls_args: int64 list
+    val mutable f1_syscalls_args: Vine.exp list
     val mutable f2_syscalls_num: int 
     val mutable f2_syscalls_arg_num: int 
     method get_in_f1_range: unit -> bool
     method get_in_f2_range: unit -> bool
-    method add_f1_syscall_with_args: int -> int64 list -> unit
+    method add_f1_syscall_with_args: int -> Vine.exp list -> unit
     method check_f2_syscall: int -> bool
-    method check_f2_syscall_args: int64 list -> bool
+    method check_f2_syscall_args: Vine.exp list -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
     val mem :
