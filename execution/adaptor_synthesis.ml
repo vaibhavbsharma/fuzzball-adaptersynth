@@ -475,7 +475,7 @@ let simple_adaptor fm out_nargs in_nargs =
 	 :: !opt_extra_conditions;
 	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
 	   var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs))) in
-    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+    (* Printf.printf "setting arg=%s\n" (V.exp_to_string arg); *)
     symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in

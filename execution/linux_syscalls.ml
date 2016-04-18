@@ -2747,7 +2747,7 @@ object(self)
 	  else [])
        in
        (*for i = 0 to num_args-1 do
-	 Printf.printf "arg%d = %Ld \n" i (List.nth arg_list i);
+	 Printf.printf "arg%d = %s \n" i (V.exp_to_string (List.nth arg_list i));
        done;*)
        fm#add_f1_syscall_with_args syscall_num arg_list;
      );
@@ -2782,9 +2782,9 @@ object(self)
        in
        assert((List.length arg_list)=num_args);
        (*for i = 0 to num_args-1 do
-	 Printf.printf "arg%d = %Ld \n" i (List.nth arg_list i);
+	 Printf.printf "arg%d = %s \n" i (V.exp_to_string (List.nth arg_list i));
        done;*)
-       if (fm#check_f2_syscall_args arg_list) = true then (
+       if (fm#check_f2_syscall_args arg_list syscall_num) = true then (
 	 Printf.printf "linux_syscalls:syscalls argument divergence raising DisqualifiedPath\n";
 	 raise DisqualifiedPath;);
      );

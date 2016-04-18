@@ -35,7 +35,7 @@ sig
     method query_with_path_cond : Vine.exp -> bool
       -> (bool * Query_engine.sat_assign)
 
-    method query_condition : Vine.exp -> int -> bool
+    method query_condition : Vine.exp -> bool option -> int -> (bool * bool option) 
 
     method query_unique_value : Vine.exp -> Vine.typ -> int64 option
 
@@ -262,7 +262,7 @@ sig
     method get_in_f2_range: unit -> bool
     method add_f1_syscall_with_args: int -> Vine.exp list -> unit
     method check_f2_syscall: int -> bool
-    method check_f2_syscall_args: Vine.exp list -> bool
+    method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
  

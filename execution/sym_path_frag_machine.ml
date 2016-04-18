@@ -277,12 +277,15 @@ struct
     method query_with_path_cond cond verbose =
       self#query_with_path_cond_wcache cond verbose true
 
-    method query_condition cond_e ident = 
+    method query_condition cond_e choice ident = 
       dt#start_new_query_binary;
-      let b = self#extend_pc_random cond_e false ident in
-      let _ = dt#check_last_choices in
+      let b = match choice with 
+	| None -> self#extend_pc_random cond_e true ident 
+	| Some bit -> self#extend_pc_known cond_e true ident bit
+      in
+      let choices = dt#check_last_choices in
       dt#count_query;
-      b
+      (b, choices)
 
     method private query_with_path_cond_wcache cond verbose with_cache =
       self#ensure_extra_conditions;
@@ -485,6 +488,7 @@ struct
        0x6ayy Misc. concretize
        0x6byy Binop concretize
        0x6cyy Adaptor expression concretize, yy is argnum*10+(type!=0 && type!=1)
+       0x6dyy Syscall argument expr added by SPFM#query_condition, yy is argnum*10
        0x7100 on_missing_random
        0x81yy SRFM load, base choice
        0x82yy SRFM load, offset concretize, yy is bit or 0x80 + try
