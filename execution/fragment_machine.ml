@@ -656,7 +656,10 @@ struct
 			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg2_exp)))) 
 		else ( V.BinOp(V.NEQ, arg1_exp, arg2_exp))
 	      in
-	      let (b,choices) = (self#query_condition exp (Some false) (0x6d00+i*10)) in
+	      (* TODO: Pass the preference as false during adaptor search mode
+		 and true during counter example search mode *)
+	      let preferred_dir = not !opt_adaptor_search_mode in
+	      let (b,choices) = (self#query_condition exp (Some preferred_dir) (0x6d00+i*10)) in
 	      (*let choices_str = 
 		(match choices with
 		| Some true -> "is true"
