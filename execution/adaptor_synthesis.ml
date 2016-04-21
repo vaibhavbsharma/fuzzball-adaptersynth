@@ -486,3 +486,56 @@ let simple_adaptor fm out_nargs in_nargs =
   )
 
 (* Simple adaptor code ends here *)
+
+(* Type conversion adaptor *)
+
+let rec get_ite_typeconv_expr fm arg_idx idx_type regs n =
+  if n = 1L
+  then V.Cast(V.CAST_SIGNED, V.REG_64, 
+	       V.Cast(V.CAST_LOW, V.REG_32, (fm#get_reg_symbolic (List.nth regs 0)))) 
+  else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
+    (V.Cast(V.CAST_SIGNED, V.REG_64, 
+	    V.Cast(V.CAST_LOW, V.REG_32, 
+		   (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
+	    )
+     )
+    )
+    (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
+
+let typeconv_adaptor fm out_nargs in_nargs =
+  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let symbolic_args = ref [] in
+  let rec main_loop n =
+    let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+    let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let var_type = fm#get_fresh_symbolic (var_name^"_type") 1 in
+    let arg =  
+      (if out_nargs = 0L then (
+	opt_extra_conditions :=  
+             V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L)))
+	 :: !opt_extra_conditions;
+	var_val
+       ) 
+       else ( 
+	 opt_extra_conditions :=  
+	   V.BinOp(
+             V.BITOR,
+             V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
+             V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	 :: !opt_extra_conditions;
+	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
+	   (get_ite_expr var_type V.EQ V.REG_8 0L 
+	      (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs)
+	      (get_ite_typeconv_expr fm var_val V.REG_64 arg_regs out_nargs))))
+    in
+    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+    symbolic_args := arg :: !symbolic_args;
+    if n > 0 then main_loop (n-1); 
+  in
+  if in_nargs > 0L then  (
+    main_loop ((Int64.to_int in_nargs)-1);
+    List.iteri (fun index expr ->
+	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
+  )
+
+(* Type conversion adaptor code ends here *)

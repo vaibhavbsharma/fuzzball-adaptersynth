@@ -76,6 +76,10 @@ let call_replacements fm last_eip eip =
           then Some (fun () -> 
 	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
             (Some in_addr))
+	  else if adaptor_mode = "typeconv"
+	  then Some (fun () -> 
+	    Adaptor_synthesis.typeconv_adaptor fm out_nargs in_nargs;
+            (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
             then Some (fun () -> 
