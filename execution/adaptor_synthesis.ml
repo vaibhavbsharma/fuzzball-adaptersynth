@@ -182,20 +182,20 @@ let int_val_type = V.REG_32
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
    V.NEG; V.NOT *)
-let int_binops = [V.PLUS; V.TIMES]
-let int_unops = []
+let int_binops = [V.PLUS; V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]
+let int_unops = [V.NEG; V.NOT]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
    zero if used) *)
-let int_restrict_constant_range = Some (0L, 20L)
+let int_restrict_constant_range = None
 let int_restrict_constant_list = None
 (* restrict the input and output of the adaptor (input restrictions reflect
    f1 preconditions and output restrictions reflect f2 preconditions)
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
    int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
    this list must contain zero if used) *)
-let int_restrict_input_range = Some (0L, 1920L)
+let int_restrict_input_range = None
 let int_restrict_input_list = None
 let int_restrict_output_range = None (* TODO *)
 let int_restrict_output_list = None (* TODO *)
