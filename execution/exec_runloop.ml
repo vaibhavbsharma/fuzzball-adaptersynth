@@ -76,6 +76,10 @@ let call_replacements fm last_eip eip =
           then Some (fun () -> 
 	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
             (Some in_addr))
+	  else if adaptor_mode = "typeconv"
+	  then Some (fun () -> 
+	    Adaptor_synthesis.typeconv_adaptor fm out_nargs in_nargs;
+            (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
             then Some (fun () -> 
@@ -220,15 +224,15 @@ let call_replacements fm last_eip eip =
 	     (*Printf.printf "decision_loop var_name = %s\n" var_name;*)
              let var_type = 
                fm#get_fresh_symbolic (var_name^"_type") 8 in
-	     let b1 = fm#query_condition (V.BinOp(
+	     let (b1,_) = fm#query_condition (V.BinOp(
 	       V.BITAND,
 	       V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,0L))),
-	       V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L))))) (0x6c00+n*10+1) in
+	       V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L))))) None (0x6c00+n*10+1) in
 	     (*Printf.printf "Chose b1 = %B\n" b1;*)
 	     if b1 <> true then
 	       ((*let b2 = *)
 		 ignore(fm#query_condition (
-		 V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L)))) (0x6c00+n*10))
+		 V.BinOp(V.NEQ,var_type,V.Constant(V.Int(V.REG_8,1L)))) None (0x6c00+n*10))
 		(*in
 		  Printf.printf "Chose b2 = %B\n" b2;*));
 	     if n > 0 then decision_loop (n-1);

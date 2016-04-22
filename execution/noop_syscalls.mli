@@ -1,3 +1,5 @@
+val syscalls_x64: ( int * string ) array 
+
 class noop_linux_special_handler : Fragment_machine.fragment_machine ->
 object
   method handle_special : string -> Vine.stmt list option

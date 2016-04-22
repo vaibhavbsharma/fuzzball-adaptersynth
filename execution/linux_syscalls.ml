@@ -2698,14 +2698,94 @@ object(self)
 	   r6 = get_reg arg_regs.(6) in
 	 (r0, r1, r2, r3, r4, r5, r6)
      in
+     let read_1_reg_sym () = fm#get_reg_symbolic arg_regs.(0) in
+     let read_2_regs_sym () =
+       let ebx = read_1_reg_sym () and
+	   ecx = fm#get_reg_symbolic arg_regs.(1) in
+	 (ebx, ecx) in
+     let read_3_regs_sym () = 
+       let (ebx, ecx) = read_2_regs_sym () and
+	   edx = fm#get_reg_symbolic arg_regs.(2) in
+	 (ebx, ecx, edx) in
+     let read_4_regs_sym () =
+       let (ebx, ecx, edx) = read_3_regs_sym () and
+	   esi = fm#get_reg_symbolic arg_regs.(3) in
+	 (ebx, ecx, edx, esi) in
+     let read_5_regs_sym () =
+       let (ebx, ecx, edx, esi) = read_4_regs_sym () and
+	   edi = fm#get_reg_symbolic arg_regs.(4) in
+	 (ebx, ecx, edx, esi, edi) in
+     let read_6_regs_sym () =
+       let (ebx, ecx, edx, esi, edi) = read_5_regs_sym () and
+	   ebp = fm#get_reg_symbolic arg_regs.(5) in
+	 (ebx, ecx, edx, esi, edi, ebp) 
+     in
      if (fm#get_in_f1_range ()) = true then (
-       (*Printf.printf "f1:syscall(%d)\n" syscall_num;*)
-       fm#add_f1_syscall syscall_num;
+       Printf.printf "f1:syscall(%d)\n" syscall_num;
+       let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
+       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
+	 syscall_num name num_args;
+       let arg_list = 
+	 (if num_args = 1 then
+	     let arg1 = read_1_reg_sym () in
+	     [arg1]
+	  else if num_args = 2 then
+	    let (arg1, arg2) = read_2_regs_sym () in
+	    [arg1; arg2]
+	  else if num_args = 3 then
+	    let (arg1, arg2, arg3) = read_3_regs_sym () in
+	    [arg1; arg2; arg3]
+	  else if num_args = 4 then
+	    let (arg1, arg2, arg3, arg4) = read_4_regs_sym () in
+	    [arg1; arg2; arg3; arg4]
+	  else if num_args = 5 then
+	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs_sym () in
+		[arg1; arg2; arg3; arg4; arg5]
+	  else if num_args = 6 then
+	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs_sym () in
+	    [arg1; arg2; arg3; arg4; arg5; arg6]
+	  else [])
+       in
+       (*for i = 0 to num_args-1 do
+	 Printf.printf "arg%d = %s \n" i (V.exp_to_string (List.nth arg_list i));
+       done;*)
+       fm#add_f1_syscall_with_args syscall_num arg_list;
      );
      if (fm#get_in_f2_range ()) = true then (
-       (*Printf.printf "f2:syscall(%d)\n" syscall_num;*)
+       Printf.printf "f2:syscall(%d)\n" syscall_num;
        if fm#check_f2_syscall syscall_num = false then (
-	 (*Printf.printf "linux_syscalls raising DisqualifiedPath\n";*)
+	 Printf.printf "linux_syscalls:syscall divergence: raising DisqualifiedPath\n";
+	 raise DisqualifiedPath;);
+       let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
+       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
+	 syscall_num name num_args;
+       let arg_list = 
+	 (if num_args = 1 then
+	     let arg1 = read_1_reg_sym () in
+	     [arg1]
+	  else if num_args = 2 then
+	    let (arg1, arg2) = read_2_regs_sym () in
+	    [arg1; arg2]
+	  else if num_args = 3 then
+	    let (arg1, arg2, arg3) = read_3_regs_sym () in
+	    [arg1; arg2; arg3]
+	  else if num_args = 4 then
+	    let (arg1, arg2, arg3, arg4) = read_4_regs_sym () in
+	    [arg1; arg2; arg3; arg4]
+	  else if num_args = 5 then
+	    let (arg1, arg2, arg3, arg4, arg5) = read_5_regs_sym () in
+	    [arg1; arg2; arg3; arg4; arg5]
+	  else if num_args = 6 then
+	    let (arg1, arg2, arg3, arg4, arg5, arg6) = read_6_regs_sym () in
+	    [arg1; arg2; arg3; arg4; arg5; arg6]
+	  else [])
+       in
+       assert((List.length arg_list)=num_args);
+       (*for i = 0 to num_args-1 do
+	 Printf.printf "arg%d = %s \n" i (V.exp_to_string (List.nth arg_list i));
+       done;*)
+       if (fm#check_f2_syscall_args arg_list syscall_num) = true then (
+	 Printf.printf "linux_syscalls:syscalls argument divergence raising DisqualifiedPath\n";
 	 raise DisqualifiedPath;);
      );
        ignore(0, read_7_regs);
@@ -2983,41 +3063,6 @@ object(self)
 	 | (ARM, 56) -> uh "No mpx (56) syscall in Linux/ARM (E)ABI"
 	 | (X86, 56) -> (* mpx *)
 	     uh "Unhandled Linux system call mpx (56)"
-	 | (X64, 26) (* msync *) 
-	 | (X64, 28) (* madvise *)
-	 | (X64, 56) (* clone *)
-	 | (X64, 149) (* mlock *)
-	 | (X64, 150) (* munlock *)
-	 | (X64, 151) (* mlockall *)
-	 | (X64, 152) (* munlockall *)
-	 | (X64, 216) (* remap_file_pages *) ->
-	   let rec read_regs n =
-	     match n with
-	     | 0 -> []
-	     | _ ->
-	       (read_regs (n - 1)) @ [(fm#printable_long_reg arg_regs.(n-1))]
-	   in
-	   let (name, nargs) = 
-	     match syscall_num with 
-	     | 26 -> ("msync", 3)
-	     | 28 -> ("madvise", 3)
-	     | 56 -> ("clone", 4)
-	     | 149 -> ("mlock", 2)
-	     | 150 -> ("munlock", 2)
-	     | 151 -> ("mlockall", 1)
-	     | 152 -> ("munlockall", 0)
-	     | 216 -> ("remap_file_pages", 5)
-	     | _ -> 
-	       Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
-	       uh "Unhandled Linux system call (%d)"
-	   in 
-           let args = read_regs nargs in
-	   if !opt_trace_syscalls then
-	     Printf.printf "%s(%s)\n" name (String.concat ", " args);
-	   (if !opt_ret_zero_missing_x64_syscalls = true then 
-	     put_return 0L
-	   else 
-	     self#put_errno Unix.ENOSYS);
 	 | ((X86|ARM), 57) -> (* setpgid *)
 	     uh "Unhandled Linux system call setpgid (57)"
 	 | (ARM, 58) -> uh "No ulimit (58) syscall in Linux/ARM (E)ABI"
@@ -4517,7 +4562,7 @@ object(self)
 	     uh "Unhandled Linux system call clock_adjtime (343)"
 	 | (X86, 344) -> (* syncfs *)
 	     uh "Unhandled Linux system call syncfs (344)"
-       | (X86, 345) -> (* sendmmsg *)
+	 | (X86, 345) -> (* sendmmsg *)
            let (ebx, ecx, edx, esi) = read_4_regs () in
            let sockfd = Int64.to_int ebx and
                msg = ecx and
@@ -4551,7 +4596,6 @@ object(self)
 	     Printf.printf "Unknown Linux/ARM system call %d\n" syscall_num;
 	     uh "Unhandled Linux system call"
 	 | (X64, _) ->
-	   Printf.printf "Unknown Linux/x86-64 system call %d\n" syscall_num;
 	   if !opt_ret_zero_missing_x64_syscalls = true then 
 	     put_return 0L
 	   else self#put_errno Unix.ENOSYS);

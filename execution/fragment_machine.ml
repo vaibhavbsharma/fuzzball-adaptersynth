@@ -483,7 +483,7 @@ class virtual fragment_machine = object
   method virtual query_with_path_cond : Vine.exp -> bool
     -> (bool * Query_engine.sat_assign)
 
-  method virtual query_condition: Vine.exp -> int -> bool
+  method virtual query_condition : Vine.exp -> bool option -> int -> (bool * bool option) 
 
   method virtual match_input_var : string -> int option
 
@@ -511,13 +511,15 @@ class virtual fragment_machine = object
   method virtual load_long_concretize  : int64 -> bool -> string -> int64
 
   method virtual make_sink_region : string -> int64 -> unit
-  
-  method virtual get_in_f1_range : unit -> bool
-  method virtual get_in_f2_range : unit -> bool
-  method virtual add_f1_syscall: int -> unit
+ 
+  method virtual get_in_f1_range: unit -> bool
+  method virtual get_in_f2_range: unit -> bool
+  method virtual add_f1_syscall_with_args: int -> Vine.exp list -> unit
   method virtual check_f2_syscall: int -> bool
+  method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
+
 end
 
 module FragmentMachineFunctor =
@@ -593,18 +595,25 @@ struct
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
     
+    val form_man = new FormMan.formula_manager
+    method get_form_man = form_man
+    
     val mutable in_f1_range = false
     val mutable in_f2_range = false
     val mutable f1_syscalls:(int list) = []
     val mutable f2_syscalls_num = 0
-    
+    val mutable f1_syscalls_args:(Vine.exp list) = []
+    val mutable f2_syscalls_arg_num = 0
+ 
     method get_in_f1_range () = in_f1_range 
     
     method get_in_f2_range () = in_f2_range
     
-    method add_f1_syscall syscall_num = 
+    method add_f1_syscall_with_args syscall_num arg_list = 
       f1_syscalls <- f1_syscalls@[syscall_num] ;
-      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);*)
+      f1_syscalls_args <- f1_syscalls_args@arg_list;
+      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);
+      Printf.printf "f1_syscalls_args length = %d\n" (List.length f1_syscalls_args);*)
     
     method check_f2_syscall syscall_num = 
       f2_syscalls_num <- 1 + f2_syscalls_num;
@@ -613,6 +622,68 @@ struct
 	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
 	true
       else false
+	
+    (* returns true if f2 syscall args diverge from f1 *)
+    method check_f2_syscall_args arg_list syscall_num=
+      (*for i = 0 to (List.length f1_syscalls_args)-1 do
+	Printf.printf "f1_syscalls_args[%d] = %Ld\n" i (List.nth f1_syscalls_args i);
+      done;
+      for i = 0 to (List.length arg_list)-1 do
+	Printf.printf "arg_list[%d] = %Ld\n" i (List.nth arg_list i);
+      done; *)
+      let start_ind = f2_syscalls_arg_num in
+      let end_ind = (f2_syscalls_arg_num + (List.length arg_list)) in
+      let ret = 
+	if ((List.length f1_syscalls_args) >= end_ind) then
+	  (
+	    let is_diverge = ref false in
+	    for i = start_ind to (end_ind-1) do
+	      let arg1_exp = (D.to_symbolic_64 (
+		form_man#simplify64 (D.from_symbolic (
+		  List.nth f1_syscalls_args i)))) in
+	      let arg2_exp = (D.to_symbolic_64 (
+		form_man#simplify64 (D.from_symbolic (
+		  List.nth arg_list (i-start_ind))))) in
+	      (*Printf.printf "f1_arg_exp = %s f2_arg_exp = %s\n" 
+		(V.exp_to_string arg1_exp)
+		(V.exp_to_string arg2_exp);*)
+	      let exp = 
+		(* wait4 syscall uses only the low 32 bits of its 1st and 3rd argument*)
+		if (syscall_num = 61) && ((i = start_ind) || (i = start_ind+2))then (
+		  (*Printf.printf "check_f2_syscall_args type casting arg1_exp and arg2_exp to 32 bit\n";*)
+		  V.BinOp(V.NEQ, 
+			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg1_exp)), 
+			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg2_exp)))) 
+		else ( V.BinOp(V.NEQ, arg1_exp, arg2_exp))
+	      in
+	      (* TODO: Pass the preference as false during adaptor search mode
+		 and true during counter example search mode *)
+	      let preferred_dir = not !opt_adaptor_search_mode in
+	      let (b,choices) = (self#query_condition exp (Some preferred_dir) (0x6d00+i*10)) in
+	      (*let choices_str = 
+		(match choices with
+		| Some true -> "is true"
+		| Some false -> "is false"
+		| None -> "can be true or false")
+	      in
+	      Printf.printf "chose branch %B with choices %s\n" b choices_str;*)
+	      if b = true then (
+		is_diverge := true;
+		Printf.printf "diverged on syscall(%d) arg%d %s vs %s\n" syscall_num i 
+		  (V.exp_to_string arg1_exp) 
+		  (V.exp_to_string arg2_exp);
+	      )
+	    done;
+	    !is_diverge
+	  )
+	else (
+	  (* Printf.printf "f1_syscalls_args.length = %d start_ind+end_ind = %d\n"
+	    (List.length f1_syscalls_args) end_ind;*)
+	  false
+	) 
+      in
+      f2_syscalls_arg_num <- f2_syscalls_arg_num + (List.length arg_list);
+      ret
 
     method match_syscalls () =
       if ((List.length f1_syscalls) <> f2_syscalls_num) then
@@ -624,16 +695,15 @@ struct
       f2_syscalls_num <- 0;
       in_f1_range <- false;
       in_f2_range <- false;
+      f1_syscalls_args <- [];
+      f2_syscalls_arg_num <- 0;
  
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
     val mutable frag = ([], [])
     val mutable insns = []
 
-    val form_man = new FormMan.formula_manager
-    method get_form_man = form_man
     
-    (* Added for adaptor synthesis*)
     method set_reg_symbolic reg symb_var =
       self#set_int_var (Hashtbl.find reg_to_var reg)
         (D.from_symbolic symb_var);    
@@ -662,7 +732,6 @@ struct
       in
       let table_dt =  map_vexp_dt_list (fun e -> D.from_symbolic e) table_vexp in
       D.to_symbolic_8 (form_man#make_table_lookup table_dt idx_exp idx_wd ty)
-    (* End of adaptor synthesis changes*)
 
     val mutable snap = (V.VarHash.create 1, V.VarHash.create 1)
 
@@ -2686,8 +2755,9 @@ struct
     method query_with_path_cond (e:Vine.exp) (v:bool)
       : (bool * Query_engine.sat_assign) =
       (false, (Query_engine.ce_from_list []))
-    method query_condition (e:Vine.exp) (i:int) =
-      (false)
+    method query_condition (e:Vine.exp) (b:bool option) 
+	(i:int) : (bool * bool option) =
+      (false,None)
     method match_input_var (s:string) : int option = None
     method get_path_cond : Vine.exp list = []
     method on_missing_random : unit =

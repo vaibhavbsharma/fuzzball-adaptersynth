@@ -110,7 +110,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	      V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
 	  :: !opt_extra_conditions;);*)
        (*Printf.printf "opt_extra_condition.length = %d\n" (List.length !opt_extra_conditions);*)
-       if n > 0 then simple_loop (n-1) out_nargs type_name type_size; in
+       if n > 0 then simple_loop (n-1) out_nargs type_name type_size; 
+     in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
       (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adaptor in
       (*Printf.printf "Running simple+len adaptor in exec_fuzzloop\n";*)
@@ -124,6 +125,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" 
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
+       else if mode = "typeconv"
+       then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
        else if mode = "arithmetic_int" 
             then Adaptor_synthesis.arithmetic_int_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
