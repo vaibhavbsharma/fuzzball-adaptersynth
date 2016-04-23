@@ -20,6 +20,7 @@ let rec get_ite_arg_expr fm arg_idx idx_type regs n =
          (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
          (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
 
+
 (* build an expression that restricts v to be in a certain range; the lower 
    and upper bounds are inclusive *)
 let restrict_range v v_type lower upper =
@@ -551,8 +552,17 @@ let typeconv_adaptor fm out_nargs in_nargs =
    type = 4 -> apply a 64-to-32 bit narrowing operation on one of the 
    inner function arguments in ret_val
 *)
+
+let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
+  if n = 1L
+  then (List.nth saved_args_list 0) 
+  else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
+         (List.nth saved_args_list ((Int64.to_int n) - 1))
+         (get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list (Int64.sub n 1L))
+
 let ret_typeconv_adaptor fm in_nargs =
-  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let saved_args_list = fm#get_saved_arg_regs () in
+  assert((List.length saved_args_list) = (Int64.to_int in_nargs));
   let ret_val = fm#get_fresh_symbolic ("ret_val") 64 in
   let ret_type = fm#get_fresh_symbolic ("ret_type") 8 in
   (* TODO: try using other return argument registers like XMM0 *)
@@ -560,20 +570,20 @@ let ret_typeconv_adaptor fm in_nargs =
   let arg =  
     (*get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
       (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	 (V.Cast(V.CAST_SIGNED, V.REG_64, 
-		(V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-	 ))
+      (V.Cast(V.CAST_SIGNED, V.REG_64, 
+      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
+      ))
       )*)
     if in_nargs = 0L then (
       opt_extra_conditions :=  
         V.BinOp(V.LT,ret_type,V.Constant(V.Int(V.REG_8,3L)))
 			    :: !opt_extra_conditions;
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
-      (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	 (V.Cast(V.CAST_SIGNED, V.REG_64, 
-		(V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-	 ))
-      )
+	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+	   (V.Cast(V.CAST_SIGNED, V.REG_64, 
+		   (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
+	    ))
+	)
     ) 
     else ( 
       opt_extra_conditions :=  
@@ -588,7 +598,7 @@ let ret_typeconv_adaptor fm in_nargs =
 	      (V.Cast(V.CAST_SIGNED, V.REG_64, 
 		      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
 	       ))    
-	      (get_ite_arg_expr fm ret_val V.REG_64 arg_regs in_nargs)
+	      (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
 	   )
 	)
     )

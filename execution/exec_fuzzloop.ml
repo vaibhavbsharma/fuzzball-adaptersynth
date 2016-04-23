@@ -197,6 +197,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
+	       if (List.length !opt_synth_ret_adaptor) <> 0 then
+		 fm#reset_saved_arg_regs ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then
 		   Printf.printf "Coverage increased to %d on %Ld\n"

@@ -165,6 +165,9 @@ class virtual fragment_machine : object
 
   method virtual get_fresh_symbolic : string -> int -> Vine.exp
   method virtual get_reg_symbolic : register_name -> Vine.exp
+  method virtual save_arg_regs : int64 -> unit
+  method virtual get_saved_arg_regs : unit -> Vine.exp list
+  method virtual reset_saved_arg_regs : unit 
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
@@ -343,6 +346,7 @@ sig
     val mutable f1_syscalls_args: Vine.exp list
     val mutable f2_syscalls_num: int 
     val mutable f2_syscalls_arg_num: int 
+    val mutable saved_arg_regs: Vine.exp list
     method get_in_f1_range: unit -> bool
     method get_in_f2_range: unit -> bool
     method add_f1_syscall_with_args: int -> Vine.exp list -> unit
@@ -422,6 +426,9 @@ sig
 
     method get_fresh_symbolic : string -> int -> Vine.exp
     method get_reg_symbolic : register_name -> Vine.exp
+    method save_arg_regs : int64 -> unit
+    method get_saved_arg_regs : unit -> Vine.exp list
+    method reset_saved_arg_regs : unit
     method set_reg_symbolic : register_name -> Vine.exp -> unit
     method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     

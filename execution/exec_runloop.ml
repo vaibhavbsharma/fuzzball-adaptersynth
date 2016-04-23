@@ -46,9 +46,10 @@ let call_replacements fm last_eip eip =
   in
   let lookup_ret_info targ l = 
     List.fold_left
-      (fun ret (str, addr, nargs) ->
-	if ((canon_eip addr) = (canon_eip targ)) then
-	  Some (str,addr,nargs) 
+      (fun ret (str, addr1, addr2, nargs) ->
+	if ((canon_eip addr1) = (canon_eip targ)) || 
+	  ((canon_eip addr2) = (canon_eip targ)) then
+	  Some (str,addr1,addr2,nargs) 
 	else ret)
       None l
   in
@@ -138,14 +139,19 @@ let call_replacements fm last_eip eip =
             Printf.printf "unsupported adaptor";
             (Some in_addr))
       | (None, None, None, None, None, None, None, None, 
-          Some (adaptor_mode, addr, in_nargs), None) ->
-	if adaptor_mode = "return-typeconv" 
-        then Some (fun () -> 
+          Some (adaptor_mode, addr1, addr2, in_nargs), None) ->
+	if (adaptor_mode = "return-typeconv") && addr2 = eip then
+        Some (fun () -> 
 	  Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
-          (Some addr))
+          (Some addr2))
+	else if (adaptor_mode = "return-typeconv") && addr1 = eip then
+        Some (fun () -> 
+	  fm#save_arg_regs in_nargs;
+	  Printf.printf "exec_runloop#thunk() should save arg regs here\n";
+          (Some addr1))
 	else Some (fun () ->
           Printf.printf "unsupported adaptor";
-          (Some addr))
+          (Some eip))
       | (None, None, None, None, None, None, None, None, None,
 	 Some (out_nargs, in_addr, in_nargs, max_depth)) ->
 	  (* an adaptor that tries permutations of arguments as well as 

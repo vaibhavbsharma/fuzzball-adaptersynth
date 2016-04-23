@@ -181,10 +181,11 @@ let concrete_state_cmdline_opts =
     "which takes 'nargs1' arguments with a call to function at "^
     "address 'addr2' which users 'nargs2' arguments");
     ("-synthesize-return-adaptor", Arg.String
-       (add_delimited_info_3 opt_synth_ret_adaptor ':'),
-     "string:addr Using adaptor of type 'string', "^
-     "replace the return argument at instruction at 'addr1' "^
-     "with an adaptor symbolic formula ");
+       (add_delimited_info_s_i_i_i opt_synth_ret_adaptor ':'),
+     "string:addr1:addr2:N Using adaptor of type 'string', "^
+       "save N argument registers at addr1, " ^
+       "replace the return value at instruction with address 'addr2' "^
+       "with an adaptor symbolic formula ");
   ]
 
 let symbolic_state_cmdline_opts =

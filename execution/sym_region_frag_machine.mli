@@ -181,6 +181,9 @@ sig
       Fragment_machine.register_name -> Vine.exp
     method set_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp -> unit
+    method save_arg_regs : int64 -> unit
+    method get_saved_arg_regs : unit -> Vine.exp list
+    method reset_saved_arg_regs : unit 
     method load_byte_symbolic  : int64 -> Vine.exp
     method store_byte_symbolic  : int64 -> Vine.exp -> unit
     method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
