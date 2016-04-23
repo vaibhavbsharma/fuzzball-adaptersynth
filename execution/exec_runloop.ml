@@ -146,8 +146,8 @@ let call_replacements fm last_eip eip =
           (Some addr2))
 	else if (adaptor_mode = "return-typeconv") && addr1 = eip then
         Some (fun () -> 
-	  fm#save_arg_regs in_nargs;
 	  Printf.printf "exec_runloop#thunk() should save arg regs here\n";
+	  fm#save_arg_regs in_nargs;
           (Some addr1))
 	else Some (fun () ->
           Printf.printf "unsupported adaptor";
@@ -162,7 +162,7 @@ let call_replacements fm last_eip eip =
 	     any other value: the length of the argument corresponding 
 	     to var_val is plugged in*)
          Some (fun () -> 
-	   (*Printf.printf "Running simple+len adaptor in call_replacements\n";*)
+	   Printf.printf "Running simple+len adaptor in call_replacements\n";
 	   (* Assuming we are running on X86_64 *)
            let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
 	   (*let lower_bound = 0L in

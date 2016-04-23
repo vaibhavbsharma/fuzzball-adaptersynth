@@ -612,16 +612,23 @@ struct
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
+      Printf.printf "fm#save_arg_regs\n";
       let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
-      assert((List.length saved_arg_regs)=0);
-      for i = 0 to (Int64.to_int nargs)-1 do
-	saved_arg_regs <- saved_arg_regs@
-	  [(self#get_reg_symbolic (List.nth arg_regs i))];
-      done
+      if (List.length saved_arg_regs) = 0 then (
+	for i = 0 to (Int64.to_int nargs)-1 do
+	  saved_arg_regs <- saved_arg_regs@
+	    [(self#get_reg_symbolic (List.nth arg_regs i))];
+	done
+      )
+      else (
+	Printf.printf "fm#save_arg_regs %d arg_regs already saved\n"
+	  (List.length saved_arg_regs);
+      )
    
     method get_saved_arg_regs () = saved_arg_regs
 
     method reset_saved_arg_regs = 
+      Printf.printf "fm#reset_saved_arg_regs\n";
       saved_arg_regs <- [];
 
     method get_in_f1_range () = in_f1_range 

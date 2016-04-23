@@ -455,6 +455,7 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 (*** simple adaptor ***)
 
 let simple_adaptor fm out_nargs in_nargs =
+  Printf.printf "Starting simple adaptor\n";
   let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
   let symbolic_args = ref [] in
   let rec main_loop n =
@@ -491,28 +492,37 @@ let simple_adaptor fm out_nargs in_nargs =
 
 
 (* Type conversion adaptor *)
-(*
-  type = 0 -> use outer function arg in val
-  type = 1 -> replace the inner function argument with a constant in val
-  type = 2 -> sign-extend the low 32-bits of the outer function arg in val
-  type > 2 -> fwiden the low 32-bits of the outer function arg in val(in-progress)
-*)
-let rec get_ite_typeconv_expr fm arg_idx idx_type regs n =
+
+let get_ite_typeconv_expr fm arg_idx idx_type regs n =
   V.Cast(V.CAST_SIGNED, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, 
 		(get_ite_arg_expr fm arg_idx idx_type regs n)
 	 )
   ) 
 
+let get_ite_ftypeconv_expr fm arg_idx idx_type regs n =
+  V.FCast(V.CAST_FWIDEN, Vine_util.ROUND_NEAREST, V.REG_64, 
+	 V.Cast(V.CAST_LOW, V.REG_32, 
+		(get_ite_arg_expr fm arg_idx idx_type regs n)
+	 )
+  ) 
+
+(*
+  type = 0 -> use outer function arg in val
+  type = 1 -> replace the inner function argument with a constant in val
+  type = 2 -> sign-extend the low 32-bits of the outer function arg in val
+  type > 2 -> fwiden the low 32-bits of the outer function arg in val(in-progress)
+*)
 let typeconv_adaptor fm out_nargs in_nargs =
+  Printf.printf "Starting typeconv adaptor\n";
   let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
   (* argument registers -- assumes SSE floating point *)
-  let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in
+  (*let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in*)
   let symbolic_args = ref [] in
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
-    let var_type = fm#get_fresh_symbolic (var_name^"_type") 1 in
+    let var_type = fm#get_fresh_symbolic (var_name^"_type") 8 in
     let arg =  
       (if out_nargs = 0L then (
 	opt_extra_conditions :=  
@@ -530,7 +540,14 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
 	   (get_ite_expr var_type V.EQ V.REG_8 0L 
 	      (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs)
-	      (get_ite_typeconv_expr fm var_val V.REG_64 arg_regs out_nargs))))
+	      (get_ite_typeconv_expr fm var_val V.REG_64 arg_regs out_nargs)
+	      (*(get_ite_expr var_type V.EQ V.REG_8 2L
+		 (get_ite_typeconv_expr fm var_val V.REG_64 arg_regs out_nargs)
+		 (get_ite_ftypeconv_expr fm var_val V.REG_64 f_arg_regs out_nargs)
+	      )*)
+	   )
+       )
+      )
     in
     Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
     symbolic_args := arg :: !symbolic_args;
@@ -547,15 +564,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 
 
 (* Return value type conversion adaptor *)
-(* 
-   type = 0 -> leave the return value unchanged, ret_val ignored
-   type = 1 -> constant in ret_val
-   type = 2 -> apply a 64-to-32 bit narrowing operation on the return value, ret_val ignored
-   type = 3 -> make the return value be one of the inner function arguments in ret_val
-   Not implementing the below types for now
-   type = 4 -> apply a 64-to-32 bit narrowing operation on one of the 
-   inner function arguments in ret_val
-*)
+
 
 let rec get_len_expr fm base_addr pos max_depth =
   (*Printf.printf 
@@ -580,18 +589,19 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
          (get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list (Int64.sub n 1L))
 
 let ret_typeconv_adaptor fm in_nargs =
+  Printf.printf "Starting return-typeconv adaptor\n";
   let saved_args_list = fm#get_saved_arg_regs () in
   assert((List.length saved_args_list) = (Int64.to_int in_nargs));
-  let ret_val = fm#get_fresh_symbolic ("ret_val") 64 in
-  let ret_type = fm#get_fresh_symbolic ("ret_type") 8 in
+  let ret_val = (fm#get_fresh_symbolic ("ret_val") 64) in
+  let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   (* TODO: try using other return argument registers like XMM0 *)
   let return_arg = fm#get_reg_symbolic R_RAX in
   (*let return_base_addr =
   try 
      fm#get_long_var R_RAX
   with NotConcrete(_) -> 0L 
-  in*)
-  let max_depth = 4L in
+  in
+  let max_depth = 4L in*)
   let arg =  
     if in_nargs = 0L then (
       opt_extra_conditions :=  
@@ -604,6 +614,15 @@ let ret_typeconv_adaptor fm in_nargs =
 	    ))
 	)
     ) 
+(* 
+   type = 0 -> leave the return value unchanged, ret_val ignored
+   type = 1 -> constant in ret_val
+   type = 2 -> apply a 64-to-32 bit narrowing operation on the return value, ret_val ignored
+   type = 3 -> make the return value be one of the inner function arguments in ret_val
+   Not implementing the below types for now
+   type = 4 -> apply a 64-to-32 bit narrowing operation on one of the 
+   inner function arguments in ret_val
+*)
     else ( 
       opt_extra_conditions :=  
 	V.BinOp(
@@ -621,7 +640,7 @@ let ret_typeconv_adaptor fm in_nargs =
 	      (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)   
 	      (*(if return_base_addr <> 0L then
 		(get_ite_expr ret_type V.EQ V.REG_8 3L
-		   (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
+		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
 		   (get_len_expr fm return_base_addr 0L max_depth)
 		)
 	      else 
@@ -632,6 +651,6 @@ let ret_typeconv_adaptor fm in_nargs =
   in
   Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
   fm#set_reg_symbolic R_RAX arg;
-
+  
 (* Return value type conversion adaptor code ends here *)
-
+  
