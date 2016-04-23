@@ -5,6 +5,7 @@ module V = Vine;;
 
 open Fragment_machine;;
 open Exec_options;;
+open Exec_exceptions;;
 
 (*** general helper code used in multiple adaptors ***)
 
@@ -493,7 +494,8 @@ let simple_adaptor fm out_nargs in_nargs =
 (*
   type = 0 -> use outer function arg in val
   type = 1 -> replace the inner function argument with a constant in val
-  type > 1 -> sign-extend the low 32-bits of the outer function arg in val
+  type = 2 -> sign-extend the low 32-bits of the outer function arg in val
+  type > 2 -> fwiden the low 32-bits of the outer function arg in val(in-progress)
 *)
 let rec get_ite_typeconv_expr fm arg_idx idx_type regs n =
   V.Cast(V.CAST_SIGNED, V.REG_64, 
@@ -504,6 +506,8 @@ let rec get_ite_typeconv_expr fm arg_idx idx_type regs n =
 
 let typeconv_adaptor fm out_nargs in_nargs =
   let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  (* argument registers -- assumes SSE floating point *)
+  let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in
   let symbolic_args = ref [] in
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
@@ -553,6 +557,21 @@ let typeconv_adaptor fm out_nargs in_nargs =
    inner function arguments in ret_val
 *)
 
+let rec get_len_expr fm base_addr pos max_depth =
+  (*Printf.printf 
+    "get_len_expr pos = %Ld base_addr = %Lx\n" 
+    pos base_addr;*)
+  let b = (fm#load_byte_symbolic (Int64.add base_addr pos)) in
+  if pos < max_depth then
+    get_ite_expr b V.EQ V.REG_8 0L 
+      (V.Constant(V.Int(V.REG_64,0L)))
+      (V.BinOp(V.PLUS,V.Constant(V.Int(V.REG_64,1L)),
+	       (get_len_expr fm base_addr (Int64.succ pos) max_depth)))
+  else
+    get_ite_expr b V.EQ V.REG_8 0L
+      (V.Constant(V.Int(V.REG_64,0L)))
+      (V.Constant(V.Int(V.REG_64,1L)))
+
 let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
   if n = 1L
   then (List.nth saved_args_list 0) 
@@ -567,13 +586,13 @@ let ret_typeconv_adaptor fm in_nargs =
   let ret_type = fm#get_fresh_symbolic ("ret_type") 8 in
   (* TODO: try using other return argument registers like XMM0 *)
   let return_arg = fm#get_reg_symbolic R_RAX in
+  (*let return_base_addr =
+  try 
+     fm#get_long_var R_RAX
+  with NotConcrete(_) -> 0L 
+  in*)
+  let max_depth = 4L in
   let arg =  
-    (*get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
-      (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-      (V.Cast(V.CAST_SIGNED, V.REG_64, 
-      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-      ))
-      )*)
     if in_nargs = 0L then (
       opt_extra_conditions :=  
         V.BinOp(V.LT,ret_type,V.Constant(V.Int(V.REG_8,3L)))
@@ -597,8 +616,16 @@ let ret_typeconv_adaptor fm in_nargs =
 	   (get_ite_expr ret_type V.EQ V.REG_8 2L 
 	      (V.Cast(V.CAST_SIGNED, V.REG_64, 
 		      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-	       ))    
-	      (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
+	       )
+	      )
+	      (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)   
+	      (*(if return_base_addr <> 0L then
+		(get_ite_expr ret_type V.EQ V.REG_8 3L
+		   (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
+		   (get_len_expr fm return_base_addr 0L max_depth)
+		)
+	      else 
+		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs))*)
 	   )
 	)
     )
