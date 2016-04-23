@@ -11,3 +11,5 @@ val simple_adaptor :
   Fragment_machine.fragment_machine -> int64 -> int64 -> unit
 val typeconv_adaptor : 
   Fragment_machine.fragment_machine -> int64 -> int64 -> unit
+val ret_typeconv_adaptor :
+  Fragment_machine.fragment_machine -> int64 -> unit

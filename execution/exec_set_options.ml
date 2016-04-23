@@ -180,6 +180,11 @@ let concrete_state_cmdline_opts =
     "replace the outer function call at 'addr1' "^
     "which takes 'nargs1' arguments with a call to function at "^
     "address 'addr2' which users 'nargs2' arguments");
+    ("-synthesize-return-adaptor", Arg.String
+       (add_delimited_info_3 opt_synth_ret_adaptor ':'),
+     "string:addr Using adaptor of type 'string', "^
+     "replace the return argument at instruction at 'addr1' "^
+     "with an adaptor symbolic formula ");
   ]
 
 let symbolic_state_cmdline_opts =

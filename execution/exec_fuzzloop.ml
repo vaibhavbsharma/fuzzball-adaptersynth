@@ -136,6 +136,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else if mode = "chartrans"
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
+     if (List.length !opt_synth_ret_adaptor) <> 0 then (
+       ignore(fm#get_fresh_symbolic ("ret_type") 8);
+       ignore(fm#get_fresh_symbolic ("ret_val") 64););
+ 
      
      
      if !opt_trace_setup then

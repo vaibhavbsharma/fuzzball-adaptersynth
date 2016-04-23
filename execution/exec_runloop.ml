@@ -44,6 +44,14 @@ let call_replacements fm last_eip eip =
 	else ret)
       None l
   in
+  let lookup_ret_info targ l = 
+    List.fold_left
+      (fun ret (str, addr, nargs) ->
+	if ((canon_eip addr) = (canon_eip targ)) then
+	  Some (str,addr,nargs) 
+	else ret)
+      None l
+  in
     match ((lookup eip      !opt_skip_func_addr),
 	   (lookup eip      !opt_skip_func_addr_symbol),
 	   (lookup eip      !opt_skip_func_addr_region),
@@ -52,25 +60,26 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_symbol_once),
 	   (lookup last_eip !opt_skip_call_addr_region),
 	   (lookup_info last_eip !opt_synth_adaptor),
+	   (lookup_ret_info eip !opt_synth_ret_adaptor),
 	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor))
     with
-      | (None, None, None, None, None, None, None, None, None) -> None
-      | (Some sfa_val, None, None, None, None, None, None, None, None) ->
+      | (None, None, None, None, None, None, None, None, None, None) -> None
+      | (Some sfa_val, None, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_var ret_reg sfa_val; None)
-      | (None, Some sfas_sym, None, None, None, None, None, None, None) ->
+      | (None, Some sfas_sym, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_symbolic ret_reg sfas_sym; None)
-      | (None, None, Some sfar_sym, None, None, None, None, None, None) ->
+      | (None, None, Some sfar_sym, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg sfar_sym; None)
-      | (None, None, None, Some cfa_val, None, None, None, None, None) ->
+      | (None, None, None, Some cfa_val, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_var ret_reg cfa_val; None)
-      | (None, None, None, None, Some cfas_sym, None, None, None, None) ->
+      | (None, None, None, None, Some cfas_sym, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_symbolic ret_reg cfas_sym; None)
-      | (None, None, None, None, None, Some cfaso_sym, None, None, None) ->
+      | (None, None, None, None, None, Some cfaso_sym, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_symbolic ret_reg cfaso_sym; None)
-      | (None, None, None, None, None, None, Some cfar_sym, None, None) ->
+      | (None, None, None, None, None, None, Some cfar_sym, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
-          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None) ->
+          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None, None) ->
           (*** simple adaptor ***)
           if adaptor_mode = "simple" 
           then Some (fun () -> 
@@ -129,6 +138,15 @@ let call_replacements fm last_eip eip =
             Printf.printf "unsupported adaptor";
             (Some in_addr))
       | (None, None, None, None, None, None, None, None, 
+          Some (adaptor_mode, addr, in_nargs), None) ->
+	if adaptor_mode = "return-typeconv" 
+        then Some (fun () -> 
+	  Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
+          (Some addr))
+	else Some (fun () ->
+          Printf.printf "unsupported adaptor";
+          (Some addr))
+      | (None, None, None, None, None, None, None, None, None,
 	 Some (out_nargs, in_addr, in_nargs, max_depth)) ->
 	  (* an adaptor that tries permutations of arguments as well as 
 	     permutations of length of other arguments
@@ -313,33 +331,42 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
                                  (Int64.logand eip 1L), thunk ()) with
 	    | (X86, _,_) -> [|'\xc3'|] (* ret *)
 	    | (X64, _,None) -> [|'\xc3'|] (* ret *)
-	    | (X64, _,Some in_addr) ->  (* Jump to the inner function *)
-              let temp = (Int64.sub in_addr eip) in
-	      let offset = (Int64.sub temp 5L) in
-	      let offset_byte_0 = (Int64.logand offset 255L) in
-	      let offset_byte_1 = 
-		(Int64.shift_right_logical 
-		   (Int64.logand offset (Int64.shift_left 255L 8)) 8) in
-	      let offset_byte_2 = 
-		(Int64.shift_right_logical 
-		   (Int64.logand offset (Int64.shift_left 255L 16)) 16) in
-	      let offset_byte_3 = 
-		(Int64.shift_right_logical 
-		   (Int64.logand offset (Int64.shift_left 255L 24)) 24) in
-              let offset_char_arr = [|(char_of_int (Int64.to_int offset_byte_0));
-				      (char_of_int (Int64.to_int offset_byte_1));
-				      (char_of_int (Int64.to_int offset_byte_2));
-				      (char_of_int (Int64.to_int offset_byte_3))|] in
+	    | (X64, _,Some addr) ->  (* Jump to the inner function *)
+	      if addr <> eip then (
+		let in_addr = addr in
+		let temp = (Int64.sub in_addr eip) in
+		let offset = (Int64.sub temp 5L) in
+		let offset_byte_0 = (Int64.logand offset 255L) in
+		let offset_byte_1 = 
+		  (Int64.shift_right_logical 
+		     (Int64.logand offset (Int64.shift_left 255L 8)) 8) in
+		let offset_byte_2 = 
+		  (Int64.shift_right_logical 
+		     (Int64.logand offset (Int64.shift_left 255L 16)) 16) in
+		let offset_byte_3 = 
+		  (Int64.shift_right_logical 
+		     (Int64.logand offset (Int64.shift_left 255L 24)) 24) in
+		let offset_char_arr = [|(char_of_int (Int64.to_int offset_byte_0));
+					(char_of_int (Int64.to_int offset_byte_1));
+					(char_of_int (Int64.to_int offset_byte_2));
+					(char_of_int (Int64.to_int offset_byte_3))|] in
 	      (*Printf.printf "eip %Lx:jumping to adapter %Lx using offset %Lx\n" 
 		eip in_addr offset;*)
               (*Array.iter 
                 ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
-	      Array.append [|'\xe9'|] offset_char_arr
+		Array.append [|'\xe9'|] offset_char_arr)
+	      else (* noop because this was a return value adaptor *)
+		(
+		  Printf.printf "nooping because no call replacement required\n";
+		  [||]
+		)
 	    | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
 	    | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
 	    | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
 	  in
-	  decode_insn asmir_gamma eip fake_insn
+	  if (Array.length fake_insn) <> 0 then
+	    decode_insn asmir_gamma eip fake_insn
+	  else prog
       in
 	if !opt_trace_insns then
 	  print_insns eip prog' None '\n';

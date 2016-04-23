@@ -487,20 +487,19 @@ let simple_adaptor fm out_nargs in_nargs =
 
 (* Simple adaptor code ends here *)
 
-(* Type conversion adaptor *)
 
+(* Type conversion adaptor *)
+(*
+  type = 0 -> use outer function arg in val
+  type = 1 -> replace the inner function argument with a constant in val
+  type > 1 -> sign-extend the low 32-bits of the outer function arg in val
+*)
 let rec get_ite_typeconv_expr fm arg_idx idx_type regs n =
-  if n = 1L
-  then V.Cast(V.CAST_SIGNED, V.REG_64, 
-	       V.Cast(V.CAST_LOW, V.REG_32, (fm#get_reg_symbolic (List.nth regs 0)))) 
-  else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
-    (V.Cast(V.CAST_SIGNED, V.REG_64, 
-	    V.Cast(V.CAST_LOW, V.REG_32, 
-		   (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
-	    )
-     )
-    )
-    (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
+  V.Cast(V.CAST_SIGNED, V.REG_64, 
+	 V.Cast(V.CAST_LOW, V.REG_32, 
+		(get_ite_arg_expr fm arg_idx idx_type regs n)
+	 )
+  ) 
 
 let typeconv_adaptor fm out_nargs in_nargs =
   let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
@@ -539,3 +538,63 @@ let typeconv_adaptor fm out_nargs in_nargs =
   )
 
 (* Type conversion adaptor code ends here *)
+
+
+
+(* Return value type conversion adaptor *)
+(* 
+   type = 0 -> leave the return value unchanged, ret_val ignored
+   type = 1 -> constant in ret_val
+   type = 2 -> apply a 64-to-32 bit narrowing operation on the return value, ret_val ignored
+   type = 3 -> make the return value be one of the inner function arguments in ret_val
+   Not implementing the below types for now
+   type = 4 -> apply a 64-to-32 bit narrowing operation on one of the 
+   inner function arguments in ret_val
+*)
+let ret_typeconv_adaptor fm in_nargs =
+  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let ret_val = fm#get_fresh_symbolic ("ret_val") 64 in
+  let ret_type = fm#get_fresh_symbolic ("ret_type") 8 in
+  (* TODO: try using other return argument registers like XMM0 *)
+  let return_arg = fm#get_reg_symbolic R_RAX in
+  let arg =  
+    (*get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
+      (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+	 (V.Cast(V.CAST_SIGNED, V.REG_64, 
+		(V.Cast(V.CAST_LOW, V.REG_32, return_arg))
+	 ))
+      )*)
+    if in_nargs = 0L then (
+      opt_extra_conditions :=  
+        V.BinOp(V.LT,ret_type,V.Constant(V.Int(V.REG_8,3L)))
+			    :: !opt_extra_conditions;
+      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
+      (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+	 (V.Cast(V.CAST_SIGNED, V.REG_64, 
+		(V.Cast(V.CAST_LOW, V.REG_32, return_arg))
+	 ))
+      )
+    ) 
+    else ( 
+      opt_extra_conditions :=  
+	V.BinOp(
+          V.BITOR,
+          V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
+          V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
+			    :: !opt_extra_conditions;
+      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
+	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+	   (get_ite_expr ret_type V.EQ V.REG_8 2L 
+	      (V.Cast(V.CAST_SIGNED, V.REG_64, 
+		      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
+	       ))    
+	      (get_ite_arg_expr fm ret_val V.REG_64 arg_regs in_nargs)
+	   )
+	)
+    )
+  in
+  Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
+  fm#set_reg_symbolic R_RAX arg;
+
+(* Return value type conversion adaptor code ends here *)
+
