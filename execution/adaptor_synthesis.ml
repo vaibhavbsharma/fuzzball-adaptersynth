@@ -493,15 +493,15 @@ let simple_adaptor fm out_nargs in_nargs =
 
 (* Type conversion adaptor *)
 
-let get_ite_typeconv_expr fm arg_idx idx_type regs n =
-  V.Cast(V.CAST_SIGNED, V.REG_64, 
+let get_ite_ftypeconv_expr fm arg_idx idx_type regs n =
+  V.FCast(V.CAST_FWIDEN, Vine_util.ROUND_NEAREST, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, 
 		(get_ite_arg_expr fm arg_idx idx_type regs n)
 	 )
   ) 
 
-let get_ite_ftypeconv_expr fm arg_idx idx_type regs n =
-  V.FCast(V.CAST_FWIDEN, Vine_util.ROUND_NEAREST, V.REG_64, 
+let get_ite_typeconv_expr fm arg_idx idx_type regs n =
+  V.Cast(V.CAST_SIGNED, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, 
 		(get_ite_arg_expr fm arg_idx idx_type regs n)
 	 )
@@ -565,7 +565,6 @@ let typeconv_adaptor fm out_nargs in_nargs =
 
 (* Return value type conversion adaptor *)
 
-
 let rec get_len_expr fm base_addr pos max_depth =
   (*Printf.printf 
     "get_len_expr pos = %Ld base_addr = %Lx\n" 
@@ -588,6 +587,32 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
          (List.nth saved_args_list ((Int64.to_int n) - 1))
          (get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list (Int64.sub n 1L))
 
+(* 
+   type = 0 -> leave the return value unchanged, ret_val ignored
+   type = 1 -> constant in ret_val
+   type = 11 -> 32-to-64 bit sign extension on inner function arg in ret_val
+   type = 12 -> 32-to-64 bit zero extension on inner function arg in ret_val
+   type = 21 -> 16-to-64 bit sign extension on inner function arg in ret_val
+   type = 22 -> 16-to-64 bit zero extension on inner function arg in ret_val
+   type = 31 -> 8-to-64 bit sign extension on inner function arg in ret_val
+   type = 32 -> 8-to-64 bit zero extension on inner function arg in ret_val
+   type = 41 -> 1-to-64 bit sign extension on inner function arg in ret_val
+   type = 42 -> 1-to-64 bit zero extension on inner function arg in ret_val
+   type = 51 -> 32-to-64 bit sign extension on return_arg, ret_val ignored
+   type = 52 -> 32-to-64 bit zero extension on return_arg, ret_val ignored
+   type = 61 -> 16-to-64 bit sign extension on return_arg, ret_val ignored
+   type = 62 -> 16-to-64 bit zero extension on return_arg, ret_val ignored
+   type = 71 -> 8-to-64 bit sign extension on return_arg, ret_val ignored
+   type = 72 -> 8-to-64 bit zero extension on return_arg, ret_val ignored
+   type = 81 -> 1-to-64 bit sign extension on return_arg, ret_val ignored
+   type = 82 -> 1-to-64 bit zero extension on return_arg, ret_val ignored
+*)
+
+let get_typeconv_expr src_operand src_type extend_op =
+  V.Cast(extend_op, V.REG_64, 
+	 (V.Cast(V.CAST_LOW, src_type, src_operand))
+  )
+
 let ret_typeconv_adaptor fm in_nargs =
   Printf.printf "Starting return-typeconv adaptor\n";
   let saved_args_list = fm#get_saved_arg_regs () in
@@ -596,33 +621,51 @@ let ret_typeconv_adaptor fm in_nargs =
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   (* TODO: try using other return argument registers like XMM0 *)
   let return_arg = fm#get_reg_symbolic R_RAX in
+  let ite_saved_arg_expr = 
+    (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs) in
+  let type_11_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_SIGNED) in
+  let type_12_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_UNSIGNED) in
+  let type_21_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_SIGNED) in
+  let type_22_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_UNSIGNED) in
+  let type_31_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_SIGNED) in
+  let type_32_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_UNSIGNED) in
+  let type_41_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_SIGNED) in
+  let type_42_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_UNSIGNED) in
+  let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
+  let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
+  let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
+  let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
+  let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
+  let type_72_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_UNSIGNED) in
+  let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
+  let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in
+    
   (*let return_base_addr =
   try 
      fm#get_long_var R_RAX
   with NotConcrete(_) -> 0L 
   in
   let max_depth = 4L in*)
+  
   let arg =  
-    if in_nargs = 0L then (
-      opt_extra_conditions :=  
-        V.BinOp(V.LT,ret_type,V.Constant(V.Int(V.REG_8,3L)))
-			    :: !opt_extra_conditions;
+    (if in_nargs = 0L then (
+      (*opt_extra_conditions := 
+	V.BinOp(V.BITOR, 
+		V.BinOp(V.LE,ret_type,V.Constant(V.Int(V.REG_8,1L))),
+		V.BinOp(V.GE,ret_type,V.Constant(V.Int(V.REG_8,51L))))
+			    :: !opt_extra_conditions;*)
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
 	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	   (V.Cast(V.CAST_SIGNED, V.REG_64, 
-		   (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-	    ))
-	)
+	   (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
+	      (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
+		 (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+		    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+		       (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+			  (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+			     (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+				type_82_expr)
+			  )))))))
     ) 
-(* 
-   type = 0 -> leave the return value unchanged, ret_val ignored
-   type = 1 -> constant in ret_val
-   type = 2 -> apply a 64-to-32 bit narrowing operation on the return value, ret_val ignored
-   type = 3 -> make the return value be one of the inner function arguments in ret_val
-   Not implementing the below types for now
-   type = 4 -> apply a 64-to-32 bit narrowing operation on one of the 
-   inner function arguments in ret_val
-*)
     else ( 
       opt_extra_conditions :=  
 	V.BinOp(
@@ -632,12 +675,24 @@ let ret_typeconv_adaptor fm in_nargs =
 			    :: !opt_extra_conditions;
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
 	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	   (get_ite_expr ret_type V.EQ V.REG_8 2L 
-	      (V.Cast(V.CAST_SIGNED, V.REG_64, 
-		      (V.Cast(V.CAST_LOW, V.REG_32, return_arg))
-	       )
-	      )
-	      (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)   
+	 (get_ite_expr ret_type V.EQ V.REG_8 11L type_11_expr
+	  (get_ite_expr ret_type V.EQ V.REG_8 12L type_12_expr
+           (get_ite_expr ret_type V.EQ V.REG_8 21L type_21_expr
+            (get_ite_expr ret_type V.EQ V.REG_8 22L type_22_expr
+             (get_ite_expr ret_type V.EQ V.REG_8 31L type_31_expr
+              (get_ite_expr ret_type V.EQ V.REG_8 32L type_32_expr
+               (get_ite_expr ret_type V.EQ V.REG_8 41L type_41_expr
+                (get_ite_expr ret_type V.EQ V.REG_8 42L type_42_expr
+                 (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
+                  (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
+                   (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+                    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+                     (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+                      (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+                       (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                         type_82_expr)
+			  )))))))))))))))
+
 	      (*(if return_base_addr <> 0L then
 		(get_ite_expr ret_type V.EQ V.REG_8 3L
 		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
@@ -645,7 +700,6 @@ let ret_typeconv_adaptor fm in_nargs =
 		)
 	      else 
 		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs))*)
-	   )
 	)
     )
   in
