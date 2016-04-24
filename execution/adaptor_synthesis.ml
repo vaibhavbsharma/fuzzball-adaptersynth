@@ -535,15 +535,6 @@ let typeconv_adaptor fm out_nargs in_nargs =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
     let var_type = fm#get_fresh_symbolic (var_name^"_type") 8 in
-    let ite_arg_expr = (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) in
-    let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
-    let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
-    let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
-    let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
-    let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
-    let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
-    let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
-    let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
     let arg =  
       (if out_nargs = 0L then (
 	opt_extra_conditions :=  
@@ -552,6 +543,15 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	var_val
        ) 
        else ( 
+	 let ite_arg_expr = (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) in
+	 let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
+	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
+	 let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
+	 let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
+	 let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
+	 let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
+	 let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
+	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
 	 opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -576,7 +576,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
        )
       )
     in
-    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+    (*Printf.printf "setting arg=%s\n" (V.exp_to_string arg);*)
     symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
@@ -643,16 +643,6 @@ let ret_typeconv_adaptor fm in_nargs =
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   (* TODO: try using other return argument registers like XMM0 *)
   let return_arg = fm#get_reg_symbolic R_RAX in
-  let ite_saved_arg_expr = 
-    (get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs) in
-  let type_11_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_SIGNED) in
-  let type_12_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_UNSIGNED) in
-  let type_21_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_SIGNED) in
-  let type_22_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_UNSIGNED) in
-  let type_31_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_SIGNED) in
-  let type_32_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_UNSIGNED) in
-  let type_41_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_SIGNED) in
-  let type_42_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_UNSIGNED) in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
@@ -689,6 +679,16 @@ let ret_typeconv_adaptor fm in_nargs =
 			  )))))))
     ) 
     else ( 
+      let ite_saved_arg_expr = 
+	(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs) in
+      let type_11_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_SIGNED) in
+      let type_12_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_UNSIGNED) in
+      let type_21_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_SIGNED) in
+      let type_22_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_UNSIGNED) in
+      let type_31_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_SIGNED) in
+      let type_32_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_UNSIGNED) in
+      let type_41_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_SIGNED) in
+      let type_42_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_UNSIGNED) in
       opt_extra_conditions :=  
 	V.BinOp(
           V.BITOR,
@@ -725,7 +725,7 @@ let ret_typeconv_adaptor fm in_nargs =
 	)
     )
   in
-  Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
+  (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
   fm#set_reg_symbolic R_RAX arg;
   
 (* Return value type conversion adaptor code ends here *)
