@@ -612,7 +612,7 @@ struct
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
-      Printf.printf "fm#save_arg_regs\n";
+      (* Printf.printf "fm#save_arg_regs\n"; *)
       let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
       if (List.length saved_arg_regs) = 0 then (
 	for i = 0 to (Int64.to_int nargs)-1 do
@@ -628,7 +628,7 @@ struct
     method get_saved_arg_regs () = saved_arg_regs
 
     method reset_saved_arg_regs = 
-      Printf.printf "fm#reset_saved_arg_regs\n";
+      (* Printf.printf "fm#reset_saved_arg_regs\n"; *)
       saved_arg_regs <- [];
 
     method get_in_f1_range () = in_f1_range 

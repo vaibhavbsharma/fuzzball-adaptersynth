@@ -726,7 +726,52 @@ let ret_typeconv_adaptor fm in_nargs =
     )
   in
   (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
-  fm#set_reg_symbolic R_RAX arg;
+  fm#set_reg_symbolic R_RAX arg
   
 (* Return value type conversion adaptor code ends here *)
-  
+
+(*
+   type = 0 -> leave the return value unchanged, ret_val ignored
+   type = 1 -> constant in ret_val
+   type = 2 -> length of normal return value
+   type = 3 -> copy of an argument, ret_val counts args from zero
+   type = 4 -> length of an argument, ret_val counts args from zero TODO
+*)
+
+let ret_simplelen_adaptor fm in_nargs =
+  (*Printf.printf "Starting return-simplelen adaptor\n";*)
+  assert(in_nargs <> 0L);
+  let saved_args_list = fm#get_saved_arg_regs () in
+    assert((List.length saved_args_list) = (Int64.to_int in_nargs));
+    let ret_val = fm#get_fresh_symbolic "ret_val" 64 in
+    let ret_type = fm#get_fresh_symbolic "ret_type" 8 in
+    let return_arg = fm#get_reg_symbolic R_RAX in
+    let ite_saved_arg_expr =
+      get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs in
+    let return_base_addr =
+      try
+	fm#get_long_var R_RAX
+      with NotConcrete(_) -> 0L
+    in
+    let max_depth = 100L in
+    let ret_len_expr =
+      (if return_base_addr <> 0L then
+	 get_len_expr fm return_base_addr 0L max_depth
+       else
+	 V.Constant(V.Int(V.REG_64, 0L))) in
+    let arg =
+      (get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
+	 (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+	    (get_ite_expr ret_type V.EQ V.REG_8 2L ret_len_expr
+	       (* get_ite_expr ret_type V.EQ V.REG_8 3L*) ite_saved_arg_expr
+	    )))
+    in
+      opt_extra_conditions :=
+	V.BinOp(
+	  V.BITOR,
+	  V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
+	  V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
+      :: !opt_extra_conditions;
+      fm#reset_saved_arg_regs;
+      (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
+      fm#set_reg_symbolic R_RAX arg

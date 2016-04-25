@@ -149,8 +149,16 @@ let call_replacements fm last_eip eip =
 	  Printf.printf "exec_runloop#thunk() should save arg regs here\n";
 	  fm#save_arg_regs in_nargs;
           (Some addr1))
+	else if (adaptor_mode = "return-simple+len") && addr2 = eip then
+          Some (fun () ->
+		  Adaptor_synthesis.ret_simplelen_adaptor fm in_nargs;
+		  (Some addr2))
+	else if (adaptor_mode = "return-simple+len") && addr1 = eip then
+          Some (fun () ->
+		  fm#save_arg_regs in_nargs;
+		  (Some addr1))
 	else Some (fun () ->
-          Printf.printf "unsupported adaptor";
+          Printf.printf "unsupported adaptor\n";
           (Some eip))
       | (None, None, None, None, None, None, None, None, None,
 	 Some (out_nargs, in_addr, in_nargs, max_depth)) ->
@@ -363,7 +371,7 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 		Array.append [|'\xe9'|] offset_char_arr)
 	      else (* noop because this was a return value adaptor *)
 		(
-		  Printf.printf "nooping because no call replacement required\n";
+		  (* Printf.printf "nooping because no call replacement required\n"; *)
 		  [||]
 		)
 	    | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
