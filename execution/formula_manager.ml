@@ -707,7 +707,7 @@ when special_ec_vars\n"; *)
 	(fun e ->
 	  (*Printf.printf "formula_manager.ml#simplify_with_callback e=%s\n"
 	    (V.exp_to_string e);*)
-	  let e_replaced = self#rewrite_special_ec_vars e in
+	  let e_replaced = e in (*self#rewrite_special_ec_vars e in*)
 	  (*Printf.printf "formula_manager.ml#simplify_with_callback e_replaced=%s\n"
 	    (V.exp_to_string e_replaced);*)
 	  let e2 = simplify_fp e_replaced in

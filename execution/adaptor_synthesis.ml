@@ -558,6 +558,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
              V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
              V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
 			       :: !opt_extra_conditions;
+
+
 	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
 	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
 	    (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
@@ -569,10 +571,6 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	          (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
                      type_42_expr)
 		 )))))))
-	      (*(get_ite_expr var_type V.EQ V.REG_8 2L
-		 (get_ite_typeconv_expr fm var_val V.REG_64 arg_regs out_nargs)
-		 (get_ite_ftypeconv_expr fm var_val V.REG_64 f_arg_regs out_nargs)
-	      )*)
        )
       )
     in
@@ -652,13 +650,6 @@ let ret_typeconv_adaptor fm in_nargs =
   let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
   let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in
     
-  (*let return_base_addr =
-  try 
-     fm#get_long_var R_RAX
-  with NotConcrete(_) -> 0L 
-  in
-  let max_depth = 4L in*)
-  
   let arg =  
     (if in_nargs = 0L then (
       (*opt_extra_conditions := 
@@ -714,18 +705,11 @@ let ret_typeconv_adaptor fm in_nargs =
                        (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
                          type_82_expr)
 			  )))))))))))))))
-
-	      (*(if return_base_addr <> 0L then
-		(get_ite_expr ret_type V.EQ V.REG_8 3L
-		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs)
-		   (get_len_expr fm return_base_addr 0L max_depth)
-		)
-	      else 
-		(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs))*)
 	)
     )
   in
   (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
+  fm#reset_saved_arg_regs;
   fm#set_reg_symbolic R_RAX arg
   
 (* Return value type conversion adaptor code ends here *)
