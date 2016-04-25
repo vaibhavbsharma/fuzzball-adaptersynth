@@ -177,14 +177,14 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 3
+let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
    V.NEG; V.NOT *)
-let int_binops = [V.PLUS; V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]
+let int_binops = [V.PLUS; V.MINUS; V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]
 let int_unops = [V.NEG; V.NOT]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
