@@ -181,6 +181,13 @@ struct
     in
       FormMan.map_expr_temp form_man e f combine
 
+  let narrow_bitwidth_cutoff () =
+    match (!opt_narrow_bitwidth_cutoff, (reg_addr ())) with
+      | ((Some i), _) -> i
+      | (_, V.REG_32) -> 23
+      | (_, V.REG_64) -> 40
+      | (_, _) -> 23
+
   let ctz i =
     let rec loop = function
       | 0L -> 64
@@ -346,10 +353,10 @@ struct
       | V.BinOp(V.TIMES, _, _)
 	  -> ExprOffset(e)
       | e when (narrow_bitwidth form_man e)
-	  < (if reg_addr () == V.REG_32 then 23 else 40)
+	  < (narrow_bitwidth_cutoff ())
 	  -> ExprOffset(e)
       | e when (narrow_bitwidth_signed form_man e)
-	  < (if reg_addr () == V.REG_32 then 23 else 40)
+	  < (narrow_bitwidth_cutoff ())
 	  -> ExprOffset(e)
       | V.BinOp(V.ARSHIFT, _, _)
 	  -> ExprOffset(e)
