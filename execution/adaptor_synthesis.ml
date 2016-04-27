@@ -523,6 +523,7 @@ let get_typeconv_expr src_operand src_type extend_op =
    type = 32 -> 8-to-64 bit zero extension on outer function arg in var_val
    type = 41 -> 1-to-64 bit sign extension on outer function arg in var_val
    type = 42 -> 1-to-64 bit zero extension on outer function arg in var_val
+   type = 43 -> 64-to-1 bit ITE operation on outer function arg in var_val
 *)
 
 let typeconv_adaptor fm out_nargs in_nargs =
@@ -552,6 +553,10 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
 	 let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
 	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
+	 let type_43_expr = 
+	   (get_ite_expr ite_arg_expr V.EQ V.REG_64 0L 
+	      (V.Constant(V.Int(V.REG_64,0L))) 
+	      (V.Constant(V.Int(V.REG_64,1L)))) in
 	 opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -569,8 +574,9 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	        (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
                  (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
 	          (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
-                     type_42_expr)
-		 )))))))
+                   (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
+		      type_43_expr)
+		  ))))))))
        )
       )
     in
@@ -625,6 +631,7 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
    type = 42 -> 1-to-64 bit zero extension on inner function arg in ret_val
    type = 51 -> 32-to-64 bit sign extension on return_arg, ret_val ignored
    type = 52 -> 32-to-64 bit zero extension on return_arg, ret_val ignored
+   type = 53 -> 64-to-1 bit ITE operation on return_arg, ret_val ignored
    type = 61 -> 16-to-64 bit sign extension on return_arg, ret_val ignored
    type = 62 -> 16-to-64 bit zero extension on return_arg, ret_val ignored
    type = 71 -> 8-to-64 bit sign extension on return_arg, ret_val ignored
@@ -643,6 +650,9 @@ let ret_typeconv_adaptor fm in_nargs =
   let return_arg = fm#get_reg_symbolic R_RAX in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
+  let type_53_expr = (get_ite_expr return_arg V.EQ V.REG_64 0L 
+			       (V.Constant(V.Int(V.REG_64,0L))) 
+			       (V.Constant(V.Int(V.REG_64,1L)))) in
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
   let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
   let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
@@ -658,16 +668,17 @@ let ret_typeconv_adaptor fm in_nargs =
 		V.BinOp(V.GE,ret_type,V.Constant(V.Int(V.REG_8,51L))))
 			    :: !opt_extra_conditions;*)
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
-	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	   (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
-	      (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
-		 (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
-		    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
-		       (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
-			  (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
-			     (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
-				type_82_expr)
-			  )))))))
+       (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+        (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
+         (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
+          (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
+           (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+            (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+             (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+              (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+               (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                 type_82_expr)
+	      ))))))))
     ) 
     else ( 
       let ite_saved_arg_expr = 
@@ -698,13 +709,14 @@ let ret_typeconv_adaptor fm in_nargs =
                 (get_ite_expr ret_type V.EQ V.REG_8 42L type_42_expr
                  (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
                   (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
-                   (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
-                    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
-                     (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
-                      (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
-                       (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
-                         type_82_expr)
-			  )))))))))))))))
+                   (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
+                    (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+                     (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+                      (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+                       (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+                        (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                          type_82_expr)
+			  ))))))))))))))))
 	)
     )
   in
