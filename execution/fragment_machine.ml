@@ -401,7 +401,10 @@ class virtual fragment_machine = object
   method virtual reset_saved_arg_regs : unit
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
-  
+ 
+  method virtual add_f1_store : int64 -> unit
+  method virtual add_f2_store : int64 -> unit
+ 
   method virtual set_long_reg_symbolic : register_name -> string -> unit
   method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
 
@@ -609,6 +612,21 @@ struct
     val mutable f2_syscalls_arg_num = 0
  
     val mutable saved_arg_regs:(Vine.exp list) = []
+
+    val mutable saved_f1_rsp = 0L
+    val mutable saved_f2_rsp = 0L
+
+    method add_f1_store addr = 
+      (*Printf.printf "FM#add_f1_store: mem store in f1(%08Lx) at %08Lx\n" 
+	saved_f1_rsp addr;*)
+      (*if (saved_f1_rsp <= addr) || (addr <= 0x60000000L) then
+	Printf.printf "FM#add_f1_store: outside local var";*)
+      ()
+    
+    method add_f2_store addr = 
+      (*Printf.printf "FM#add_f2_store: mem store in f2(%08Lx) at %08Lx\n" 
+	saved_f2_rsp addr;*)
+      ()
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
@@ -824,14 +842,18 @@ struct
       List.iter (
 	fun (start1,end1,start2,end2) ->
 	  if eip = start1 then 
-	    (in_f1_range <- true)
+	    (saved_f1_rsp <- self#get_long_var R_RSP; 
+	     in_f1_range <- true)
 	  else if eip = end1 then 
-	    (in_f1_range <- false;
+	    (saved_f1_rsp <- 0L;
+	     in_f1_range <- false;
 	    (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*));
 	  if eip = start2 then 
-	    (in_f2_range <- true)
+	    (saved_f2_rsp <- self#get_long_var R_RSP;
+	     in_f2_range <- true)
 	  else if eip = end2 then 
-	    (in_f2_range <- false);
+	    (saved_f2_rsp <- 0L;
+	     in_f2_range <- false);
       ) 
 	!opt_match_syscalls_addr_range;
       self#watchpoint
