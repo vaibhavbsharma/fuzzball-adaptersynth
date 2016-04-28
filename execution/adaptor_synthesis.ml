@@ -177,9 +177,9 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 1
+let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = V.REG_64
+let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
@@ -190,14 +190,14 @@ let int_unops = [V.NEG; V.NOT]
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
    zero if used) *)
-let int_restrict_constant_range = None
+let int_restrict_constant_range = Some (-1L, 127L)
 let int_restrict_constant_list = None
 (* restrict the input and output of the adaptor (input restrictions reflect
    f1 preconditions and output restrictions reflect f2 preconditions)
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
    int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
    this list must contain zero if used) *)
-let int_restrict_input_range = None
+let int_restrict_input_range = Some (0L, 2147483647L)
 let int_restrict_input_list = None
 let int_restrict_output_range = None (* TODO *)
 let int_restrict_output_list = None (* TODO *)
