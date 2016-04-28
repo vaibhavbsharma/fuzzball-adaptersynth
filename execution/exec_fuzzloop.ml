@@ -127,9 +127,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
        else if mode = "typeconv"
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
-       else if mode = "arithmetic_int" 
-            then Adaptor_synthesis.arithmetic_int_extra_conditions
-                   fm out_nargs ((Int64.to_int in_nargs)-1)
+       else if (mode = "arithmetic_int")   
+            then (
+	      if (in_nargs <> 0L) then
+		Adaptor_synthesis.arithmetic_int_extra_conditions
+		  fm out_nargs ((Int64.to_int in_nargs)-1);)
        else if mode = "arithmetic_float"
             then Adaptor_synthesis.arithmetic_float_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
