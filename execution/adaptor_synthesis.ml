@@ -55,23 +55,32 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth =
       let node_val = fm#get_fresh_symbolic (var ^ "_val_" ^ base) 
                        (if val_type = V.REG_32 then 32 else 64) in
       if d = 1 
-      then get_ite_expr node_type V.EQ V.REG_8 0L 
-             node_val 
-             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
-              if val_type = V.REG_32 
-              then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
-              else reg_expr)
+      then if out_nargs = 0L
+           then node_val
+           else 
+             get_ite_expr node_type V.EQ V.REG_8 0L 
+               node_val 
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+                if val_type = V.REG_32 
+                then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
+                else reg_expr)
       else
         let left_expr = build_tree (d-1) (base ^ "0") in
         let right_expr = build_tree (d-1) (base ^ "1") in
-        get_ite_expr node_type V.EQ V.REG_8 0L 
-          node_val 
-          (get_ite_expr node_type V.EQ V.REG_8 1L
-             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
-              if val_type = V.REG_32 
-              then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
-              else reg_expr) 
-             (get_oper_expr node_val left_expr right_expr)) in
+        if out_nargs = 0L
+        then 
+          get_ite_expr node_type V.EQ V.REG_8 0L
+            node_val
+            (get_oper_expr node_val left_expr right_expr)
+        else 
+          get_ite_expr node_type V.EQ V.REG_8 0L 
+            node_val 
+            (get_ite_expr node_type V.EQ V.REG_8 1L
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+                if val_type = V.REG_32 
+                then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
+                else reg_expr) 
+               (get_oper_expr node_val left_expr right_expr)) in
   build_tree depth "R"
 
 (* add extra conditions on the structure of the int/float arithmetic adaptors' 
@@ -112,15 +121,18 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
              - type <= 1
              - if type = 1, then val < (# of arguments)
              - if type = 0, then val must be in the specified range,
-               or be one of the specified values *)
+               or be one of the specified values
+             - also, if out_nargs = 0 then we only want to allow constants *)
           synth_extra_conditions := 
             (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 1L)))) ::
-            (V.BinOp(
-               V.BITOR,
-               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-               V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
+              (V.BinOp(
+                 V.BITOR,
+                 V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
+                 V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
             (restrict_const_node node_type node_val) ::
-            !synth_extra_conditions
+            (if out_nargs = 0L 
+             then (V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L)))) :: !synth_extra_conditions 
+             else !synth_extra_conditions)
         else
           (* in this case we are at a non-leaf node, we require:
              - type <= 2
@@ -131,7 +143,8 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
              - if the type is 0 or 1 (constant or variable) then the nodes in
                the left and right subtrees must be zero
              - if type = 2 and val corresponds to a unary operator, then nodes
-               in the right subtree must be zero *)
+               in the right subtree must be zero
+             - also, if out_nargs = 0 then we only want to allow constants & operators *)
           (synth_extra_conditions := 
             (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 2L)))) ::
             (V.BinOp(
@@ -166,7 +179,12 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
                              val_type, 
                              Int64.of_int (List.length binops))))),
                zero_lower (d-1) (base ^ "1"))) ::
-            !synth_extra_conditions;
+            (if out_nargs = 0L
+             then (V.BinOp(V.BITOR,
+                           V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
+                           V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 2L))))) ::
+                  !synth_extra_conditions 
+             else !synth_extra_conditions);
             traverse_tree (d-1) (base ^ "0");
             traverse_tree (d-1) (base ^ "1")) in
   traverse_tree depth "R"
@@ -177,7 +195,7 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 3
+let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_64
 (* binary and unary operators; all possible operators:
