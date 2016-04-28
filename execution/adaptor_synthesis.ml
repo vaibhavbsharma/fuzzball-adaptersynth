@@ -179,7 +179,7 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
 (* tree depth *)
 let int_arith_depth = 3
 (* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = V.REG_32
+let int_val_type = V.REG_64
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
@@ -258,12 +258,15 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
       (get_arithmetic_expr fm var_name arg_regs int_val_type out_nargs 
          get_oper_expr int_arith_depth) :: !symbolic_exprs;
     if n > 0 then get_exprs (n-1) else () in
-  (get_exprs ((Int64.to_int in_nargs) - 1);
-   List.iteri 
-     (fun idx expr ->
-        fm#set_reg_symbolic (List.nth arg_regs idx) expr) !symbolic_exprs)
   
-
+  if in_nargs > 0L then  (
+    (get_exprs ((Int64.to_int in_nargs) - 1);
+     List.iteri 
+       (fun idx expr ->
+         fm#set_reg_symbolic (List.nth arg_regs idx) expr) !symbolic_exprs)
+  ) else ()
+    
+    
 (* adds extra conditions on the input variables and associated 
    adaptor variables; this function is called in exec_fuzzloop *)
 let rec arithmetic_int_extra_conditions fm out_nargs n = 
