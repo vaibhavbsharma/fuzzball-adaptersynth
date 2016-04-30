@@ -404,6 +404,7 @@ class virtual fragment_machine = object
  
   method virtual add_f1_store : int64 -> unit
   method virtual add_f2_store : int64 -> unit
+  method virtual check_f2_write : unit -> bool
  
   method virtual set_long_reg_symbolic : register_name -> string -> unit
   method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
@@ -615,18 +616,46 @@ struct
 
     val mutable saved_f1_rsp = 0L
     val mutable saved_f2_rsp = 0L
+    val mutable f1_write_addr_l:(int64 list) = []
+    val mutable f2_write_addr_l:(int64 list) = []
 
     method add_f1_store addr = 
       (*Printf.printf "FM#add_f1_store: mem store in f1(%08Lx) at %08Lx\n" 
 	saved_f1_rsp addr;*)
-      (*if (saved_f1_rsp <= addr) || (addr <= 0x60000000L) then
-	Printf.printf "FM#add_f1_store: outside local var";*)
+      if (saved_f1_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) 
+      then 	
+	(Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n" 
+	  addr saved_f1_rsp;
+	 f1_write_addr_l <- f1_write_addr_l @ [addr] ;
+	)
+      else (
+	(*Printf.printf "FM#add_f1_store: %08Lx inside local scope(%08Lx)\n" 
+	  addr saved_f1_rsp;*)
+      );
       ()
     
     method add_f2_store addr = 
       (*Printf.printf "FM#add_f2_store: mem store in f2(%08Lx) at %08Lx\n" 
 	saved_f2_rsp addr;*)
+      if (saved_f2_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) 
+      then
+	(Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)\n" 
+	   addr saved_f2_rsp;
+	 if ((List.length f1_write_addr_l) > (List.length f2_write_addr_l)) &&
+	   ((List.nth f1_write_addr_l (List.length f2_write_addr_l)) = addr) then
+	   (f2_write_addr_l <- f2_write_addr_l @ [addr] ;)
+	 else (
+	   raise DisqualifiedPath;
+	 )
+	)
+      else (
+      (*Printf.printf "FM#add_f2_store: %08Lx inside local scope(%08Lx)\n" 
+	addr saved_f2_rsp;*)
+      );
       ()
+	
+    method check_f2_write () = 
+      (List.length f1_write_addr_l) = (List.length f2_write_addr_l)
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
@@ -741,6 +770,8 @@ struct
       in_f2_range <- false;
       f1_syscalls_args <- [];
       f2_syscalls_arg_num <- 0;
+      f1_write_addr_l <- [];
+      f2_write_addr_l <- [];
  
     val temps = V.VarHash.create 100
     val mutable mem_var = V.newvar "mem" (V.TMem(V.REG_32, V.Little))
