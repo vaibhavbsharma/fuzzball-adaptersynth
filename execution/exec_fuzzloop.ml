@@ -193,7 +193,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		     | Simplify_failure(_) -> () (* shouldn't happen *)*)
 	       );
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
-		 if (fm#match_syscalls ()) <> true then
+		 if ((fm#match_syscalls ()) <> true)  ||
+		   ((fm#check_f2_write ()) <> true)
+		 then
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
