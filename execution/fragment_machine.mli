@@ -171,6 +171,10 @@ class virtual fragment_machine : object
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
+  method virtual add_f1_store : int64 -> unit
+  method virtual add_f2_store : int64 -> unit
+  method virtual check_f2_write : unit -> bool
+  
   method virtual set_long_reg_symbolic : register_name -> string -> unit
   method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
 
@@ -358,9 +362,10 @@ sig
     method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
+    val mutable f1_write_addr_l:int64 list
+    val mutable f2_write_addr_l:int64 list
     
     method restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
-    
     method check_adaptor_condition : Vine.exp -> unit
     
     method private load_byte  : int64 -> D.t
@@ -435,6 +440,9 @@ sig
     method get_fresh_symbolic : string -> int -> Vine.exp
     method get_reg_symbolic : register_name -> Vine.exp
     method save_arg_regs : int64 -> unit
+    method add_f1_store : int64 -> unit
+    method add_f2_store : int64 -> unit
+    method check_f2_write : unit -> bool
     method get_saved_arg_regs : unit -> Vine.exp list
     method reset_saved_arg_regs : unit
     method set_reg_symbolic : register_name -> Vine.exp -> unit

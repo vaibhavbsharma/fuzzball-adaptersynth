@@ -127,9 +127,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
        else if mode = "typeconv"
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
-       else if mode = "arithmetic_int" 
-            then Adaptor_synthesis.arithmetic_int_extra_conditions
-                   fm out_nargs ((Int64.to_int in_nargs)-1)
+       else if (mode = "arithmetic_int")   
+            then (
+	      if (in_nargs <> 0L) then
+		Adaptor_synthesis.arithmetic_int_extra_conditions
+		  fm out_nargs ((Int64.to_int in_nargs)-1);)
        else if mode = "arithmetic_float"
             then Adaptor_synthesis.arithmetic_float_extra_conditions
                    fm out_nargs ((Int64.to_int in_nargs)-1)
@@ -191,7 +193,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		     | Simplify_failure(_) -> () (* shouldn't happen *)*)
 	       );
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
-		 if (fm#match_syscalls ()) <> true then
+		 if ((fm#match_syscalls ()) <> true)  ||
+		   ((fm#check_f2_write ()) <> true)
+		 then
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);

@@ -68,12 +68,15 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
       let node_val = fm#get_fresh_symbolic (var ^ "_val_" ^ base) 
                        (if val_type = V.REG_32 then 32 else 64) in
       if d = 1 
-      then get_ite_expr node_type V.EQ V.REG_8 0L 
-             node_val 
-             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
-              if val_type = V.REG_32 
-              then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
-              else reg_expr)
+      then if out_nargs = 0L
+           then node_val
+           else 
+             get_ite_expr node_type V.EQ V.REG_8 0L 
+               node_val 
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+                if val_type = V.REG_32 
+                then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
+                else reg_expr)
       else
         let left_expr = build_tree (d-1) (base ^ "0") in
         let right_expr = build_tree (d-1) (base ^ "1") in
@@ -89,14 +92,20 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
         let _ = match apply_special_conditions with
                 | None -> ()
                 | Some f -> f node_type node_val left_expr right_expr in
-        get_ite_expr node_type V.EQ V.REG_8 0L 
-          node_val 
-          (get_ite_expr node_type V.EQ V.REG_8 1L
-             (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
-              if val_type = V.REG_32 
-              then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
-              else reg_expr) 
-             (get_oper_expr node_val left_expr right_expr)) in
+        if out_nargs = 0L
+        then
+          get_ite_expr node_type V.EQ V.REG_8 0L
+            node_val
+            (get_oper_expr node_val left_expr right_expr)
+        else
+          get_ite_expr node_type V.EQ V.REG_8 0L 
+            node_val 
+            (get_ite_expr node_type V.EQ V.REG_8 1L
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+                if val_type = V.REG_32 
+                then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
+                else reg_expr) 
+               (get_oper_expr node_val left_expr right_expr)) in
   build_tree depth "R"
 
 (* add extra conditions on the structure of the int/float arithmetic adaptors' 
@@ -137,15 +146,18 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
              - type <= 1
              - if type = 1, then val < (# of arguments)
              - if type = 0, then val must be in the specified range,
-               or be one of the specified values *)
+               or be one of the specified values
+             - also, if out_nargs = 0 then we only want to allow constants *)
           synth_extra_conditions := 
             (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 1L)))) ::
-            (V.BinOp(
-               V.BITOR,
-               V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
-               V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
+              (V.BinOp(
+                 V.BITOR,
+                 V.BinOp(V.NEQ, node_type, V.Constant(V.Int(V.REG_8, 1L))),
+                 V.BinOp(V.LT, node_val, V.Constant(V.Int(val_type, out_nargs))))) :: 
             (restrict_const_node node_type node_val) ::
-            !synth_extra_conditions
+            (if out_nargs = 0L 
+             then (V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L)))) :: !synth_extra_conditions 
+             else !synth_extra_conditions)
         else
           (* in this case we are at a non-leaf node, we require:
              - type <= 2
@@ -156,7 +168,8 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
              - if the type is 0 or 1 (constant or variable) then the nodes in
                the left and right subtrees must be zero
              - if type = 2 and val corresponds to a unary operator, then nodes
-               in the right subtree must be zero *)
+               in the right subtree must be zero
+             - also, if out_nargs = 0 then we only want to allow constants & operators *)
           (synth_extra_conditions := 
             (V.BinOp(V.LE, node_type, V.Constant(V.Int(V.REG_8, 2L)))) ::
             (V.BinOp(
@@ -191,7 +204,12 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
                              val_type, 
                              Int64.of_int (List.length binops))))),
                zero_lower (d-1) (base ^ "1"))) ::
-            !synth_extra_conditions;
+            (if out_nargs = 0L
+             then (V.BinOp(V.BITOR,
+                           V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 0L))),
+                           V.BinOp(V.EQ, node_type, V.Constant(V.Int(V.REG_8, 2L))))) ::
+                  !synth_extra_conditions 
+             else !synth_extra_conditions);
             traverse_tree (d-1) (base ^ "0");
             traverse_tree (d-1) (base ^ "1")) in
   traverse_tree depth "R"
@@ -202,7 +220,7 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 1
+let int_arith_depth = 3
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
@@ -344,24 +362,26 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
          get_oper_expr int_arith_depth None) 
       :: !symbolic_exprs;
     if n > 0 then get_exprs (n-1) else () in
-  (get_exprs ((Int64.to_int in_nargs) - 1);
-   List.iteri
-     (fun idx expr ->
-        (*let var_name = String.make 1 (Char.chr ((Char.code 'a') + idx)) in 
-        let root_sym = fm#get_fresh_symbolic (var_name ^ "_subtree_R") 
-                         (if int_val_type = V.REG_32 then 32 else 64) in
-        fm#check_adaptor_condition (V.BinOp(V.EQ, root_sym, expr));
-        fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
-        fm#check_adaptor_condition 
-          (restrict root_sym int_val_type int_restrict_output_range 
-             int_restrict_output_list)*)
-        fm#set_reg_symbolic (List.nth arg_regs idx) expr;
-        fm#check_adaptor_condition 
-          (restrict expr int_val_type int_restrict_output_range 
-             int_restrict_output_list))
-     !symbolic_exprs)
-  
-
+  if in_nargs > 0L
+  then
+    (get_exprs ((Int64.to_int in_nargs) - 1);
+     List.iteri
+       (fun idx expr ->
+          (*let var_name = String.make 1 (Char.chr ((Char.code 'a') + idx)) in 
+          let root_sym = fm#get_fresh_symbolic (var_name ^ "_subtree_R") 
+                           (if int_val_type = V.REG_32 then 32 else 64) in
+          fm#check_adaptor_condition (V.BinOp(V.EQ, root_sym, expr));
+          fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
+          fm#check_adaptor_condition 
+            (restrict root_sym int_val_type int_restrict_output_range 
+               int_restrict_output_list)*)
+          fm#set_reg_symbolic (List.nth arg_regs idx) expr;
+          fm#check_adaptor_condition 
+            (restrict expr int_val_type int_restrict_output_range 
+               int_restrict_output_list))
+       !symbolic_exprs)
+  else ()
+    
 (* adds extra conditions on the input variables and associated 
    adaptor variables; this function is called in exec_fuzzloop *)
 let rec arithmetic_int_extra_conditions fm out_nargs n = 
@@ -613,6 +633,7 @@ let get_typeconv_expr src_operand src_type extend_op =
    type = 32 -> 8-to-64 bit zero extension on outer function arg in var_val
    type = 41 -> 1-to-64 bit sign extension on outer function arg in var_val
    type = 42 -> 1-to-64 bit zero extension on outer function arg in var_val
+   type = 43 -> 64-to-1 bit ITE operation on outer function arg in var_val
 *)
 
 let typeconv_adaptor fm out_nargs in_nargs =
@@ -642,6 +663,10 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
 	 let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
 	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
+	 let type_43_expr = 
+	   (get_ite_expr ite_arg_expr V.EQ V.REG_64 0L 
+	      (V.Constant(V.Int(V.REG_64,0L))) 
+	      (V.Constant(V.Int(V.REG_64,1L)))) in
 	 opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -659,8 +684,9 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	        (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
                  (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
 	          (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
-                     type_42_expr)
-		 )))))))
+                   (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
+		      type_43_expr)
+		  ))))))))
        )
       )
     in
@@ -715,6 +741,7 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
    type = 42 -> 1-to-64 bit zero extension on inner function arg in ret_val
    type = 51 -> 32-to-64 bit sign extension on return_arg, ret_val ignored
    type = 52 -> 32-to-64 bit zero extension on return_arg, ret_val ignored
+   type = 53 -> 64-to-1 bit ITE operation on return_arg, ret_val ignored
    type = 61 -> 16-to-64 bit sign extension on return_arg, ret_val ignored
    type = 62 -> 16-to-64 bit zero extension on return_arg, ret_val ignored
    type = 71 -> 8-to-64 bit sign extension on return_arg, ret_val ignored
@@ -733,6 +760,9 @@ let ret_typeconv_adaptor fm in_nargs =
   let return_arg = fm#get_reg_symbolic R_RAX in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
+  let type_53_expr = (get_ite_expr return_arg V.EQ V.REG_64 0L 
+			       (V.Constant(V.Int(V.REG_64,0L))) 
+			       (V.Constant(V.Int(V.REG_64,1L)))) in
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
   let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
   let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
@@ -748,16 +778,17 @@ let ret_typeconv_adaptor fm in_nargs =
 		V.BinOp(V.GE,ret_type,V.Constant(V.Int(V.REG_8,51L))))
 			    :: !opt_extra_conditions;*)
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
-	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
-	   (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
-	      (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
-		 (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
-		    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
-		       (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
-			  (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
-			     (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
-				type_82_expr)
-			  )))))))
+       (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
+        (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
+         (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
+          (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
+           (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+            (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+             (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+              (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+               (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                 type_82_expr)
+	      ))))))))
     ) 
     else ( 
       let ite_saved_arg_expr = 
@@ -788,13 +819,14 @@ let ret_typeconv_adaptor fm in_nargs =
                 (get_ite_expr ret_type V.EQ V.REG_8 42L type_42_expr
                  (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
                   (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
-                   (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
-                    (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
-                     (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
-                      (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
-                       (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
-                         type_82_expr)
-			  )))))))))))))))
+                   (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
+                    (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+                     (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+                      (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+                       (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+                        (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                          type_82_expr)
+			  ))))))))))))))))
 	)
     )
   in
