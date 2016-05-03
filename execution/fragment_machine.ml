@@ -523,6 +523,11 @@ class virtual fragment_machine = object
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
 
+  method virtual restrict_symbolic_expr : 
+    register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
+  
+  method virtual check_adaptor_condition : Vine.exp -> unit
+
 end
 
 module FragmentMachineFunctor =
@@ -729,6 +734,32 @@ struct
     val mutable frag = ([], [])
     val mutable insns = []
 
+    method restrict_symbolic_expr arg_regs i restriction =
+      let expr = self#get_reg_symbolic (List.nth arg_regs i)
+                 (*D.to_symbolic_64 
+                   (form_man#simplify64 
+                     (D.from_symbolic (List.nth arg_regs i)))*) in
+      let (b, choices) = self#query_condition (restriction expr) (Some true) (0x6d00+i*10) in
+      (let str = match choices with
+		         | Some true -> "is true"
+		         | Some false -> "is false"
+		         | None -> "can be true or false"
+	   in Printf.printf "chose branch %B with choices %s\n" b str;
+       if b then () 
+       else (Printf.printf "fragment_machine: expression violates restriction, raising DisqualifiedPath\n";
+             raise DisqualifiedPath))
+	
+	method check_adaptor_condition expr =
+      (* TODO this function is still in progress *)
+      let (b, choices) = self#query_condition expr (Some true) (0x6d00) in 
+      ((*let str = match choices with
+		         | Some true -> "is true)"
+		         | Some false -> "is false)"
+		         | None -> "can be true or false)"
+	   in Printf.printf "chose branch %B (with choice: %s\n" b str;*)
+       if b then () 
+       else (Printf.printf "fragment_machine: adaptor violates restriction, raising DisqualifiedPath\n";
+             raise DisqualifiedPath)) 
     
     method set_reg_symbolic reg symb_var =
       self#set_int_var (Hashtbl.find reg_to_var reg)

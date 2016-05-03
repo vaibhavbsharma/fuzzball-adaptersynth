@@ -290,6 +290,10 @@ class virtual fragment_machine : object
   method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
+  
+  method virtual restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
+  method virtual check_adaptor_condition : Vine.exp -> unit
+  
 end
 
 module FragmentMachineFunctor :
@@ -354,6 +358,10 @@ sig
     method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
+    
+    method restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
+    
+    method check_adaptor_condition : Vine.exp -> unit
     
     method private load_byte  : int64 -> D.t
     method private load_short : int64 -> D.t

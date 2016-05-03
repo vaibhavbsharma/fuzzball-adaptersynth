@@ -274,6 +274,10 @@ sig
     method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
+    
+    method restrict_symbolic_expr : Fragment_machine.register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
+    method check_adaptor_condition : Vine.exp -> unit
+    
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory
   end
