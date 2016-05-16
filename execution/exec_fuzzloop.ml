@@ -100,8 +100,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
        (*let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in*)
        ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
+       ignore(fm#get_fresh_symbolic (var_name^"_f_val") 64);
        (*let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in*)
        ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);
+       ignore(fm#get_fresh_symbolic (var_name^"_f"^type_name) type_size);
        (*if out_nargs > 0L then 
 	 (opt_extra_conditions :=
 	    V.BinOp(
