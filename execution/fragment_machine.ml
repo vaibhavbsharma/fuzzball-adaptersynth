@@ -404,7 +404,7 @@ class virtual fragment_machine = object
  
   method virtual add_f1_store : int64 -> unit
   method virtual add_f2_store : int64 -> unit
-  method virtual check_f2_write : unit -> bool
+  method virtual match_writes : unit -> bool
  
   method virtual set_long_reg_symbolic : register_name -> string -> unit
   method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
@@ -659,7 +659,7 @@ struct
       );
       ()
 	
-    method check_f2_write () = 
+    method match_writes () = 
       (List.length f1_write_addr_l) = (List.length f2_write_addr_l)
 
     method save_arg_regs nargs = 

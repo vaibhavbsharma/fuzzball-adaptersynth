@@ -172,7 +172,7 @@ sig
     method save_arg_regs : int64 -> unit
     method add_f1_store : int64 -> unit
     method add_f2_store : int64 -> unit
-    method check_f2_write : unit -> bool
+    method match_writes : unit -> bool
     method get_saved_arg_regs : unit -> Vine.exp list
     method reset_saved_arg_regs : unit
     method load_byte_symbolic  : int64 -> Vine.exp

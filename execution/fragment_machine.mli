@@ -173,7 +173,7 @@ class virtual fragment_machine : object
   
   method virtual add_f1_store : int64 -> unit
   method virtual add_f2_store : int64 -> unit
-  method virtual check_f2_write : unit -> bool
+  method virtual match_writes : unit -> bool
   
   method virtual set_long_reg_symbolic : register_name -> string -> unit
   method virtual set_long_reg_fresh_symbolic : register_name -> string -> unit
@@ -442,7 +442,7 @@ sig
     method save_arg_regs : int64 -> unit
     method add_f1_store : int64 -> unit
     method add_f2_store : int64 -> unit
-    method check_f2_write : unit -> bool
+    method match_writes : unit -> bool
     method get_saved_arg_regs : unit -> Vine.exp list
     method reset_saved_arg_regs : unit
     method set_reg_symbolic : register_name -> Vine.exp -> unit
