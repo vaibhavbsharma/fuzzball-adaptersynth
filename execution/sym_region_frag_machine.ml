@@ -386,8 +386,9 @@ struct
 	  (match (classify_term form_man x), (classify_term form_man y) with
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) ->
-		 ExprOffset(e)
-	     | _ -> AmbiguousExpr(e)
+	       ExprOffset(e)
+	     | _ -> 
+	       AmbiguousExpr(e)
 	  )
       (* Similar pattern where we don't have the sign extend, but
 	 we do have something and its negation *)
@@ -401,7 +402,8 @@ struct
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) ->
 		 ExprOffset(e)
-	     | _ -> AmbiguousExpr(e)
+	     | _ -> 
+	       AmbiguousExpr(e)
 	  )
       (* Occurs as an optimization of bitwise ITE: *)
       | V.BinOp(V.BITAND, x, V.UnOp(V.NOT, V.Cast(V.CAST_SIGNED, _, _)))
@@ -516,19 +518,36 @@ struct
       let new_idx = 1 + List.length regions in
       let region = (new GM.granular_hash_memory)  and
 	  name = "region_" ^ (string_of_int new_idx) in
-	regions <- regions @ [region];
-	if !opt_zero_memory then
-	  spfm#on_missing_zero_m region
-	else
-	  spfm#on_missing_symbol_m region name;
-	new_idx
+      regions <- regions @ [region];
+      (*if !opt_zero_region_limit <> 0L then
+	spfm#on_missing_zero_m_lim region !opt_zero_region_limit
+      else *)if !opt_zero_memory then
+	spfm#on_missing_zero_m region
+      else
+	spfm#on_missing_symbol_m region name;
+      new_idx
 
     method private region_for e =
       try
 	Hashtbl.find region_vals e
       with Not_found ->
-	let new_region = self#fresh_region in
-	  Hashtbl.replace region_vals e new_region;
+	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
+	   same region, if e is equivalent to an expression already in 
+	   region_vals, then reuse that region
+	*)
+	let new_rnum = ref 0 in
+	Hashtbl.iter (fun reg_exp region -> 
+	  let exp = V.BinOp(V.EQ, reg_exp, e) in
+	  let (b,_) = (self#query_condition exp (Some true) 0x6d00) in
+	  if b = true then (
+	    Printf.printf "SRFM#region_for satisfied expr = %s\n"
+	      (V.exp_to_string exp);
+	    new_rnum := region;)
+	) region_vals;
+	let new_region =
+	  if !new_rnum <> 0 then !new_rnum else self#fresh_region
+	in
+	Hashtbl.replace region_vals e new_region;
 	  if !opt_trace_regions then
 	    Printf.printf "Address %s is region %d\n"
 	      (V.exp_to_string e) new_region;
@@ -688,7 +707,10 @@ struct
 	let cbase = List.fold_left Int64.add 0L cbases in
 	let (base, off_syms) = match (cbase, syms, ambig) with
 	  | (0L, [], []) -> raise NullDereference
-	  | (0L, [], el) -> (Some 0, el)
+	  (* adaptor expressions are classified as AmbiguousExpr, but they can
+	     still be region expressions *)
+	  | (0L, [], [e]) -> (Some(self#region_for e), [])
+	  | (0L, [], el) -> (Some 0, el) (* TODO: Pick one element from el *)
 	  | (0L, [v], _) -> (Some(self#region_for v), ambig)
 	  | (0L, vl, _) ->
 	      let (bvar, rest_vars) =
