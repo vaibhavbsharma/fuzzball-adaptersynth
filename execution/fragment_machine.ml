@@ -1042,7 +1042,7 @@ struct
         try ignore (Str.search_forward re s1 0); true
         with Not_found -> false
       in
-      Printf.printf "FM#on_missing_symbol_m_lim lim=%Ld" lim;
+      Printf.printf "FM#on_missing_symbol_m_lim lim=%Ld\n" lim;
       m#on_missing
 	(fun size addr -> 
 	  let ret_sym = ref false in

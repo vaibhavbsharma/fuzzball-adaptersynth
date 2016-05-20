@@ -499,6 +499,7 @@ struct
 
     val mutable regions = []
     val region_vals = Hashtbl.create 101
+    val region_val_queried = Hashtbl.create 101
 
     val mutable location_id = 0L
 
@@ -528,6 +529,17 @@ struct
       new_idx
 
     method private region_for e =
+	(* We dont allow a region-creating expression to be set to NULL 
+	   on this execution path *)
+      (try 
+	ignore(Hashtbl.find region_val_queried e );
+      with Not_found ->
+	let (b_is_regexp_null,_) = self#query_condition (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
+	    (Some true) 0x6d00 in
+	Hashtbl.replace region_val_queried e 1;
+	if b_is_regexp_null <> true then raise NullDereference;
+      );
+      
       try
 	Hashtbl.find region_vals e
       with Not_found ->
@@ -1697,6 +1709,7 @@ struct
     method reset () =
       spfm#reset ();
       List.iter (fun gm -> gm#clear ()) regions;
+      Hashtbl.clear region_val_queried;
       Hashtbl.clear concrete_cache
   end
 end
