@@ -111,6 +111,9 @@ sig
     method private on_missing_symbol_m :
       Granular_memory.GranularMemoryFunctor(D).granular_memory
       -> string -> unit
+    method private on_missing_symbol_m_lim :
+      Granular_memory.GranularMemoryFunctor(D).granular_memory
+      -> string -> int64 -> unit
     method make_regs_zero : unit
     method make_regs_symbolic : unit
     method load_x86_user_regs : Temu_state.userRegs -> unit

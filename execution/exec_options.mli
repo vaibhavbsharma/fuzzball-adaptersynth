@@ -152,6 +152,7 @@ val opt_disable_ce_cache : bool ref
 val opt_narrow_bitwidth_cutoff : int option ref
 
 val opt_symbolic_memory : bool ref
+val opt_zero_region_limit : int64 ref
 val opt_zero_memory : bool ref
 val opt_random_memory : bool ref
 

@@ -324,6 +324,9 @@ sig
     method private on_missing_symbol_m :
       Granular_memory.GranularMemoryFunctor(D).granular_memory
       -> string -> unit
+    method private on_missing_symbol_m_lim :
+      Granular_memory.GranularMemoryFunctor(D).granular_memory
+      -> string -> int64 -> unit
     method on_missing_zero : unit
     method on_missing_random : unit
     method on_missing_symbol : unit

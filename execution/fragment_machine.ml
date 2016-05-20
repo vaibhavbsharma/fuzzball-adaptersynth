@@ -1027,13 +1027,46 @@ struct
     method private on_missing_symbol_m (m:GM.granular_memory) name =
       m#on_missing
 	(fun size addr -> 
+	  Printf.printf "FM#on_missing_symbol_m addr=%Lx\n" addr;
 	   match size with
 	     | 8  -> form_man#fresh_symbolic_mem_8  name addr
 	     | 16 -> form_man#fresh_symbolic_mem_16 name addr
 	     | 32 -> form_man#fresh_symbolic_mem_32 name addr
 	     | 64 -> form_man#fresh_symbolic_mem_64 name addr
 	     | _ -> failwith "Bad size in on_missing_symbol")
-
+    
+    method private on_missing_symbol_m_lim (m:GM.granular_memory) name lim =
+      let contains s1 s2 =
+	let re = Str.regexp_string s2
+	in
+        try ignore (Str.search_forward re s1 0); true
+        with Not_found -> false
+      in
+      Printf.printf "FM#on_missing_symbol_m_lim lim=%Ld" lim;
+      m#on_missing
+	(fun size addr -> 
+	  let ret_sym = ref false in
+	  let is_region = ref false in
+	  if (addr<0L) || (addr>=lim) then 
+	    ret_sym := true;
+	  if (contains name "region_") = true then is_region := true;
+	  match (!is_region, !ret_sym, size) with
+	  | (true, false, 8)  -> form_man#fresh_symbolic_mem_8  name addr
+	  | (true, false, 16) -> form_man#fresh_symbolic_mem_16 name addr
+	  | (true, false, 32) -> form_man#fresh_symbolic_mem_32 name addr
+	  | (true, false, 64) -> form_man#fresh_symbolic_mem_64 name addr
+	  | (true, false,_) -> 
+	    failwith "Bad size in on_missing_symbol_m_lim inside region limit"
+	  | (true, true, 8) -> D.from_concrete_8  0
+	  | (true, true, 16) -> D.from_concrete_16 0
+	  | (true, true, 32) -> D.from_concrete_32 0L
+	  | (true, true, 64) -> D.from_concrete_64 0L
+	  | (true, true, _) -> 
+	    failwith "Bad size in on_missing_symbol_m_lim outside region limit"
+	  | (false, _, _) ->
+	    failwith "on_missing_symbol_m_lim called on non-region memory"
+	)
+	
     method on_missing_symbol =
       self#on_missing_symbol_m (mem :> GM.granular_memory) "mem"
 

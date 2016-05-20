@@ -519,9 +519,9 @@ struct
       let region = (new GM.granular_hash_memory)  and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
-      (*if !opt_zero_region_limit <> 0L then
-	spfm#on_missing_zero_m_lim region !opt_zero_region_limit
-      else *)if !opt_zero_memory then
+      if !opt_zero_region_limit <> 0L then
+	spfm#on_missing_symbol_m_lim region name !opt_zero_region_limit
+      else if !opt_zero_memory then
 	spfm#on_missing_zero_m region
       else
 	spfm#on_missing_symbol_m region name;
@@ -533,8 +533,7 @@ struct
       with Not_found ->
 	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
 	   same region, if e is equivalent to an expression already in 
-	   region_vals, then reuse that region
-	*)
+	   region_vals, then reuse that region *)
 	let new_rnum = ref 0 in
 	Hashtbl.iter (fun reg_exp region -> 
 	  let exp = V.BinOp(V.EQ, reg_exp, e) in

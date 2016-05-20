@@ -175,6 +175,7 @@ let opt_narrow_bitwidth_cutoff = ref None
 
 let opt_symbolic_memory = ref false
 let opt_zero_memory = ref false
+let opt_zero_region_limit = ref 1L
 let opt_random_memory = ref false
 
 let opt_fuzz_start_addr_count = ref 1
