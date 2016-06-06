@@ -497,7 +497,7 @@ struct
   class sym_region_frag_machine (dt:decision_tree) = object(self)
     inherit SPFM.sym_path_frag_machine dt as spfm
 
-    val mutable regions = []
+    val mutable regions : GM.granular_snapshot_memory list = []
     val region_vals = Hashtbl.create 101
     val region_val_queried = Hashtbl.create 101
 
@@ -513,35 +513,48 @@ struct
       match r with
 	| None -> (sink_mem :> (GM.granular_memory))
 	| Some 0 -> (mem :> (GM.granular_memory))
-	| Some r_num -> List.nth regions (r_num - 1)
+	| Some r_num -> ((List.nth regions (r_num - 1)) :> GM.granular_memory)
 
     method private fresh_region =
       let new_idx = 1 + List.length regions in
-      let region = (new GM.granular_hash_memory)  and
+      let region = (new GM.granular_snapshot_memory 
+		      (new GM.granular_hash_memory) 
+		      (new GM.granular_hash_memory)) and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
       if !opt_zero_region_limit <> 0L then
-	spfm#on_missing_symbol_m_lim region name !opt_zero_region_limit
+	spfm#on_missing_symbol_m_lim (region :> GM.granular_memory) name !opt_zero_region_limit
       else if !opt_zero_memory then
-	spfm#on_missing_zero_m region
+	spfm#on_missing_zero_m (region :> GM.granular_memory)
       else
-	spfm#on_missing_symbol_m region name;
+	spfm#on_missing_symbol_m (region :> GM.granular_memory) name;
       new_idx
 
     method private region_for e =
-	(* We dont allow a region-creating expression to be set to NULL 
-	   on this execution path *)
+      (* We dont allow a region-creating expression to be set to NULL 
+	 on this execution path while limiting this query to only once
+	 per execution path *)
       (try 
-	ignore(Hashtbl.find region_val_queried e );
-      with Not_found ->
-	let (b_is_regexp_null,_) = self#query_condition (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
-	    (Some true) 0x6d00 in
-	Hashtbl.replace region_val_queried e 1;
-	if b_is_regexp_null <> true then raise NullDereference;
+	 let _ = Hashtbl.find region_val_queried e in
+	 if !opt_trace_regions then
+	   Printf.printf "SRFM#region_for found in region_val_queried expr = %s\n"
+	     (V.exp_to_string e);
+       with Not_found ->
+	 let (b_is_regexp_null,_) = self#query_condition (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
+	   (Some true) 0x6d00 in
+	 if !opt_trace_regions then
+	   Printf.printf "SRFM#region_for took branch %b in Not_found case expr = %s\n" 
+	     b_is_regexp_null (V.exp_to_string e);
+	 Hashtbl.replace region_val_queried e 1;
+	 if b_is_regexp_null <> true then raise NullDereference;
       );
       
       try
-	Hashtbl.find region_vals e
+	let ret = Hashtbl.find region_vals e in
+	if !opt_trace_regions then
+	  Printf.printf "SRFM#region_for found region number in region_vals, ret = %d expr = %s\n" 
+	    ret (V.exp_to_string e);
+	ret
       with Not_found ->
 	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
 	   same region, if e is equivalent to an expression already in 
@@ -551,8 +564,9 @@ struct
 	  let exp = V.BinOp(V.EQ, reg_exp, e) in
 	  let (b,_) = (self#query_condition exp (Some true) 0x6d00) in
 	  if b = true then (
-	    Printf.printf "SRFM#region_for satisfied expr = %s\n"
-	      (V.exp_to_string exp);
+	    if !opt_trace_regions then
+	      Printf.printf "SRFM#region_for satisfied expr = %s\n"
+		(V.exp_to_string exp);
 	    new_rnum := region;)
 	) region_vals;
 	let new_region =
