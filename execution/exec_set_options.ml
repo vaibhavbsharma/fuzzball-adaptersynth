@@ -303,6 +303,10 @@ let explore_cmdline_opts =
     ("-insn-limit", Arg.String
        (fun s -> opt_insn_limit := Int64.of_string s),
      "N Stop path after N instructions");
+    ("-region-limit", Arg.String 
+      (fun s -> opt_zero_region_limit := Int64.of_string s),
+     "N Treat upto N byte offsets into a region as symbolic " ^
+       "and everything else as containing zero");
     ("-path-depth-limit", Arg.String
        (fun s -> opt_path_depth_limit := Int64.of_string s),
      "N Stop path after N bits of symbolic branching");
