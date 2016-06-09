@@ -400,6 +400,14 @@ class virtual fragment_machine = object
   method virtual get_saved_arg_regs : unit -> Vine.exp list
   method virtual reset_saved_arg_regs : unit
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+  method virtual make_sym_snap : unit 
+  method virtual make_conc_snap : unit 
+  method virtual save_sym_se : unit
+  method virtual save_conc_se : unit
+  method virtual restore_sym_snap : unit
+  method virtual restore_conc_snap : unit
+  method virtual compare_sym_se : unit
+  method virtual compare_conc_se : unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
  
   method virtual add_f1_store : int64 -> unit
@@ -813,7 +821,55 @@ struct
     method set_reg_symbolic reg symb_var =
       self#set_int_var (Hashtbl.find reg_to_var reg)
         (D.from_symbolic symb_var);    
+      
+    method make_sym_snap = 
+      (* this method is implemented in SRFM *)
+      if !opt_trace_regions then
+	Printf.printf "FM#make_sym_snap called\n";
+      ()
 
+    method make_conc_snap = 
+      (* TODO: finish this method *)
+      if !opt_trace_regions then
+	Printf.printf "FM#make_conc_snap called\n";
+      ()
+
+    method save_sym_se = 
+      (* TODO: finish this method *)
+      if !opt_trace_regions then
+	Printf.printf "FM#save_sym_se called\n";
+      ()
+    
+    method save_conc_se = 
+      (* TODO: finish this method *)
+      if !opt_trace_regions then
+	Printf.printf "FM#save_conc_se called\n";
+      ()
+      
+    method restore_sym_snap = 
+      (* TODO: finish this method *)
+      if !opt_trace_regions then
+	Printf.printf "FM#restore_sym_snap called\n";
+      ()
+	
+    method restore_conc_snap = 
+      (* TODO: finish this method *)
+      if !opt_trace_regions then
+	Printf.printf "FM#restore_conc_snap called\n";
+      ()
+
+    method compare_sym_se =
+      (* TODO: compare side-effects on symbolic memory between f1 and f2 *)
+      if !opt_trace_regions then
+	Printf.printf "FM#compare_sym_se called\n";
+      ()
+    
+    method compare_conc_se =
+      (* TODO: compare side-effects on concrete memory between f1 and f2 *)
+      if !opt_trace_regions then
+	Printf.printf "FM#compare_conc_se called\n";
+      ()
+    
     method get_reg_symbolic reg =
       D.to_symbolic_64 (self#get_int_var (Hashtbl.find reg_to_var reg))
     
@@ -905,17 +961,38 @@ struct
 	fun (start1,end1,start2,end2) ->
 	  if eip = start1 then 
 	    (saved_f1_rsp <- self#get_long_var R_RSP; 
-	     in_f1_range <- true)
+	     in_f1_range <- true;
+	     
+	     (* TODO: save a snapshot, S, of all memory, concrete and symbolic *)
+	     self#make_sym_snap ; 
+	     self#make_conc_snap ;  
+	    )
 	  else if eip = end1 then 
 	    (saved_f1_rsp <- 0L;
 	     in_f1_range <- false;
-	    (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*));
+	     (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*)
+	     
+	     (* TODO: capture all side-effects seen in memory, concrete and symbolic *)
+	     self#save_sym_se ;
+	     self#save_conc_se ;
+	    );
 	  if eip = start2 then 
 	    (saved_f2_rsp <- self#get_long_var R_RSP;
-	     in_f2_range <- true)
-	  else if eip = end2 then 
-	    (saved_f2_rsp <- 0L;
-	     in_f2_range <- false);
+	     in_f2_range <- true;
+	     
+	     (* TODO: restore all memory, concrete and symbolic, from saved snapshot S *)
+	     self#restore_sym_snap ;
+	     self#restore_conc_snap ;
+	    )
+	  else if eip = end2 then (
+	      saved_f2_rsp <- 0L;
+	      in_f2_range <- false;
+	      
+	      (* TODO: capture all side-effects seen in memory, concrete and symbolic
+		 compare these with the captured side-effects of f1's execution *)
+	      self#compare_sym_se ;
+	      self#compare_conc_se ;
+	    );
       ) 
 	!opt_match_syscalls_addr_range;
       self#watchpoint

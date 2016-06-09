@@ -169,6 +169,16 @@ class virtual fragment_machine : object
   method virtual get_saved_arg_regs : unit -> Vine.exp list
   method virtual reset_saved_arg_regs : unit 
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
+
+  method virtual make_sym_snap : unit 
+  method virtual make_conc_snap : unit 
+  method virtual save_sym_se : unit
+  method virtual save_conc_se : unit
+  method virtual restore_sym_snap : unit
+  method virtual restore_conc_snap : unit
+  method virtual compare_sym_se : unit
+  method virtual compare_conc_se : unit
+
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
   method virtual add_f1_store : int64 -> unit
@@ -449,6 +459,16 @@ sig
     method get_saved_arg_regs : unit -> Vine.exp list
     method reset_saved_arg_regs : unit
     method set_reg_symbolic : register_name -> Vine.exp -> unit
+
+    method make_sym_snap : unit 
+    method make_conc_snap : unit 
+    method save_sym_se : unit
+    method save_conc_se : unit
+    method restore_sym_snap : unit
+    method restore_conc_snap : unit
+    method compare_sym_se : unit
+    method compare_conc_se : unit
+
     method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     
     method set_long_reg_symbolic : register_name -> string -> unit
