@@ -586,7 +586,7 @@ struct
 	   same region, if e is equivalent to an expression already in 
 	   region_vals, then reuse that region *)
 	let new_rnum = ref 0 in
-	Hashtbl.iter (fun reg_exp region -> 
+	(*Hashtbl.iter (fun reg_exp region -> 
 	  let exp = V.BinOp(V.EQ, reg_exp, e) in
 	  let (b,_) = (self#query_condition exp (Some true) 0x6d00) in
 	  if b = true then (
@@ -594,7 +594,7 @@ struct
 	      Printf.printf "SRFM#region_for satisfied expr = %s\n"
 		(V.exp_to_string exp);
 	    new_rnum := region;)
-	) region_vals;
+	) region_vals; *)
 	let new_region =
 	  if !new_rnum <> 0 then !new_rnum else self#fresh_region
 	in
