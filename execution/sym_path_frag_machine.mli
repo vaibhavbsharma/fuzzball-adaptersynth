@@ -173,12 +173,12 @@ sig
     method set_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp -> unit
     
-    method make_sym_snap : unit 
-    method make_conc_snap : unit 
-    method save_sym_se : unit
-    method save_conc_se : unit
-    method restore_sym_snap : unit
-    method restore_conc_snap : unit
+    method make_f1_sym_snap : unit 
+    method make_f1_conc_snap : unit 
+    method save_f1_sym_se : unit
+    method save_f1_conc_se : unit
+    method make_f2_sym_snap : unit
+    method make_f2_conc_snap : unit
     method compare_sym_se : unit
     method compare_conc_se : unit
 

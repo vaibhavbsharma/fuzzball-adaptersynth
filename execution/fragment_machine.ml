@@ -400,12 +400,12 @@ class virtual fragment_machine = object
   method virtual get_saved_arg_regs : unit -> Vine.exp list
   method virtual reset_saved_arg_regs : unit
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
-  method virtual make_sym_snap : unit 
-  method virtual make_conc_snap : unit 
-  method virtual save_sym_se : unit
-  method virtual save_conc_se : unit
-  method virtual restore_sym_snap : unit
-  method virtual restore_conc_snap : unit
+  method virtual make_f1_sym_snap : unit 
+  method virtual make_f1_conc_snap : unit 
+  method virtual save_f1_sym_se : unit
+  method virtual save_f1_conc_se : unit
+  method virtual make_f2_sym_snap : unit
+  method virtual make_f2_conc_snap : unit
   method virtual compare_sym_se : unit
   method virtual compare_conc_se : unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
@@ -636,13 +636,14 @@ struct
     val mutable f2_write_addr_l:(int64 list) = []
 
     val mutable f1_se = new GM.granular_hash_memory 
+    val mutable f1_hash : ( (int64, GM.gran64) Hashtbl.t) = Hashtbl.create 0
     val mutable f2_se = new GM.granular_hash_memory
 
     method add_f1_store addr = 
       (*Printf.printf "FM#add_f1_store: mem store in f1(%08Lx) at %08Lx\n" 
 	saved_f1_rsp addr;*)
-      if (saved_f1_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) 
-      then 	
+      (*if (saved_f1_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L))*)
+      if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	(Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n" 
 	  addr saved_f1_rsp;
 	 f1_write_addr_l <- f1_write_addr_l @ [addr] ;
@@ -652,12 +653,17 @@ struct
 	  addr saved_f1_rsp;*)
       );
       ()
-    
+   
+    method private is_nonlocal_addr rsp addr =
+      if (rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) then
+	true 
+      else false
+	
     method add_f2_store addr = 
       (*Printf.printf "FM#add_f2_store: mem store in f2(%08Lx) at %08Lx\n" 
 	saved_f2_rsp addr;*)
-      if (saved_f2_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) 
-      then
+      (*if (saved_f2_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L))*)
+      if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
 	(Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)\n" 
 	   addr saved_f2_rsp;
 	 if ((List.length f1_write_addr_l) > (List.length f2_write_addr_l)) &&
@@ -828,49 +834,49 @@ struct
       self#set_int_var (Hashtbl.find reg_to_var reg)
         (D.from_symbolic symb_var);    
       
-    method make_sym_snap = 
+    method make_f1_sym_snap = 
       (* this method is implemented in SRFM *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#make_sym_snap called\n";
+	Printf.printf "FM#make_f1_sym_snap called\n";
       ()
 
-    method save_sym_se = 
-      (* TODO: finish this method *)
+    method save_f1_sym_se = 
+      (* this method is implemented in SRFM *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#save_sym_se called\n";
+	Printf.printf "FM#save_f1_sym_se called\n";
       ()
     
-    method restore_sym_snap = 
-      (* TODO: finish this method *)
+    method make_f2_sym_snap = 
+      (* this method is implemented in SRFM *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#restore_sym_snap called\n";
+	Printf.printf "FM#make_f2_sym_snap called\n";
       ()
 	
     method compare_sym_se =
-      (* TODO: compare side-effects on symbolic memory between f1 and f2 *)
+      (* this method is implemented in SRFM *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_sym_se called\n";
       ()
     
-    method make_conc_snap = 
-      (* TODO: finish this method *)
+    method make_f1_conc_snap = 
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#make_conc_snap called\n";
+	Printf.printf "FM#make_f1_conc_snap called\n";
       mem#make_snap ();
       ()
 
-    method save_conc_se = 
-      (* TODO: finish this method *)
+    method save_f1_conc_se = 
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#save_conc_se called\n";
+	Printf.printf "FM#save_f1_conc_se called\n";
       f1_se <- mem#get_level4;
+      f1_hash <- Hashtbl.copy f1_se#get_mem;
       mem#reset4_3 ();
       ()
       
-    method restore_conc_snap = 
-      (* TODO: finish this method *)
+    method make_f2_conc_snap = 
+      (* reset back to level 3 already completed in save_f1_conc_se *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "FM#restore_conc_snap called\n";
+	Printf.printf "FM#make_f2_conc_snap called\n";
+      mem#make_snap ();
       ()
 
     method compare_conc_se =
@@ -878,7 +884,7 @@ struct
       if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_conc_se called\n";
       f2_se <- mem#get_level4;
-      mem#reset4_3 ();
+      let f2_hash = (f2_se#get_mem) in
       if !opt_trace_mem_snapshots then
 	(Printf.printf "f1 memory side-effects\n";
 	 Hashtbl.iter 
@@ -887,7 +893,7 @@ struct
 	       f1_se#get_missing addr in
 	     Printf.printf "%Lx %s\n" addr 
 	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   (f1_se#get_mem);
+	   f1_hash;
 	 Printf.printf "\nf2 memory side-effects\n";
 	 Hashtbl.iter 
 	   (fun addr chunk ->
@@ -895,10 +901,48 @@ struct
 	       f2_se#get_missing addr in
 	     Printf.printf "%Lx %s\n" addr 
 	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   (f2_se#get_mem);
+	   f2_hash;
+	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
+	);
+      let f1_nonlocal_se = Hashtbl.create 0 in
+      let f2_nonlocal_se = Hashtbl.create 0 in
+      Hashtbl.iter (fun addr chunk ->
+	let (exp, _) = GM.gran64_get_long chunk (f1_se#get_missing) addr in
+	if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
+	  (if !opt_trace_mem_snapshots = true then
+	      Printf.printf "addr = %Lx, rsp = %Lx was non-local side-effect\n" 
+		addr saved_f1_rsp;
+	   Hashtbl.replace f1_nonlocal_se addr exp;)
+      ) f1_hash;
+      Hashtbl.iter (fun addr chunk ->
+	let (exp, _) = GM.gran64_get_long chunk (f2_se#get_missing) addr in
+	if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
+	  (if !opt_trace_mem_snapshots = true then
+	      Printf.printf "addr = %Lx, rsp = %Lx was non-local side-effect\n" 
+		addr saved_f2_rsp;
+	   Hashtbl.replace f2_nonlocal_se addr exp;)
+      ) f2_hash;
+      
+      if !opt_trace_mem_snapshots then
+	(Printf.printf "f1 non-local memory side-effects\n";
+	 Hashtbl.iter 
+	   (fun addr exp ->
+	     Printf.printf "%Lx %s\n" addr 
+	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
+	   f1_nonlocal_se;
+	 Printf.printf "\nf2 non-local memory side-effects\n";
+	 Hashtbl.iter 
+	   (fun addr exp ->
+	     Printf.printf "%Lx %s\n" addr 
+	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
+	   f2_nonlocal_se;
 	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
 	);
       
+      (* TODO: Check for non-local memory side-effects equivalence here *) 
+      mem#reset4_3 ();
+      saved_f1_rsp <- 0L;
+      saved_f2_rsp <- 0L;
       ()
     
     method get_reg_symbolic reg =
@@ -995,28 +1039,28 @@ struct
 	     in_f1_range <- true;
 	     
 	     (* TODO: save a snapshot, S, of all memory, concrete and symbolic *)
-	     self#make_sym_snap ; 
-	     self#make_conc_snap ;  
+	     self#make_f1_sym_snap ; 
+	     self#make_f1_conc_snap ;  
 	    )
 	  else if eip = end1 then 
-	    (saved_f1_rsp <- 0L;
+	    ((* saved_f1_rsp <- 0L; *)
 	     in_f1_range <- false;
 	     (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*)
 	     
 	     (* TODO: capture all side-effects seen in memory, concrete and symbolic *)
-	     self#save_sym_se ;
-	     self#save_conc_se ;
+	     self#save_f1_sym_se ;
+	     self#save_f1_conc_se ;
 	    );
 	  if eip = start2 then 
 	    (saved_f2_rsp <- self#get_long_var R_RSP;
 	     in_f2_range <- true;
 	     
 	     (* TODO: restore all memory, concrete and symbolic, from saved snapshot S *)
-	     self#restore_sym_snap ;
-	     self#restore_conc_snap ;
+	     self#make_f2_sym_snap ;
+	     self#make_f2_conc_snap ;
 	    )
 	  else if eip = end2 then (
-	      saved_f2_rsp <- 0L;
+	      (*saved_f2_rsp <- 0L;*)
 	      in_f2_range <- false;
 	      
 	      (* TODO: capture all side-effects seen in memory, concrete and symbolic

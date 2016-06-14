@@ -515,23 +515,23 @@ struct
 	| Some 0 -> (mem :> (GM.granular_memory))
 	| Some r_num -> ((List.nth regions (r_num - 1)) :> GM.granular_memory)
 
-    method make_sym_snap =
+    method make_f1_sym_snap =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#make_sym_snap called\n";
       (*List.iter (fun m -> m#make_snap ();) regions;*)
       ()
 	
-    method save_sym_se =
+    method save_f1_sym_se =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#save_sym_se called\n";
       ()
 
-    method restore_sym_snap =
+    method make_f2_sym_snap =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "SRFM#restore_sym_snap called\n";
+	Printf.printf "SRFM#make_f2_sym_snap called\n";
       (*List.iter (fun m -> m#reset ();) regions;*)
       ()
 
