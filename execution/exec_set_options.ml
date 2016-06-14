@@ -513,6 +513,8 @@ let cmdline_opts =
      " Print calls and returns");
     ("-trace-regions", Arg.Set(opt_trace_regions),
      " Print symbolic memory regions");
+    ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
+     " Print memory snapshot/reset operations");
     ("-trace-registers", Arg.Set(opt_trace_registers),
      " Print register contents");
     ("-trace-setup", Arg.Set(opt_trace_setup),

@@ -3,6 +3,7 @@
 *)
 
 open Exec_domain;;
+open Exec_options;;
 
 module GranularMemoryFunctor =
   functor (D : DOMAIN) ->
@@ -285,6 +286,8 @@ struct
 	
     method on_missing m = missing <- m
       
+    method get_missing = missing
+      
     method private virtual with_chunk : int64 ->
       (gran64 -> int64 -> int -> (D.t * gran64)) -> D.t option
 
@@ -426,6 +429,11 @@ struct
 
     method virtual measure_size : int * int * int
 
+    method get_mem : (int64, gran64) Hashtbl.t =  Hashtbl.create 0
+      (*let ret = Hashtbl.create 1 in
+      Hashtbl.replace ret 0L Absent64;
+      ret*)
+
   (* method make_snap () = failwith "make_snap unsupported"; ()
      method reset () = failwith "reset unsupported"; () *)
   end
@@ -536,13 +544,25 @@ struct
 	"[" ^ (gran64_to_string chunk) ^ "]"
 
     method clear () =
+      (*if !opt_trace_mem_snapshots = true then
+	(Printf.printf "GHM#clear called\n";
+	 Hashtbl.iter 
+	   (fun addr chunk ->
+	     let (exp,_) = gran64_get_long chunk missing addr in
+	     Printf.printf "%Lx %s\n" addr 
+	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
+	   mem;
+	 Printf.printf "-x-x-x-x-fin-x-x-x-x-\n\n";
+	);*)
       Hashtbl.clear mem
-
+	  
     method measure_size =
       let num_nodes = Hashtbl.fold (fun k v sum -> sum + gran64_size v) mem 0
       in
       let num_entries = Hashtbl.length mem in
 	(num_nodes, num_entries, 0)
+
+    method get_mem = mem
   end
 
   class granular_snapshot_memory
@@ -661,24 +681,80 @@ struct
 	(ents_d + ents_m, nodes_d + nodes_m, conc_d + conc_m)
 
     method clear () = 
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSM#clear clearing diff\n";
       diff#clear ();
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSM#clear clearing main\n";
       main#clear ()
 	
     method make_snap () =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSM#make_snap called\n";
       have_snap <- true
 	
     method reset () = 
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSM#reset called\n";
       diff#clear (); ()
+	
+    method get_snap () = have_snap
+      
+    (* This method should only be used to set level 4 memory have_snap to false *)
+    method set_snap b = have_snap <- b
+
+    method get_mem = diff#get_mem
+
+    method get_diff = diff
+
+    method get_missing = main#get_missing
   end
 
   class granular_second_snapshot_memory
-    (mem1_2:granular_snapshot_memory) (mem3:granular_memory) =
+    (mem1_2:granular_snapshot_memory) (mem3_4:granular_snapshot_memory) =
   object(self) 
-    inherit granular_snapshot_memory (mem1_2 :> granular_memory) mem3
+    inherit granular_snapshot_memory (mem1_2 :> granular_memory) 
+      (mem3_4 :> granular_memory)
+    val mutable f1_se : (int64, gran64) Hashtbl.t = Hashtbl.create 0 
       
-    method inner_make_snap () = mem1_2#make_snap ()
-  end
-    
+    (*method inner_make_snap () = mem1_2#make_snap ()*)
+    method make_snap_self () =
+      have_snap <- true
+      
+    method make_snap =
+      if ((mem1_2#get_snap ()) = false) then
+	(if !opt_trace_mem_snapshots = true then
+	    Printf.printf "GSSM#make_snap 1 -> 2\n";
+	  mem1_2#make_snap)
+      else if ((mem1_2#get_snap ()) = true) && ((self#get_snap ()) = false) then
+	(if !opt_trace_mem_snapshots = true then
+	    Printf.printf "GSSSM#make_snap 2 -> 3\n";	
+	 self#make_snap_self)
+      else if ((mem1_2#get_snap ()) = true) && ((self#get_snap ()) = true) && 
+	  ((mem3_4#get_snap ()) = false) then
+	(if !opt_trace_mem_snapshots = true then
+	    Printf.printf "GSSM#make_snap 3 -> 4\n";
+	 mem3_4#make_snap)
+      else failwith "oh snap!"
+	
+    method reset4_3 =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSSM#reset4_3 called\n";
+      f1_se <- mem3_4#get_mem;
+      mem3_4#set_snap false;
+      mem3_4#reset
+
+    method reset =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "GSSM#reset called\n";
+      mem3_4#set_snap false;
+      mem3_4#clear
+	
+    method get_level4 = 
+      let ret = mem3_4#get_diff in
+      (ret :> granular_hash_memory)
+end
+  
   class concrete_adaptor_memory (mem:Concrete_memory.concrete_memory) =
   object(self)
     method on_missing (m:int -> int64 -> D.t) = ()
@@ -712,7 +788,11 @@ struct
       val mutable missing : (int -> int64 -> D.t) =
 	(fun _ -> failwith "Must call on_missing")
 
+      method get_mem : (int64, gran64) Hashtbl.t =  Hashtbl.create 0
+      
       method on_missing m = missing <- m
+
+      method get_missing = missing
 
       method store_byte  addr b = mem#store_byte  addr (D.to_concrete_8 b)
       method store_short addr s = mem#store_short addr (D.to_concrete_16 s)

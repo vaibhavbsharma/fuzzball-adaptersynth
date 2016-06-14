@@ -63,6 +63,8 @@ sig
   class virtual granular_memory : object
     method on_missing : missing_t -> unit
 
+    method get_missing : (int -> int64 -> D.t)
+
     method private virtual store_common_fast :
       int64 -> (gran64 -> int -> gran64) -> unit
       
@@ -89,6 +91,7 @@ sig
     method virtual clear : unit -> unit
 
     method virtual measure_size : int * int * int
+    method get_mem : (int64, gran64) Hashtbl.t
   end
     
   class granular_page_memory : object
@@ -170,6 +173,7 @@ sig
     method store_page : int64 -> string -> unit
     method clear : unit -> unit
     method measure_size : int * int * int
+    method get_mem : (int64, gran64) Hashtbl.t 
   end
 
   class granular_snapshot_memory : granular_memory -> granular_memory ->
@@ -190,13 +194,18 @@ sig
     method store_page : int64 -> string -> unit
     method clear : unit -> unit
     method measure_size : int * int * int
+    method get_snap : unit -> bool
 
     method make_snap : unit -> unit
+    method set_snap : bool -> unit
     method reset : unit -> unit
+    method get_mem : (int64, gran64) Hashtbl.t
+    method get_diff : granular_hash_memory
+    method get_missing : (int -> int64 -> D.t)
   end
 
   class granular_second_snapshot_memory :
-    granular_snapshot_memory -> granular_memory ->
+    granular_snapshot_memory -> granular_snapshot_memory ->
   object
     method on_missing : missing_t -> unit
     method maybe_load_byte  : int64 -> D.t option
@@ -214,13 +223,19 @@ sig
     method store_page : int64 -> string -> unit
     method clear : unit -> unit
     method measure_size : int * int * int
+    method get_snap : unit -> bool
 
     method make_snap : unit -> unit
+    method set_snap : bool -> unit
+    method make_snap_self : unit -> unit
     method reset : unit -> unit
-
-    method inner_make_snap : unit -> unit
+    method reset4_3 : unit -> unit
+    method get_mem : (int64, gran64) Hashtbl.t
+    method get_diff : granular_hash_memory
+    method get_level4 : granular_hash_memory
+    method get_missing : (int -> int64 -> D.t)
   end
-    
+ 
   class concrete_adaptor_memory : Concrete_memory.concrete_memory -> object
     method on_missing : missing_t -> unit
     method maybe_load_byte  : int64 -> D.t option
@@ -258,5 +273,7 @@ sig
     method store_page : int64 -> string -> unit
     method clear : unit -> unit
     method measure_size : int * int * int
+    method get_mem : (int64, gran64) Hashtbl.t
+    method get_missing : (int -> int64 -> D.t)
   end
 end

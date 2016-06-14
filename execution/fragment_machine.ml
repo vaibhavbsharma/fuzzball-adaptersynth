@@ -605,12 +605,15 @@ struct
 	   (D.reassemble32 (D.reassemble16 b4 b5) (D.reassemble16 b6 b7)))
 
   class frag_machine = object(self)
+      
     val mem = (new GM.granular_second_snapshot_memory
 		 (new GM.granular_snapshot_memory
 		    (new GM.concrete_maybe_adaptor_memory
 		       (new string_maybe_memory))
 		    (new GM.granular_hash_memory))
-		 (new GM.granular_hash_memory))
+		 (new GM.granular_snapshot_memory
+		    (new GM.granular_hash_memory)
+		    (new GM.granular_hash_memory)))
 
     val reg_store = V.VarHash.create 100
     val reg_to_var = Hashtbl.create 100
@@ -631,6 +634,9 @@ struct
     val mutable saved_f2_rsp = 0L
     val mutable f1_write_addr_l:(int64 list) = []
     val mutable f2_write_addr_l:(int64 list) = []
+
+    val mutable f1_se = new GM.granular_hash_memory 
+    val mutable f2_se = new GM.granular_hash_memory
 
     method add_f1_store addr = 
       (*Printf.printf "FM#add_f1_store: mem store in f1(%08Lx) at %08Lx\n" 
@@ -806,7 +812,7 @@ struct
        else (Printf.printf "fragment_machine: expression violates restriction, raising DisqualifiedPath\n";
              raise DisqualifiedPath))
 	
-	method check_adaptor_condition expr =
+    method check_adaptor_condition expr =
       (* TODO this function is still in progress *)
       let (b, choices) = self#query_condition expr (Some true) (0x6d00) in 
       ((*let str = match choices with
@@ -824,50 +830,75 @@ struct
       
     method make_sym_snap = 
       (* this method is implemented in SRFM *)
-      if !opt_trace_regions then
+      if !opt_trace_mem_snapshots then
 	Printf.printf "FM#make_sym_snap called\n";
-      ()
-
-    method make_conc_snap = 
-      (* TODO: finish this method *)
-      if !opt_trace_regions then
-	Printf.printf "FM#make_conc_snap called\n";
       ()
 
     method save_sym_se = 
       (* TODO: finish this method *)
-      if !opt_trace_regions then
+      if !opt_trace_mem_snapshots then
 	Printf.printf "FM#save_sym_se called\n";
       ()
     
-    method save_conc_se = 
-      (* TODO: finish this method *)
-      if !opt_trace_regions then
-	Printf.printf "FM#save_conc_se called\n";
-      ()
-      
     method restore_sym_snap = 
       (* TODO: finish this method *)
-      if !opt_trace_regions then
+      if !opt_trace_mem_snapshots then
 	Printf.printf "FM#restore_sym_snap called\n";
       ()
 	
-    method restore_conc_snap = 
-      (* TODO: finish this method *)
-      if !opt_trace_regions then
-	Printf.printf "FM#restore_conc_snap called\n";
-      ()
-
     method compare_sym_se =
       (* TODO: compare side-effects on symbolic memory between f1 and f2 *)
-      if !opt_trace_regions then
+      if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_sym_se called\n";
       ()
     
+    method make_conc_snap = 
+      (* TODO: finish this method *)
+      if !opt_trace_mem_snapshots then
+	Printf.printf "FM#make_conc_snap called\n";
+      mem#make_snap ();
+      ()
+
+    method save_conc_se = 
+      (* TODO: finish this method *)
+      if !opt_trace_mem_snapshots then
+	Printf.printf "FM#save_conc_se called\n";
+      f1_se <- mem#get_level4;
+      mem#reset4_3 ();
+      ()
+      
+    method restore_conc_snap = 
+      (* TODO: finish this method *)
+      if !opt_trace_mem_snapshots then
+	Printf.printf "FM#restore_conc_snap called\n";
+      ()
+
     method compare_conc_se =
       (* TODO: compare side-effects on concrete memory between f1 and f2 *)
-      if !opt_trace_regions then
+      if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_conc_se called\n";
+      f2_se <- mem#get_level4;
+      mem#reset4_3 ();
+      if !opt_trace_mem_snapshots then
+	(Printf.printf "f1 memory side-effects\n";
+	 Hashtbl.iter 
+	   (fun addr chunk ->
+	     let (exp,_) = GM.gran64_get_long chunk 
+	       f1_se#get_missing addr in
+	     Printf.printf "%Lx %s\n" addr 
+	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
+	   (f1_se#get_mem);
+	 Printf.printf "\nf2 memory side-effects\n";
+	 Hashtbl.iter 
+	   (fun addr chunk ->
+	     let (exp,_) = GM.gran64_get_long chunk 
+	       f2_se#get_missing addr in
+	     Printf.printf "%Lx %s\n" addr 
+	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
+	   (f2_se#get_mem);
+	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
+	);
+      
       ()
     
     method get_reg_symbolic reg =
@@ -1947,7 +1978,8 @@ struct
 	setup ()
 
     method start_symbolic =
-      mem#inner_make_snap ();
+      (*mem#inner_make_snap ();*)
+      mem#make_snap ();
       started_symbolic <- true
 
     val mutable special_handler_list = ([] : #special_handler list)
@@ -1979,6 +2011,8 @@ struct
 	fuzz_finish_reasons
 
     method reset () =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "FM#reset calling mem#reset()\n";
       mem#reset ();
       (match snap with (r, t) ->
 	 move_hash r reg_store;

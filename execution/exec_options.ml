@@ -103,6 +103,7 @@ let opt_concrete_path_simulate = ref false
 let opt_concolic_prob = ref None
 let opt_solve_path_conditions = ref false
 let opt_trace_regions = ref false
+let opt_trace_mem_snapshots = ref false
 let opt_check_for_null = ref false
 let opt_offset_strategy = ref UniformStrat
 let opt_concretize_divisors = ref false
