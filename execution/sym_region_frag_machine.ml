@@ -1683,12 +1683,14 @@ struct
 	     (if !opt_use_tags then
 		Printf.printf " (%Ld @ %08Lx)" (D.get_tag value) location_id);
 	     Printf.printf "\n");
-	if (self#get_in_f1_range ()) = true then (
-	  (*Printf.printf "SRFM#handle_store: mem store in f1 at %08Lx\n" addr;*)
-	  self#add_f1_store addr;
-	) else if (self#get_in_f2_range ()) = true then (
-	  (*Printf.printf "SRFM#handle_store: mem store in f2 at %08Lx\n" addr;*)
-	  self#add_f2_store addr;
+	if !opt_check_store_sequence = true then (  
+	  if (self#get_in_f1_range ()) = true then (
+	    (*Printf.printf "SRFM#handle_store: mem store in f1 at %08Lx\n" addr;*)
+	    self#add_f1_store addr;
+	  ) else if (self#get_in_f2_range ()) = true then (
+	    (*Printf.printf "SRFM#handle_store: mem store in f2 at %08Lx\n" addr;*)
+	    self#add_f2_store addr;
+	  );
 	);
 	if !opt_track_sym_usage then
 	  (let stack_off = Int64.sub addr self#get_esp_conc_base in

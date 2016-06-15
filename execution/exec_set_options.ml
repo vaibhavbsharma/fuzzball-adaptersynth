@@ -307,6 +307,9 @@ let explore_cmdline_opts =
       (fun s -> opt_zero_region_limit := Int64.of_string s),
      "N Treat upto N byte offsets into a region as symbolic " ^
        "and everything else as containing zero");
+    ("-check-store-sequence", Arg.Set(opt_check_store_sequence),
+     " Track concrete addresses written to by f1, f2 and disqualify paths "^
+       "on which the sequence of concrete addresses diverge between f1 and f2");
     ("-path-depth-limit", Arg.String
        (fun s -> opt_path_depth_limit := Int64.of_string s),
      "N Stop path after N bits of symbolic branching");

@@ -82,6 +82,7 @@ val opt_concolic_prob : float option ref
 val opt_solve_path_conditions : bool ref
 val opt_trace_regions : bool ref
 val opt_trace_mem_snapshots : bool ref
+val opt_check_store_sequence : bool ref
 val opt_check_for_null : bool ref
 val opt_offset_strategy : offset_strategy ref
 val opt_concretize_divisors : bool ref
