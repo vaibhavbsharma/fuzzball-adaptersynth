@@ -739,7 +739,7 @@ struct
 	
     method reset4_3 =
       if !opt_trace_mem_snapshots = true then
-	Printf.printf "GSSM#reset4_3 called\n";
+	Printf.printf "GSSM#reset4_3 4 -> 3 \n";
       f1_se <- mem3_4#get_mem;
       mem3_4#set_snap false;
       mem3_4#reset

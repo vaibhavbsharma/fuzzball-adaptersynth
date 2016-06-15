@@ -938,7 +938,7 @@ struct
 	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
 	); *)
       
-      (* TODO: Check for non-local memory side-effects equivalence here *)
+      (* Check for non-local memory side-effects equivalence here *)
       if f1_nonlocal_se = f2_nonlocal_se then
 	(if !opt_trace_mem_snapshots = true then
 	  Printf.printf "all side-effects were equal\n";)
@@ -946,38 +946,51 @@ struct
       (
       (* Iterate through f1_nonlocal_se, f2_nonlocal_se and check for equivalence *)
 	Hashtbl.iter ( fun addr f1_exp ->
-	  if Hashtbl.mem f2_nonlocal_se addr then
-	    (let f2_exp = Hashtbl.find f2_nonlocal_se addr in
-	    if f1_exp = f2_exp then
-	      (if !opt_trace_mem_snapshots = true then
-		  Printf.printf "equal side-effects %s = %s\n"
-		    (V.exp_to_string f1_exp) 
-		    (V.exp_to_string f2_exp);)
-	    else (
-	      let q_exp = V.BinOp(V.EQ, f1_exp, f2_exp) in
-	      let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
-	      if b = false then (
-		if !opt_trace_mem_snapshots = true then
-		  Printf.printf "inequivalent side-effects %s!=\n%s" 
-		    (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
-		raise DisqualifiedPath;
-	      )
-	      else (
-		if !opt_trace_mem_snapshots = true then
-		  Printf.printf "equivalent side-effects %s=\n%s"
-		    (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
-	      )
-	    ))
-	  else ( (* f1 wrote to an address that f2 did not *)
-	    
-	  );
+	  let f2_exp =
+	  try 
+	    Hashtbl.find f2_nonlocal_se addr
+	  with Not_found -> (* TODO: f1 wrote to an address that f2 did not *)
+	    D.to_symbolic_64 (mem#load_long addr) in
+	  self#query_exp f1_exp f2_exp;
 	) f1_nonlocal_se;
+	Hashtbl.iter (fun addr f2_exp -> 
+	  (* TODO: Check if f2 wrote to an address that f1 did not *)
+	  try 
+	    ignore(Hashtbl.mem f1_nonlocal_se addr)
+	  with Not_found ->
+	    let f1_exp = D.to_symbolic_64 (mem#load_long addr) in
+	    self#query_exp f1_exp f2_exp; 
+	) f2_nonlocal_se;
       );
       mem#reset4_3 ();
       saved_f1_rsp <- 0L;
       saved_f2_rsp <- 0L;
       ()
-    
+	
+    (* Check if two expressions are syntactically or semantically equal,
+       disqualify the path if not *)
+    method private query_exp exp1 exp2 =
+      if exp1 = exp2 then
+	(if !opt_trace_mem_snapshots = true then
+	    Printf.printf "equal side-effects %s = %s\n"
+	      (V.exp_to_string exp1) 
+	      (V.exp_to_string exp2);)
+      else (
+	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
+	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
+	if b = false then (
+	  if !opt_trace_mem_snapshots = true then
+	    Printf.printf "inequivalent side-effects %s!=\n%s" 
+	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	  raise DisqualifiedPath;
+	)
+	else (
+	  if !opt_trace_mem_snapshots = true then
+	    Printf.printf "equivalent side-effects %s=\n%s"
+	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	)
+      )
+	
     method get_reg_symbolic reg =
       D.to_symbolic_64 (self#get_int_var (Hashtbl.find reg_to_var reg))
     
