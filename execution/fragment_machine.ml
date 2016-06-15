@@ -878,7 +878,7 @@ struct
       ()
 
     method compare_conc_se =
-      (* TODO: compare side-effects on concrete memory between f1 and f2 *)
+      (* compare side-effects on concrete memory between f1 and f2 *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_conc_se called\n";
       f2_se <- mem#get_level4;
@@ -949,12 +949,12 @@ struct
 	  let f2_exp =
 	  try 
 	    Hashtbl.find f2_nonlocal_se addr
-	  with Not_found -> (* TODO: f1 wrote to an address that f2 did not *)
+	  with Not_found -> (* f1 wrote to an address that f2 did not *)
 	    D.to_symbolic_64 (mem#load_long addr) in
 	  self#query_exp f1_exp f2_exp;
 	) f1_nonlocal_se;
 	Hashtbl.iter (fun addr f2_exp -> 
-	  (* TODO: Check if f2 wrote to an address that f1 did not *)
+	  (* Check if f2 wrote to an address that f1 did not *)
 	  try 
 	    ignore(Hashtbl.mem f1_nonlocal_se addr)
 	  with Not_found ->
@@ -1080,42 +1080,29 @@ struct
 	extra_eip_hooks;
       List.iter (
 	fun (start1,end1,start2,end2) ->
-	  if eip = start1 then 
-	    (saved_f1_rsp <- self#get_long_var R_RSP; 
-	     in_f1_range <- true;
-	     
-	     (* TODO: save a snapshot, S, of all memory, concrete and symbolic *)
-	     self#make_f1_sym_snap ; 
-	     self#make_f1_conc_snap ;  
-	    )
-	  else if eip = end1 then 
-	    ((* saved_f1_rsp <- 0L; *)
-	     in_f1_range <- false;
-	     (*List.iter (fun a -> Printf.printf "f1_syscalls = %d\n" a) f1_syscalls;*)
-	     
-	     (* TODO: capture all side-effects seen in memory, concrete and symbolic *)
-	     self#save_f1_sym_se ;
-	     self#save_f1_conc_se ;
-	    );
-	  if eip = start2 then 
-	    (saved_f2_rsp <- self#get_long_var R_RSP;
-	     in_f2_range <- true;
-	     
-	     (* TODO: restore all memory, concrete and symbolic, from saved snapshot S *)
-	     self#make_f2_sym_snap ;
-	     self#make_f2_conc_snap ;
-	    )
+	  if eip = start1 then (
+	    saved_f1_rsp <- self#get_long_var R_RSP; 
+	    in_f1_range <- true;
+	    self#make_f1_sym_snap ; 
+	    self#make_f1_conc_snap ;  
+	  )
+	  else if eip = end1 then (
+	    in_f1_range <- false;
+	    self#save_f1_sym_se ;
+	    self#save_f1_conc_se ;
+	  );
+	  if eip = start2 then (
+	    saved_f2_rsp <- self#get_long_var R_RSP;
+	    in_f2_range <- true;
+	    self#make_f2_sym_snap ;
+	    self#make_f2_conc_snap ;
+	  )
 	  else if eip = end2 then (
-	      (*saved_f2_rsp <- 0L;*)
-	      in_f2_range <- false;
-	      
-	      (* TODO: capture all side-effects seen in memory, concrete and symbolic
-		 compare these with the captured side-effects of f1's execution *)
-	      self#compare_sym_se ;
-	      self#compare_conc_se ;
-	    );
-      ) 
-	!opt_match_syscalls_addr_range;
+	    in_f2_range <- false;
+	    self#compare_sym_se ;
+	    self#compare_conc_se ;
+	  );
+      ) !opt_match_syscalls_addr_range;
       self#watchpoint
 
     method get_eip =
