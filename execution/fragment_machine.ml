@@ -754,8 +754,6 @@ struct
 			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg2_exp)))) 
 		else ( V.BinOp(V.NEQ, arg1_exp, arg2_exp))
 	      in
-	      (* TODO: Pass the preference as false during adaptor search mode
-		 and true during counter example search mode *)
 	      let preferred_dir = not !opt_adaptor_search_mode in
 	      let (b,choices) = (self#query_condition exp (Some preferred_dir) (0x6d00+i*10)) in
 	      (*let choices_str = 
@@ -885,7 +883,7 @@ struct
 	Printf.printf "FM#compare_conc_se called\n";
       f2_se <- mem#get_level4;
       let f2_hash = (f2_se#get_mem) in
-      if !opt_trace_mem_snapshots then
+      (* if !opt_trace_mem_snapshots then
 	(Printf.printf "f1 memory side-effects\n";
 	 Hashtbl.iter 
 	   (fun addr chunk ->
@@ -903,27 +901,28 @@ struct
 	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
 	   f2_hash;
 	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
-	);
+	); *)
+
       let f1_nonlocal_se = Hashtbl.create 0 in
       let f2_nonlocal_se = Hashtbl.create 0 in
       Hashtbl.iter (fun addr chunk ->
 	let (exp, _) = GM.gran64_get_long chunk (f1_se#get_missing) addr in
 	if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	  (if !opt_trace_mem_snapshots = true then
-	      Printf.printf "addr = %Lx, rsp = %Lx was non-local side-effect\n" 
+	      Printf.printf "In f1, addr = %Lx, rsp = %Lx was non-local side-effect\n" 
 		addr saved_f1_rsp;
-	   Hashtbl.replace f1_nonlocal_se addr exp;)
+	   Hashtbl.replace f1_nonlocal_se addr (D.to_symbolic_64 exp);)
       ) f1_hash;
       Hashtbl.iter (fun addr chunk ->
 	let (exp, _) = GM.gran64_get_long chunk (f2_se#get_missing) addr in
 	if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
 	  (if !opt_trace_mem_snapshots = true then
-	      Printf.printf "addr = %Lx, rsp = %Lx was non-local side-effect\n" 
+	      Printf.printf "In f2, addr = %Lx, rsp = %Lx was non-local side-effect\n" 
 		addr saved_f2_rsp;
-	   Hashtbl.replace f2_nonlocal_se addr exp;)
+	   Hashtbl.replace f2_nonlocal_se addr (D.to_symbolic_64 exp);)
       ) f2_hash;
       
-      if !opt_trace_mem_snapshots then
+      (* if !opt_trace_mem_snapshots then
 	(Printf.printf "f1 non-local memory side-effects\n";
 	 Hashtbl.iter 
 	   (fun addr exp ->
@@ -937,9 +936,43 @@ struct
 	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
 	   f2_nonlocal_se;
 	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
-	);
+	); *)
       
-      (* TODO: Check for non-local memory side-effects equivalence here *) 
+      (* TODO: Check for non-local memory side-effects equivalence here *)
+      if f1_nonlocal_se = f2_nonlocal_se then
+	(if !opt_trace_mem_snapshots = true then
+	  Printf.printf "all side-effects were equal\n";)
+      else 
+      (
+      (* Iterate through f1_nonlocal_se, f2_nonlocal_se and check for equivalence *)
+	Hashtbl.iter ( fun addr f1_exp ->
+	  if Hashtbl.mem f2_nonlocal_se addr then
+	    (let f2_exp = Hashtbl.find f2_nonlocal_se addr in
+	    if f1_exp = f2_exp then
+	      (if !opt_trace_mem_snapshots = true then
+		  Printf.printf "equal side-effects %s = %s\n"
+		    (V.exp_to_string f1_exp) 
+		    (V.exp_to_string f2_exp);)
+	    else (
+	      let q_exp = V.BinOp(V.EQ, f1_exp, f2_exp) in
+	      let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
+	      if b = false then (
+		if !opt_trace_mem_snapshots = true then
+		  Printf.printf "inequivalent side-effects %s!=\n%s" 
+		    (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
+		raise DisqualifiedPath;
+	      )
+	      else (
+		if !opt_trace_mem_snapshots = true then
+		  Printf.printf "equivalent side-effects %s=\n%s"
+		    (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
+	      )
+	    ))
+	  else ( (* f1 wrote to an address that f2 did not *)
+	    
+	  );
+	) f1_nonlocal_se;
+      );
       mem#reset4_3 ();
       saved_f1_rsp <- 0L;
       saved_f2_rsp <- 0L;
