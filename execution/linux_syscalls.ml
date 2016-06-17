@@ -78,7 +78,8 @@ type fd_extra_info = {
   mutable dirp_offset : int;
   mutable readdir_eof: int;
   mutable fname : string;
-  mutable snap_pos : int option;
+  mutable snap_pos : int option Stack.t;
+  (*mutable snap_pos : int option;*)
 }
 
 (* N.b. the argument order here is the opposite from D.assemble64,
@@ -189,7 +190,9 @@ object(self)
 	    (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
 
   val fd_info = Array.init 1024
-    (fun _ -> { dirp_offset = 0; readdir_eof = 0; fname = ""; snap_pos = None })
+    (fun _ -> { dirp_offset = 0; readdir_eof = 0; fname = ""; snap_pos = Stack.create()
+	      (*snap_pos = None*) 
+	      })
 
   val netlink_sim_sockfd = ref 1025
   val netlink_sim_seq = ref 0L
@@ -281,16 +284,26 @@ object(self)
 
   val the_break = ref None
 
-  val mutable saved_next_fresh_addr = 0L
-  val mutable saved_the_break = None
+  (*val mutable saved_next_fresh_addr = 0L*)
+  (*val mutable saved_the_break = None*)
+  val mutable saved_next_fresh_addr = Stack.create()
+  val mutable saved_the_break = Stack.create() 
 
   method private save_memory_state =
-    saved_next_fresh_addr <- next_fresh_addr;
-    saved_the_break <- !the_break
+    (*saved_next_fresh_addr <- next_fresh_addr;*)
+    Stack.push next_fresh_addr saved_next_fresh_addr;
+    (*saved_the_break <- !the_break*)
+    Stack.push !the_break saved_the_break;
 
   method private reset_memory_state =
-    next_fresh_addr <- saved_next_fresh_addr;
-    the_break := saved_the_break
+    (*next_fresh_addr <- saved_next_fresh_addr;*)
+    next_fresh_addr <- Stack.pop saved_next_fresh_addr;
+    if (Stack.length saved_next_fresh_addr = 0) then 
+      Stack.push next_fresh_addr saved_next_fresh_addr;
+    (*the_break := saved_the_break*)
+    the_break := Stack.pop saved_the_break;
+    if (Stack.length saved_the_break) = 0 then
+      Stack.push !the_break saved_the_break;
 
   method string_create len =
     try String.create len
@@ -683,44 +696,62 @@ object(self)
 
   method private save_sym_fd_positions = 
     Hashtbl.iter
-      (fun fd _ -> fd_info.(fd).snap_pos <- 
-	 Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR))
+      (fun fd _ -> 
+	(*fd_info.(fd).snap_pos <- 
+	 Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)*)
+	Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) 
+	  fd_info.(fd).snap_pos;
+      )
       symbolic_fds
 
   method private reset_sym_fd_positions = 
     Hashtbl.iter
       (fun fd _ ->
-	 match fd_info.(fd).snap_pos with
+	 (*match fd_info.(fd).snap_pos with
 	   | Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
-	   | None -> ())
+	   | None -> ()*)
+	(match Stack.top fd_info.(fd).snap_pos with
+	| Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
+	| None -> ());
+	if Stack.length fd_info.(fd).snap_pos <> 1 then
+	  ignore(Stack.pop fd_info.(fd).snap_pos);
+      )
       symbolic_fds
 
   method make_snap = 
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#make_snap called\n";
     self#save_sym_fd_positions;
     self#save_memory_state
 
   method reset = 
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#reset called\n";
     self#reset_sym_fd_positions;
     self#reset_memory_state
 
   method make_f1_snap = 
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#make_f1_snap called\n";
+    self#make_snap ;
     ()
     
   method reset_f1_snap = 
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#reset_f1_snap called\n";
+    self#reset ;
     ()
 
   method make_f2_snap =
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#make_f2_snap called\n";
+    self#make_snap ;
     ()
 
   method reset_f2_snap =
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#reset_f2_snap called\n";
+    self#reset ;
     ()
 
   method sys_access path mode =
