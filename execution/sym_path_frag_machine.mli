@@ -181,6 +181,10 @@ sig
     method make_f2_conc_snap : unit
     method compare_sym_se : unit
     method compare_conc_se : unit
+    method make_f1_special_handlers_snap : unit
+    method reset_f1_special_handlers_snap : unit
+    method make_f2_special_handlers_snap : unit
+    method reset_f2_special_handlers_snap : unit
 
     method save_arg_regs : int64 -> unit
     method add_f1_store : int64 -> unit

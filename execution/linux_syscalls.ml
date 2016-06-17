@@ -703,6 +703,26 @@ object(self)
     self#reset_sym_fd_positions;
     self#reset_memory_state
 
+  method make_f1_snap = 
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#make_f1_snap called\n";
+    ()
+    
+  method reset_f1_snap = 
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#reset_f1_snap called\n";
+    ()
+
+  method make_f2_snap =
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#make_f2_snap called\n";
+    ()
+
+  method reset_f2_snap =
+    if !opt_trace_mem_snapshots = true then
+      Printf.printf "linux_syscalls#reset_f2_snap called\n";
+    ()
+
   method sys_access path mode =
     let oc_mode =
       (if   (mode land 0x7)= 0 then [Unix.F_OK] else []) @

@@ -1161,4 +1161,8 @@ object(self)
   (* This class is stateless so these are also no-ops: *)
   method make_snap = ()
   method reset = ()
+  method make_f1_snap : unit = ()
+  method reset_f1_snap : unit = ()
+  method make_f2_snap : unit = ()
+  method reset_f2_snap : unit = ()
 end

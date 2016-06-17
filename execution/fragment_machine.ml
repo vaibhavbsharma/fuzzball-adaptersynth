@@ -65,6 +65,10 @@ class virtual special_handler = object(self)
   method virtual handle_special : string -> V.stmt list option
   method virtual make_snap : unit
   method virtual reset : unit
+  method virtual make_f1_snap : unit
+  method virtual reset_f1_snap : unit
+  method virtual make_f2_snap : unit
+  method virtual reset_f2_snap : unit
 end
 
 type register_name = 
@@ -408,6 +412,10 @@ class virtual fragment_machine = object
   method virtual make_f2_conc_snap : unit
   method virtual compare_sym_se : unit
   method virtual compare_conc_se : unit
+  method virtual make_f1_special_handlers_snap : unit
+  method virtual reset_f1_special_handlers_snap : unit
+  method virtual make_f2_special_handlers_snap : unit
+  method virtual reset_f2_special_handlers_snap : unit
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
  
   method virtual add_f1_store : int64 -> unit
@@ -855,9 +863,9 @@ struct
       if !opt_trace_mem_snapshots then
 	Printf.printf "FM#compare_sym_se called\n";
       ()
-    
+   
     method make_f1_conc_snap = 
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#make_f1_conc_snap called\n";
       mem#make_snap ();
       ()
@@ -1085,22 +1093,26 @@ struct
 	    in_f1_range <- true;
 	    self#make_f1_sym_snap ; 
 	    self#make_f1_conc_snap ;  
+	    self#make_f1_special_handlers_snap ;
 	  )
 	  else if eip = end1 then (
 	    in_f1_range <- false;
 	    self#save_f1_sym_se ;
 	    self#save_f1_conc_se ;
+	    self#reset_f1_special_handlers_snap ;
 	  );
 	  if eip = start2 then (
 	    saved_f2_rsp <- self#get_long_var R_RSP;
 	    in_f2_range <- true;
 	    self#make_f2_sym_snap ;
 	    self#make_f2_conc_snap ;
+	    self#make_f2_special_handlers_snap ;
 	  )
 	  else if eip = end2 then (
 	    in_f2_range <- false;
 	    self#compare_sym_se ;
 	    self#compare_conc_se ;
+	    self#reset_f2_special_handlers_snap ;
 	  );
       ) !opt_match_syscalls_addr_range;
       self#watchpoint
@@ -2066,6 +2078,30 @@ struct
       snap <- (V.VarHash.copy reg_store, V.VarHash.copy temps);
       List.iter (fun h -> h#make_snap) special_handler_list
 
+    method make_f1_special_handlers_snap =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "FM#make_f1_special_handlers_snap\n";
+      List.iter (fun h -> h#make_f1_snap) special_handler_list;
+      ()
+ 
+    method reset_f1_special_handlers_snap =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "FM#reset_f1_special_handlers_snap\n";
+      List.iter (fun h -> h#reset_f1_snap) special_handler_list;
+      ()
+ 
+    method make_f2_special_handlers_snap =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "FM#make_f2_special_handlers_snap\n";
+      List.iter (fun h -> h#make_f2_snap) special_handler_list;
+      ()
+ 
+    method reset_f2_special_handlers_snap =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "FM#reset_f2_special_handlers_snap\n";
+      List.iter (fun h -> h#reset_f2_snap) special_handler_list;
+      ()
+ 
     val mutable fuzz_finish_reasons = []
     val mutable disqualified = false
 

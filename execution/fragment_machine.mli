@@ -7,6 +7,10 @@ class virtual special_handler : object
   method virtual handle_special : string -> Vine.stmt list option
   method virtual make_snap : unit
   method virtual reset : unit
+  method virtual make_f1_snap : unit
+  method virtual reset_f1_snap : unit
+  method virtual make_f2_snap : unit
+  method virtual reset_f2_snap : unit
 end
 
 type register_name = 
@@ -178,7 +182,11 @@ class virtual fragment_machine : object
   method virtual make_f2_conc_snap : unit
   method virtual compare_sym_se : unit
   method virtual compare_conc_se : unit
-
+  method virtual make_f1_special_handlers_snap : unit
+  method virtual reset_f1_special_handlers_snap : unit
+  method virtual make_f2_special_handlers_snap : unit
+  method virtual reset_f2_special_handlers_snap : unit
+  
   method virtual make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
   
   method virtual add_f1_store : int64 -> unit
@@ -468,6 +476,10 @@ sig
     method make_f2_conc_snap : unit
     method compare_sym_se : unit
     method compare_conc_se : unit
+    method make_f1_special_handlers_snap : unit
+    method reset_f1_special_handlers_snap : unit
+    method make_f2_special_handlers_snap : unit
+    method reset_f2_special_handlers_snap : unit
 
     method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     

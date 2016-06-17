@@ -26,6 +26,10 @@ object(self)
 
   method make_snap : unit = ()
   method reset : unit = ()
+  method make_f1_snap : unit = ()
+  method reset_f1_snap : unit = ()
+  method make_f2_snap : unit = ()
+  method reset_f2_snap : unit = ()
 end
 
 class trap_special_nonhandler (fm : fragment_machine) =
@@ -36,6 +40,10 @@ object(self)
       | _ -> None
   method make_snap : unit = ()
   method reset : unit = ()
+  method make_f1_snap : unit = ()
+  method reset_f1_snap : unit = ()
+  method make_f2_snap : unit = ()
+  method reset_f2_snap : unit = ()
 end
 
 class cpuid_special_handler (fm : fragment_machine)
@@ -80,6 +88,10 @@ object(self)
       | (_, _) -> None
   method make_snap : unit = ()
   method reset : unit = ()
+  method make_f1_snap : unit = ()
+  method reset_f1_snap : unit = ()
+  method make_f2_snap : unit = ()
+  method reset_f2_snap : unit = ()
 end
   
 class x87_emulator_special_handler (fm : fragment_machine) =
@@ -102,4 +114,8 @@ object(self)
       | _ -> None
   method make_snap : unit = ()
   method reset : unit = ()
+  method make_f1_snap : unit = ()
+  method reset_f1_snap : unit = ()
+  method make_f2_snap : unit = ()
+  method reset_f2_snap : unit = ()
 end
