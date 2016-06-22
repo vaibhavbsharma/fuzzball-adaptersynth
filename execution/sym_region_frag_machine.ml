@@ -500,6 +500,9 @@ struct
     val mutable regions : GM.granular_snapshot_memory list = []
     val region_vals = Hashtbl.create 101
     val region_val_queried = Hashtbl.create 101
+    val region_vals_per_path = Hashtbl.create 101
+    val mutable have_snap = false
+    (*val mutable f1_hash_list : ( int, (int64 GM.gran64) Hashtbl.t) = Hashtbl.create 0*)
 
     val mutable location_id = 0L
 
@@ -507,6 +510,20 @@ struct
       location_id <- i;
       spfm#set_eip i
 
+    (* eip hook to track change in region contents as execution proceeds *)
+    method private print_region r_num = 
+      try
+	let tmp_val = (List.nth regions r_num)#load_long 0L in
+	Printf.printf "SRFM#print_reg regions[%d][0] = %s\n" 
+	  r_num (D.to_string_64 tmp_val)
+      with Failure("nth") -> 
+	Printf.printf "SRFM#print_reg regions.length = %d\n" 
+	  (List.length regions);
+	
+    method start_symbolic =
+      spfm#start_symbolic ;
+      (* self#add_extra_eip_hook (fun fm _ -> self#print_reg 15 );  *)
+	
     val sink_mem = new GM.granular_sink_memory
 
     method private region r =
@@ -519,26 +536,36 @@ struct
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#make_sym_snap called\n";
-      (*List.iter (fun m -> m#make_snap ();) regions;*)
+      List.iter (fun m -> m#make_snap ();) regions;
+      have_snap <- true;
       ()
 	
     method save_f1_sym_se =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#save_sym_se called\n";
+      (*List.iteri (fun ind ele -> 
+	let f1_hash <- Hashtbl.copy ele#get_mem in
+	Hashtbl.replace f1_hash_list (ind, f1_hash);
+      ) regions;*)
       ()
 
     method make_f2_sym_snap =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#make_f2_sym_snap called\n";
-      (*List.iter (fun m -> m#reset ();) regions;*)
+      List.iter (fun m -> 
+	if (m#get_snap ()) = false then
+	  failwith "unsnapped region being reset, panic!";
+	m#reset ();) regions;
+      have_snap <- false;
       ()
 
     method compare_sym_se =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#compare_sym_se called\n";
+      List.iter (fun m -> m#reset ();) regions;
       ()
 
     method private fresh_region =
@@ -554,6 +581,7 @@ struct
 	spfm#on_missing_zero_m (region :> GM.granular_memory)
       else
 	spfm#on_missing_symbol_m (region :> GM.granular_memory) name;
+      if have_snap = true then region#make_snap ();
       new_idx
 
     method private region_for e =
@@ -576,7 +604,7 @@ struct
       );
       
       try
-	let ret = Hashtbl.find region_vals e in
+	let ret = Hashtbl.find region_vals_per_path e in
 	if !opt_trace_regions then
 	  Printf.printf "SRFM#region_for found region number in region_vals, ret = %d expr = %s\n" 
 	    ret (V.exp_to_string e);
@@ -584,9 +612,9 @@ struct
       with Not_found ->
 	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
 	   same region, if e is equivalent to an expression already in 
-	   region_vals, then reuse that region *)
+	   seen in this execution path then reuse that region *)
 	let new_rnum = ref 0 in
-	(*Hashtbl.iter (fun reg_exp region -> 
+	Hashtbl.iter (fun reg_exp region -> 
 	  let exp = V.BinOp(V.EQ, reg_exp, e) in
 	  let (b,_) = (self#query_condition exp (Some true) 0x6d00) in
 	  if b = true then (
@@ -594,10 +622,14 @@ struct
 	      Printf.printf "SRFM#region_for satisfied expr = %s\n"
 		(V.exp_to_string exp);
 	    new_rnum := region;)
-	) region_vals; *)
+	) region_vals_per_path;
 	let new_region =
-	  if !new_rnum <> 0 then !new_rnum else self#fresh_region
+	  if !new_rnum <> 0 then !new_rnum 
+	  else  (* this is done to keep region numbers small *)
+	    if Hashtbl.mem region_vals e then Hashtbl.find region_vals e 
+	  else self#fresh_region
 	in
+	Hashtbl.replace region_vals_per_path e new_region;
 	Hashtbl.replace region_vals e new_region;
 	  if !opt_trace_regions then
 	    Printf.printf "Address %s is region %d\n"
@@ -1749,9 +1781,16 @@ struct
 	self#store_word_region (Some region) addr (D.from_concrete_32 v)
 
     method reset () =
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "SRFM#reset called\n";
       spfm#reset ();
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "SRFM#reset clearing regions\n";
       List.iter (fun gm -> gm#clear ()) regions;
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "SRFM#reset cleared regions\n";
       Hashtbl.clear region_val_queried;
+      Hashtbl.clear region_vals_per_path;
       Hashtbl.clear concrete_cache
   end
 end
