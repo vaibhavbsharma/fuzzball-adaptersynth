@@ -502,7 +502,8 @@ struct
     val region_val_queried = Hashtbl.create 101
     val region_vals_per_path = Hashtbl.create 101
     val mutable have_snap = false
-    (*val mutable f1_hash_list : ( int, (int64 GM.gran64) Hashtbl.t) = Hashtbl.create 0*)
+    val mutable f1_hash_list : (((int64, GM.gran64) Hashtbl.t) list )= []
+    val mutable f2_hash_list : (((int64, GM.gran64) Hashtbl.t) list )= []
 
     val mutable location_id = 0L
 
@@ -544,10 +545,10 @@ struct
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#save_sym_se called\n";
-      (*List.iteri (fun ind ele -> 
-	let f1_hash <- Hashtbl.copy ele#get_mem in
-	Hashtbl.replace f1_hash_list (ind, f1_hash);
-      ) regions;*)
+      List.iteri (fun ind ele -> 
+	let f1_hash = Hashtbl.copy (ele#get_mem) in
+	f1_hash_list <- f1_hash_list @ [f1_hash];
+      ) regions;
       ()
 
     method make_f2_sym_snap =
@@ -565,6 +566,14 @@ struct
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#compare_sym_se called\n";
+      List.iteri (fun ind ele -> 
+	let f2_hash = Hashtbl.copy (ele#get_mem) in
+	f2_hash_list <- f2_hash_list @ [f2_hash];
+      ) regions;
+      if f1_hash_list <> f2_hash_list then
+	if !opt_trace_mem_snapshots = true then
+	  (Printf.printf "SRFM#compare_sym_se inequivalent side-effects in symbolic regions";
+	   raise DisqualifiedPath;);
       List.iter (fun m -> m#reset ();) regions;
       ()
 
