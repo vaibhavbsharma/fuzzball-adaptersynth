@@ -988,7 +988,7 @@ struct
 	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
 	if b = false then (
 	  if !opt_trace_mem_snapshots = true then
-	    Printf.printf "inequivalent side-effects %s!=\n%s" 
+	    Printf.printf "inequivalent side-effects %s!=\n%s\n" 
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  raise DisqualifiedPath;
 	)
