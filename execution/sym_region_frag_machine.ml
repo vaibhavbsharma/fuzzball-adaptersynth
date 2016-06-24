@@ -580,12 +580,14 @@ struct
 	Printf.printf "f1_hash_list_len = %d f2_hash_list_len = %d\n"
 	  f1_hash_list_len f2_hash_list_len;
       if f1_hash_list_len <> 0 && f2_hash_list_len <> 0 then (
-	let missing = (List.nth regions 0)#get_missing in
+	(* Compare each of f1's symbolic region writes with f2 *)
 	List.iteri ( fun ind ele ->
 	  if ind >= f2_hash_list_len then inequiv := 1
 	  else (
 	    Hashtbl.iter ( fun addr chunk ->
-	      let (f1_exp,_) = (GM.gran64_get_long chunk missing addr) in
+	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
+	      let f1_exp = (List.nth regions ind)#load_long addr in
+	      (List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
 	      let f2_exp = (List.nth regions ind)#load_long addr in
 	      if !opt_trace_mem_snapshots = true then
 		Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
@@ -595,14 +597,30 @@ struct
 	  )
 	) f1_hash_list;
 	
+	(* Compare each of f2's symbolic region writes with f1 *)
+	List.iteri ( fun ind ele ->
+	  if ind >= f1_hash_list_len then inequiv := 1
+	  else (
+	    Hashtbl.iter ( fun addr chunk ->
+	      let f2_exp = (List.nth regions ind)#load_long addr in
+	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
+	      let f1_exp = (List.nth regions ind)#load_long addr in
+	      (List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
+	      if !opt_trace_mem_snapshots = true then
+		Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
+		  ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
+	      self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
+	    ) ele;
+	  )
+	) f2_hash_list;
 	(*List.iteri ( fun ind ele ->
-	Hashtbl.iter ( fun addr chunk ->
-	let (f2_exp,_) = (GM.gran64_get_long chunk 
-	(List.nth regions 0)#get_missing addr) in
-	Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld exp = %s\n"
-	ind addr (D.to_string_64 f2_exp);
-	) ele;
-	) f2_hash_list;*)
+	  Hashtbl.iter ( fun addr chunk ->
+	  let (f2_exp,_) = (GM.gran64_get_long chunk 
+	  (List.nth regions 0)#get_missing addr) in
+	  Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld exp = %s\n"
+	  ind addr (D.to_string_64 f2_exp);
+	  ) ele;
+	  ) f2_hash_list;*)
 	
 	if !inequiv = 1 then
 	  if !opt_trace_mem_snapshots = true then
