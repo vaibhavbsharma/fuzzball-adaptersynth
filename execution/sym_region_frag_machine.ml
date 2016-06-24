@@ -543,12 +543,14 @@ struct
 	
     method save_f1_sym_se =
       (* TODO: finish this method *)
-      if !opt_trace_mem_snapshots then
-	Printf.printf "SRFM#save_sym_se called\n";
       List.iteri (fun ind ele -> 
 	let f1_hash = Hashtbl.copy (ele#get_mem) in
 	f1_hash_list <- f1_hash_list @ [f1_hash];
       ) regions;
+      
+      if !opt_trace_mem_snapshots then
+	Printf.printf "SRFM#save_sym_se saving f1_hash_list.length = %d\n"
+	  (List.length f1_hash_list);
       ()
 
     method make_f2_sym_snap =
@@ -570,12 +572,69 @@ struct
 	let f2_hash = Hashtbl.copy (ele#get_mem) in
 	f2_hash_list <- f2_hash_list @ [f2_hash];
       ) regions;
-      if f1_hash_list <> f2_hash_list then
-	if !opt_trace_mem_snapshots = true then
-	  (Printf.printf "SRFM#compare_sym_se inequivalent side-effects in symbolic regions";
-	   raise DisqualifiedPath;);
+
+      let inequiv = ref 0 in
+      let f2_hash_list_len = List.length f2_hash_list in
+      let f1_hash_list_len = List.length f1_hash_list in
+      if !opt_trace_mem_snapshots = true then
+	Printf.printf "f1_hash_list_len = %d f2_hash_list_len = %d\n"
+	  f1_hash_list_len f2_hash_list_len;
+      if f1_hash_list_len <> 0 && f2_hash_list_len <> 0 then (
+	let missing = (List.nth regions 0)#get_missing in
+	List.iteri ( fun ind ele ->
+	  if ind >= f2_hash_list_len then inequiv := 1
+	  else (
+	    Hashtbl.iter ( fun addr chunk ->
+	      let (f1_exp,_) = (GM.gran64_get_long chunk missing addr) in
+	      let f2_exp = (List.nth regions ind)#load_long addr in
+	      if !opt_trace_mem_snapshots = true then
+		Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
+		  ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
+	      self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
+	    ) ele;
+	  )
+	) f1_hash_list;
+	
+	(*List.iteri ( fun ind ele ->
+	Hashtbl.iter ( fun addr chunk ->
+	let (f2_exp,_) = (GM.gran64_get_long chunk 
+	(List.nth regions 0)#get_missing addr) in
+	Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld exp = %s\n"
+	ind addr (D.to_string_64 f2_exp);
+	) ele;
+	) f2_hash_list;*)
+	
+	if !inequiv = 1 then
+	  if !opt_trace_mem_snapshots = true then
+	    (Printf.printf "SRFM#compare_sym_se inequivalent side-effects in symbolic regions\n";
+	     raise DisqualifiedPath;);
+      );
       List.iter (fun m -> m#reset ();) regions;
       ()
+	
+    (* Check if two expressions are syntactically or semantically equal,
+       disqualify the path if not *)
+    method private query_exp exp1 exp2 =
+      if exp1 = exp2 then
+	(if !opt_trace_mem_snapshots = true then
+	    Printf.printf "equal side-effects %s = %s\n"
+	      (V.exp_to_string exp1) 
+	      (V.exp_to_string exp2);)
+      else (
+	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
+	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
+	if b = false then (
+	  if !opt_trace_mem_snapshots = true then
+	    Printf.printf "inequivalent symbolic region side-effects %s!=\n%s\n" 
+	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	  raise DisqualifiedPath;
+	)
+	else (
+	  if !opt_trace_mem_snapshots = true then
+	    Printf.printf "equivalent side-effects %s=\n%s"
+	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	)
+      )
 
     method private fresh_region =
       let new_idx = 1 + List.length regions in
@@ -604,7 +663,7 @@ struct
 	     (V.exp_to_string e);
        with Not_found ->
 	 let (b_is_regexp_null,_) = self#query_condition (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
-	   (Some true) 0x6d00 in
+	   (Some true) 0x6d01 in
 	 if !opt_trace_regions then
 	   Printf.printf "SRFM#region_for took branch %b in Not_found case expr = %s\n" 
 	     b_is_regexp_null (V.exp_to_string e);
@@ -623,9 +682,12 @@ struct
 	   same region, if e is equivalent to an expression already in 
 	   seen in this execution path then reuse that region *)
 	let new_rnum = ref 0 in
+	if !opt_trace_regions = true then
+	  Printf.printf "SRFM#region_for regions seen in this path = %d\n"
+	    (Hashtbl.length region_vals_per_path);
 	Hashtbl.iter (fun reg_exp region -> 
 	  let exp = V.BinOp(V.EQ, reg_exp, e) in
-	  let (b,_) = (self#query_condition exp (Some true) 0x6d00) in
+	  let (b,_) = (self#query_condition exp (Some false) 0x6d02) in
 	  if b = true then (
 	    if !opt_trace_regions then
 	      Printf.printf "SRFM#region_for satisfied expr = %s\n"
@@ -778,7 +840,6 @@ struct
 	   | Some false -> Printf.printf "Cannot be null.\n"
 	   | None -> Printf.printf "Can be null or non-null\n";
 	       infl_man#maybe_measure_influence_deref e);
-      dt#start_new_query;
       let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man in
 	if !opt_trace_sym_addr_details then
 	  (Printf.printf "Concrete base terms: %s\n"
@@ -816,6 +877,7 @@ struct
 		   set, but with preferences based on seen regions. For
 		   now, omit that logic and always choose randomly from
 		   among all the possibilties.  *)
+		dt#start_new_query;
 		let split_count = ref (-1) in
 		  select_one vl
 		    (fun () ->
@@ -823,6 +885,7 @@ struct
 		       self#random_case_split !opt_trace_decisions
 			 (!split_count + 0x100 + ident))
 	      in
+	      dt#count_query;
 		if !opt_trace_sym_addrs then
 		  Printf.printf "Choosing %s as the base address\n"
 		    (V.exp_to_string bvar);
@@ -855,11 +918,12 @@ struct
 		   (match (eoffs, off_syms) with
 		      | ([], []) -> 0L
 		      | (el, vel) -> 
+			dt#start_new_query;
 			  (self#concretize_inner (reg_addr())
 			     (sum_list (el @ vel))) (ident + 0x200)) in
+		 dt#count_query;
 		   (base, (fix_u32 offset)))
 	in
-	  dt#count_query;
 	  (region, offset)
 
     method private eval_addr_exp_region_conc_path e ident =
@@ -1800,6 +1864,8 @@ struct
 	Printf.printf "SRFM#reset cleared regions\n";
       Hashtbl.clear region_val_queried;
       Hashtbl.clear region_vals_per_path;
+      f1_hash_list <- [];
+      f2_hash_list <- [];
       Hashtbl.clear concrete_cache
   end
 end

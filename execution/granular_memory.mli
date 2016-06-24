@@ -92,6 +92,7 @@ sig
 
     method virtual measure_size : int * int * int
     method get_mem : (int64, gran64) Hashtbl.t
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
   end
     
   class granular_page_memory : object
@@ -146,6 +147,8 @@ sig
     method store_page : int64 -> string -> unit
     method clear : unit -> unit
     method measure_size : int * int * int
+    method get_mem : (int64, gran64) Hashtbl.t 
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
   end
 
   class granular_hash_memory : object
@@ -174,6 +177,7 @@ sig
     method clear : unit -> unit
     method measure_size : int * int * int
     method get_mem : (int64, gran64) Hashtbl.t 
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
   end
 
   class granular_snapshot_memory : granular_memory -> granular_memory ->
@@ -200,6 +204,7 @@ sig
     method set_snap : bool -> unit
     method reset : unit -> unit
     method get_mem : (int64, gran64) Hashtbl.t
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
     method get_diff : granular_hash_memory
     method get_missing : (int -> int64 -> D.t)
   end
@@ -231,6 +236,7 @@ sig
     method reset : unit -> unit
     method reset4_3 : unit -> unit
     method get_mem : (int64, gran64) Hashtbl.t
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
     method get_diff : granular_hash_memory
     method get_level4 : granular_hash_memory
     method get_missing : (int -> int64 -> D.t)
@@ -274,6 +280,7 @@ sig
     method clear : unit -> unit
     method measure_size : int * int * int
     method get_mem : (int64, gran64) Hashtbl.t
+    method set_mem : (int64, gran64) Hashtbl.t -> unit
     method get_missing : (int -> int64 -> D.t)
   end
 end

@@ -430,6 +430,8 @@ struct
     method virtual measure_size : int * int * int
 
     method get_mem : (int64, gran64) Hashtbl.t =  Hashtbl.create 0
+      
+    method set_mem (mem : (int64, gran64) Hashtbl.t) = () 
       (*let ret = Hashtbl.create 1 in
       Hashtbl.replace ret 0L Absent64;
       ret*)
@@ -512,7 +514,7 @@ struct
   class granular_hash_memory = object(self)
     inherit granular_memory
 
-    val mem = Hashtbl.create 101
+    val mutable mem = Hashtbl.create 101
 
     method private with_chunk addr fn =
       let which = Int64.to_int (Int64.logand addr 0x7L) in
@@ -563,6 +565,8 @@ struct
 	(num_nodes, num_entries, 0)
 
     method get_mem = mem
+      
+    method set_mem _mem = mem <- _mem;
   end
 
   class granular_snapshot_memory
@@ -705,6 +709,8 @@ struct
 
     method get_mem = diff#get_mem
 
+    method set_mem _mem = diff#set_mem _mem
+
     method get_diff = diff
 
     method get_missing = main#get_missing
@@ -789,6 +795,8 @@ end
 	(fun _ -> failwith "Must call on_missing")
 
       method get_mem : (int64, gran64) Hashtbl.t =  Hashtbl.create 0
+
+      method set_mem (mem: (int64, gran64) Hashtbl.t) = ()
       
       method on_missing m = missing <- m
 
