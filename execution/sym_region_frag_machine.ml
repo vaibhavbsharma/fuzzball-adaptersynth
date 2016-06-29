@@ -500,7 +500,13 @@ struct
 
     val mutable regions : GM.granular_snapshot_memory list = []
     val region_vals = Hashtbl.create 101
+
+    (* per execution path (region expression != 0) query is maintained in
+       region_val_queried *)
     val region_val_queried = Hashtbl.create 101
+    
+    (* per execution path region expression to region number mapping is 
+       maintained in region_vals_per_path *)
     val region_vals_per_path = Hashtbl.create 101
     val mutable have_snap = false
     val mutable f1_hash_list : (((int64, GM.gran64) Hashtbl.t) list )= []
