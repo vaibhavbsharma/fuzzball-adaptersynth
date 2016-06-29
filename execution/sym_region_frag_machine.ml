@@ -714,12 +714,14 @@ struct
 	) region_vals_per_path;
 	let new_region =
 	  if !new_rnum <> 0 then !new_rnum 
-	  else  (* this is done to keep region numbers small *)
-	    if Hashtbl.mem region_vals e then Hashtbl.find region_vals e 
-	  else self#fresh_region
+	  else if Hashtbl.mem region_vals e then Hashtbl.find region_vals e 
+	  else ( 
+	    let rnum' = self#fresh_region in
+	    Hashtbl.replace region_vals e rnum';
+	    rnum'
+	  )
 	in
 	Hashtbl.replace region_vals_per_path e new_region;
-	Hashtbl.replace region_vals e new_region;
 	  if !opt_trace_regions then
 	    Printf.printf "Address %s is region %d\n"
 	      (V.exp_to_string e) new_region;
@@ -1226,12 +1228,12 @@ struct
 		    (V.exp_to_string off_exp) dt#get_hist_str;
 		wd
 	    with Not_found ->
-	      let wd = compute_wd off_exp in
+	      let wd = match compute_wd off_exp 
+		with Some 0 -> None
+		| wd' -> wd'
+	      in
 		Hashtbl.replace bitwidth_cache key wd;
-		if wd = Some 0 then
-		  None
-		else
-		  wd
+	        wd
 
     method private decide_offset_wd off_exp = 
       let fast_wd = narrow_bitwidth form_man off_exp in

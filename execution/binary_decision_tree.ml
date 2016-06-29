@@ -649,7 +649,7 @@ class binary_decision_tree = object(self)
       (match get_f_child n with
 	 | Some(Some kid) ->
 	     if not kid.all_seen then
-	       (Printf.printf "all_seen invariant failure: parent %d is all seen, but not true child %d%!\n"
+	       (Printf.printf "all_seen invariant failure: parent %d is all seen, but not false child %d%!\n"
 		  n.ident kid.ident;
 		self#print_tree stdout;
 		assert(kid.all_seen));
