@@ -16,6 +16,7 @@ open Granular_memory;;
 open Fragment_machine;;
 open Decision_tree;;
 open Sym_path_frag_machine;;
+open Vine_util;;
 
 module SymRegionFragMachineFunctor =
   functor (D : DOMAIN) ->
@@ -1278,17 +1279,39 @@ struct
 		wd
 		    
     method private query_maxval e ty =
+      let midpoint a b =
+	let half_rounded x =
+	  let half = Int64.shift_right_logical x 1 in
+	    if Int64.logand x 1L = 0L then
+	      half
+	    else
+	      Int64.add half 0L
+	in
+	let sz = Int64.sub b a in
+	let hf_sz = half_rounded sz in
+	let mid = Int64.add a hf_sz in
+	assert(Vine_util.int64_ucompare a mid <= 0);
+	assert(Vine_util.int64_ucompare mid b <= 0);
+	mid
+      in
       let rec loop min max =
-	assert(min <= max);
+	Printf.printf "SRFM#query_maxval min = %Lu max = %Lu\n" min max;
+	(* assert(min <= max); *)
+	assert((int64_ucompare min max) <= 0);
 	if min = max then
 	  min
 	else
 	  let mid = 
-	    if min = 0L && max > 0x1000L then
-	      Int64.div max 256L (* reduce size faster to start *)
+	    (* if min = 0L && max > 0x1000L then *)
+	    if min = 0L && (int64_ucompare max 0x1000L) > 0 then
+	      (* Int64.div max 256L *) (* reduce size faster to start *)
+	      int64_udiv max 256L (* reduce size faster to start *)
 	    else
-	      Int64.div (Int64.add min max) 2L
+	      (* int64_udiv (Int64.add min max) 2L *)
+	      midpoint min max
 	  in
+	  assert((int64_ucompare min mid) <= 0);
+	  assert((int64_ucompare mid max) <= 0);
 	  let cond_e = V.BinOp(V.LE, e, V.Constant(V.Int(ty, mid))) in
 	  let in_bounds = self#query_valid cond_e in
 	    if !opt_trace_tables then
@@ -1300,11 +1323,12 @@ struct
 	      loop (Int64.succ mid) max
       in
       let wd = narrow_bitwidth form_man e in
+      Printf.printf "SRFM#query_maxval wd = %d\n" wd;
       let max_limit = Int64.shift_right_logical (-1L) (64-wd)
       in
       let limit = loop 0L max_limit in
 	if !opt_trace_tables then
-	  Printf.printf "Largest value based on queries is %Ld\n" limit;
+	  Printf.printf "Largest value based on queries is %Lu\n" limit;
 	limit
 
     val maxval_cache = Hashtbl.create 101
@@ -1343,6 +1367,8 @@ struct
 			(V.exp_to_string off_exp) dt#get_hist_str;
 		    limit
 		with Not_found ->
+		  Printf.printf "SRFM#decide_maxval off_exp = %s\n"
+		    (V.exp_to_string off_exp);
 		  let limit = compute_maxval off_exp in
 		    Hashtbl.replace maxval_cache key limit;
 		    limit

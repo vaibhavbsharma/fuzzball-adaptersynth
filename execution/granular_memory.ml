@@ -546,16 +546,16 @@ struct
 	"[" ^ (gran64_to_string chunk) ^ "]"
 
     method clear () =
-      (*if !opt_trace_mem_snapshots = true then
+      if !opt_trace_mem_snapshots = true then
 	(Printf.printf "GHM#clear called\n";
-	 Hashtbl.iter 
+	 (*Hashtbl.iter 
 	   (fun addr chunk ->
 	     let (exp,_) = gran64_get_long chunk missing addr in
 	     Printf.printf "%Lx %s\n" addr 
 	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
 	   mem;
-	 Printf.printf "-x-x-x-x-fin-x-x-x-x-\n\n";
-	);*)
+	 Printf.printf "-x-x-x-x-fin-x-x-x-x-\n\n";*)
+	);
       Hashtbl.clear mem
 	  
     method measure_size =
