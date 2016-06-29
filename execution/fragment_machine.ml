@@ -959,14 +959,20 @@ struct
 	    Hashtbl.find f2_nonlocal_se addr
 	  with Not_found -> (* f1 wrote to an address that f2 did not *)
 	    D.to_symbolic_64 (mem#load_long addr) in
+	  if !opt_trace_mem_snapshots = true then
+	    Printf.printf "addr = %Lx f1_exp = %s f2_exp = %s\n"
+	      addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
 	  self#query_exp f1_exp f2_exp;
 	) f1_nonlocal_se;
-	Hashtbl.iter (fun addr f2_exp -> 
+	Hashtbl.iter ( fun addr f2_exp -> 
 	  (* Check if f2 wrote to an address that f1 did not *)
 	  try 
-	    ignore(Hashtbl.mem f1_nonlocal_se addr)
+	    ignore(Hashtbl.find f1_nonlocal_se addr)
 	  with Not_found ->
 	    let f1_exp = D.to_symbolic_64 (mem#load_long addr) in
+	    if !opt_trace_mem_snapshots = true then
+	      Printf.printf "addr = %Lx f1_exp = %s f2_exp = %s\n"
+		addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
 	    self#query_exp f1_exp f2_exp; 
 	) f2_nonlocal_se;
       );
