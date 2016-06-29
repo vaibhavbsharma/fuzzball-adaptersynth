@@ -1296,18 +1296,14 @@ struct
       in
       let rec loop min max =
 	Printf.printf "SRFM#query_maxval min = %Lu max = %Lu\n" min max;
-	(* assert(min <= max); *)
 	assert((int64_ucompare min max) <= 0);
 	if min = max then
 	  min
 	else
 	  let mid = 
-	    (* if min = 0L && max > 0x1000L then *)
 	    if min = 0L && (int64_ucompare max 0x1000L) > 0 then
-	      (* Int64.div max 256L *) (* reduce size faster to start *)
 	      int64_udiv max 256L (* reduce size faster to start *)
 	    else
-	      (* int64_udiv (Int64.add min max) 2L *)
 	      midpoint min max
 	  in
 	  assert((int64_ucompare min mid) <= 0);
