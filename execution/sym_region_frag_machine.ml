@@ -574,7 +574,8 @@ struct
     method compare_sym_se =
       (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
-	Printf.printf "SRFM#compare_sym_se called\n";
+	Printf.printf "SRFM#compare_sym_se called len(f1_h_l) = %d len(f2_h_l)=%d\n"
+	  (List.length f1_hash_list) (List.length f2_hash_list);
       List.iteri (fun ind ele -> 
 	let f2_hash = Hashtbl.copy (ele#get_mem) in
 	f2_hash_list <- f2_hash_list @ [f2_hash];
@@ -635,6 +636,8 @@ struct
 	     raise DisqualifiedPath;);
       );
       List.iter (fun m -> m#reset ();) regions;
+      f1_hash_list <- [];
+      f2_hash_list <- [];
       ()
 	
     (* Check if two expressions are syntactically or semantically equal,
