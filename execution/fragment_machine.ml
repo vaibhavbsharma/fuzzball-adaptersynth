@@ -1720,6 +1720,7 @@ struct
 	reg R_YMM15_1 (form_man#fresh_symbolic_64 "initial_ymm15_1");
 	reg R_YMM15_2 (form_man#fresh_symbolic_64 "initial_ymm15_2");
 	reg R_YMM15_3 (form_man#fresh_symbolic_64 "initial_ymm15_3");
+	reg R_SSEROUND (D.from_concrete_64 0L); (* to nearest *)
 	reg R_FTOP (D.from_concrete_32 0L);
 	reg R_FC3210 (D.from_concrete_32 0L);
 	reg R_FPREG0 (D.from_concrete_64 0L);
@@ -1738,6 +1739,7 @@ struct
 	reg R_FPTAG5 (D.from_concrete_8 0);
 	reg R_FPTAG6 (D.from_concrete_8 0);
 	reg R_FPTAG7 (D.from_concrete_8 0);
+	reg R_FPROUND (D.from_concrete_64 0L); (* to nearest *)
 
     method private make_arm_regs_symbolic =
       let reg r v =
