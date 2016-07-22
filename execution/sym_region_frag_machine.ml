@@ -587,7 +587,7 @@ struct
       if !opt_trace_mem_snapshots = true then
 	Printf.printf "f1_hash_list_len = %d f2_hash_list_len = %d\n"
 	  f1_hash_list_len f2_hash_list_len;
-      if f1_hash_list_len <> 0 && f2_hash_list_len <> 0 then (
+      if f1_hash_list_len <> 0 || f2_hash_list_len <> 0 then (
 	(* Compare each of f1's symbolic region writes with f2 *)
 	List.iteri ( fun ind ele ->
 	  if ind >= f2_hash_list_len then inequiv := 1

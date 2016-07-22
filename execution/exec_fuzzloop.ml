@@ -98,19 +98,21 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      
      let rec simple_loop n out_nargs type_name type_size =
        let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-       (*let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in*)
-       ignore(fm#get_fresh_symbolic (var_name^"_val") 64);
        ignore(fm#get_fresh_symbolic (var_name^"_f_val") 64);
-       (*let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in*)
-       ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);
        ignore(fm#get_fresh_symbolic (var_name^"_f"^type_name) type_size);
-       (*if out_nargs > 0L then 
-	 (opt_extra_conditions :=
-	    V.BinOp(
-	      V.BITOR,
-	      V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_1,1L))),
-	      V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-	  :: !opt_extra_conditions;);*)
+       let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+       let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in
+       (*ignore(fm#get_fresh_symbolic (var_name^"_val") 64);*)
+       (*ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);*)
+       opt_extra_conditions :=
+	 (if out_nargs > 0L then 
+	   V.BinOp(
+	     V.BITOR,
+	     V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_1,1L))),
+	     V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	 else (
+           V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L)))
+	 )) :: !opt_extra_conditions;
        (*Printf.printf "opt_extra_condition.length = %d\n" (List.length !opt_extra_conditions);*)
        if n > 0 then simple_loop (n-1) out_nargs type_name type_size; 
      in

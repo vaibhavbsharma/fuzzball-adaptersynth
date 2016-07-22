@@ -574,18 +574,20 @@ let simple_adaptor fm out_nargs in_nargs =
     let var_is_const = fm#get_fresh_symbolic (var_name^"_is_const") 1 in
     let arg =  
       (if out_nargs = 0L then (
-	opt_extra_conditions :=  
+	(* These extra conditions should be getting added in exec_fuzzloop 
+	   to make them get added at the beginning of each iteration *)
+	(*opt_extra_conditions :=  
              V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L)))
-	 :: !opt_extra_conditions;
+	 :: !opt_extra_conditions;*)
 	var_val
        ) 
        else ( 
-	 opt_extra_conditions :=  
+	 (*opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
              V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
              V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-	 :: !opt_extra_conditions;
+	 :: !opt_extra_conditions;*)
 	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
 	   var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs))) in
     (* Printf.printf "setting arg=%s\n" (V.exp_to_string arg); *)
@@ -641,9 +643,11 @@ let typeconv_adaptor fm out_nargs in_nargs =
     let var_type = fm#get_fresh_symbolic (var_name^"_type") 8 in
     let arg =  
       (if out_nargs = 0L then (
-	opt_extra_conditions :=  
+	(* These extra conditions should be getting added in exec_fuzzloop 
+	   to make them get added at the beginning of each iteration *)
+	(*opt_extra_conditions :=  
           V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L)))
-			      :: !opt_extra_conditions;
+			      :: !opt_extra_conditions;*)
 	var_val
        ) 
        else ( 
@@ -660,12 +664,12 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	   (get_ite_expr ite_arg_expr V.EQ V.REG_64 0L 
 	      (V.Constant(V.Int(V.REG_64,0L))) 
 	      (V.Constant(V.Int(V.REG_64,1L)))) in
-	 opt_extra_conditions :=  
+	 (*opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
              V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
              V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-			       :: !opt_extra_conditions;
+			       :: !opt_extra_conditions;*)
 
 
 	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 

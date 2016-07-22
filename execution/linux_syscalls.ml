@@ -704,7 +704,67 @@ object(self)
       )
       symbolic_fds
 
-  method private reset_sym_fd_positions = 
+  method private save_unix_fd_positions = 
+    for vt_fd = 0 to (Array.length unix_fds)-1 do 
+      if vt_fd > 2 then (
+	match unix_fds.(vt_fd) with
+	| Some _fd ->
+	  let cur_pos = Unix.lseek (self#get_fd vt_fd) 0 Unix.SEEK_CUR in
+	  (*Printf.printf "linux_syscalls#save_unix_fd_positions before len = %d fname = %s cur_pos = %d\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname cur_pos;*)
+	  Stack.push (Some cur_pos) fd_info.(vt_fd).snap_pos;
+	  (*Printf.printf "linux_syscalls#save_unix_fd_positions after len = %d fname = %s cur_pos = %d\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname cur_pos;*)
+	| _ -> ()
+      )
+    done
+
+  method private reset_unix_fd_positions =
+    for vt_fd = 0 to (Array.length unix_fds)-1 do 
+      if vt_fd > 2 then (
+	match unix_fds.(vt_fd) with
+	| Some _fd ->
+	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname;
+	  let snap_pos = *)
+	  let _ =
+	    match Stack.top fd_info.(vt_fd).snap_pos with
+	    | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
+	    | None -> 0
+	  in
+	  if Stack.length fd_info.(vt_fd).snap_pos > 1 then
+	    ignore(Stack.pop fd_info.(vt_fd).snap_pos);
+	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
+	| _ -> ()
+      )
+    done
+
+  method private reset_unix_fd_positions_to_base =
+    for vt_fd = 0 to (Array.length unix_fds)-1 do 
+      if vt_fd > 2 then (
+	match unix_fds.(vt_fd) with
+	| Some _fd ->
+	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname;*)
+	  let _ = while Stack.length fd_info.(vt_fd).snap_pos > 1 do
+	      ignore(Stack.pop fd_info.(vt_fd).snap_pos);
+	    done in
+	  (*let snap_pos = *)
+	  let _ =
+	    match Stack.top fd_info.(vt_fd).snap_pos with
+	    | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
+	    | None -> 0
+	  in
+	  if Stack.length fd_info.(vt_fd).snap_pos > 1 then
+	    ignore(Stack.pop fd_info.(vt_fd).snap_pos);
+	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
+	| _ -> ()
+      );
+    done
+
+  method private reset_sym_fd_positions =
     Hashtbl.iter
       (fun fd _ ->
 	 (*match fd_info.(fd).snap_pos with
@@ -713,7 +773,24 @@ object(self)
 	(match Stack.top fd_info.(fd).snap_pos with
 	| Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
 	| None -> ());
-	if Stack.length fd_info.(fd).snap_pos <> 1 then
+	if Stack.length fd_info.(fd).snap_pos > 1 then
+	  ignore(Stack.pop fd_info.(fd).snap_pos);
+      )
+      symbolic_fds
+
+  method private reset_sym_fd_positions_to_base =
+    Hashtbl.iter
+      (fun fd _ ->
+	(*match fd_info.(fd).snap_pos with
+	   | Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
+	  | None -> ()*)
+	let _ = while Stack.length fd_info.(fd).snap_pos > 1 do
+	  ignore(Stack.pop fd_info.(fd).snap_pos);
+	  done in
+	(match Stack.top fd_info.(fd).snap_pos with
+	| Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
+	| None -> ());
+	if Stack.length fd_info.(fd).snap_pos > 1 then
 	  ignore(Stack.pop fd_info.(fd).snap_pos);
       )
       symbolic_fds
@@ -722,12 +799,14 @@ object(self)
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#make_snap called\n";
     self#save_sym_fd_positions;
+    self#save_unix_fd_positions;
     self#save_memory_state
 
   method reset = 
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#reset called\n";
-    self#reset_sym_fd_positions;
+    self#reset_sym_fd_positions_to_base;
+    self#reset_unix_fd_positions_to_base;
     self#reset_memory_state
 
   method make_f1_snap = 
@@ -739,7 +818,9 @@ object(self)
   method reset_f1_snap = 
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#reset_f1_snap called\n";
-    self#reset ;
+    self#reset_sym_fd_positions;
+    self#reset_unix_fd_positions;
+    self#reset_memory_state;
     ()
 
   method make_f2_snap =
@@ -751,7 +832,9 @@ object(self)
   method reset_f2_snap =
     if !opt_trace_mem_snapshots = true then
       Printf.printf "linux_syscalls#reset_f2_snap called\n";
-    self#reset ;
+    self#reset_sym_fd_positions;
+    self#reset_unix_fd_positions;
+    self#reset_memory_state;
     ()
 
   method sys_access path mode =
