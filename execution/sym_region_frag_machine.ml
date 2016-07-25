@@ -621,14 +621,6 @@ struct
 	    ) ele;
 	  )
 	) f2_hash_list;
-	(*List.iteri ( fun ind ele ->
-	  Hashtbl.iter ( fun addr chunk ->
-	  let (f2_exp,_) = (GM.gran64_get_long chunk 
-	  (List.nth regions 0)#get_missing addr) in
-	  Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld exp = %s\n"
-	  ind addr (D.to_string_64 f2_exp);
-	  ) ele;
-	  ) f2_hash_list;*)
 	
 	if !inequiv = 1 then
 	  if !opt_trace_mem_snapshots = true then
@@ -1304,7 +1296,6 @@ struct
 	mid
       in
       let rec loop min max =
-	Printf.printf "SRFM#query_maxval min = %Lu max = %Lu\n" min max;
 	assert((int64_ucompare min max) <= 0);
 	if min = max then
 	  min
@@ -1328,7 +1319,6 @@ struct
 	      loop (Int64.succ mid) max
       in
       let wd = narrow_bitwidth form_man e in
-      Printf.printf "SRFM#query_maxval wd = %d\n" wd;
       let max_limit = Int64.shift_right_logical (-1L) (64-wd)
       in
       let limit = loop 0L max_limit in
@@ -1372,8 +1362,6 @@ struct
 			(V.exp_to_string off_exp) dt#get_hist_str;
 		    limit
 		with Not_found ->
-		  Printf.printf "SRFM#decide_maxval off_exp = %s\n"
-		    (V.exp_to_string off_exp);
 		  let limit = compute_maxval off_exp in
 		    Hashtbl.replace maxval_cache key limit;
 		    limit

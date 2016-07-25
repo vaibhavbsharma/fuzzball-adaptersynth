@@ -671,8 +671,6 @@ when special_ec_vars\n"; *)
     method private simplify (v:D.t) ty =
       D.inside_symbolic
 	(fun e ->
-	  (*Printf.printf "formula_manager.ml#simplify exp=%s\n"
-	    (V.exp_to_string e);*)
 	   let e' = simplify_fp e in
 	     (* if e <> e' then
 		Printf.printf "Simplifying %s -> %s\n"
@@ -688,8 +686,6 @@ when special_ec_vars\n"; *)
 	) v
 
     method private tempify_e e ty =
-      (*Printf.printf "formula_manager.ml#tempify e=%s\n"
-	(V.exp_to_string e);*)
       let e' = simplify_fp e in
 	V.Lval(V.Temp(self#make_temp_var e' ty))
 
@@ -705,15 +701,8 @@ when special_ec_vars\n"; *)
     method simplify_with_callback f (v:D.t) ty =
       D.inside_symbolic
 	(fun e ->
-	  (*Printf.printf "formula_manager.ml#simplify_with_callback e=%s\n"
-	    (V.exp_to_string e);*)
 	  let e_replaced = e in (*self#rewrite_special_ec_vars e in*)
-	  (*Printf.printf "formula_manager.ml#simplify_with_callback e_replaced=%s\n"
-	    (V.exp_to_string e_replaced);*)
 	  let e2 = simplify_fp e_replaced in
-	  (*Printf.printf "formula_manager.ml#simplify_with_callback e2=%s\n"
-	    (V.exp_to_string e2);*)
-	  (*let e2 = simplify_fp e in*)
 	     match e2 with
 	       | V.Constant(_) -> e2
 	       | _ -> 

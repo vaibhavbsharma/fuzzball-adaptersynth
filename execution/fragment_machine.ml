@@ -648,18 +648,12 @@ struct
     val mutable f2_se = new GM.granular_hash_memory
 
     method add_f1_store addr = 
-      (*Printf.printf "FM#add_f1_store: mem store in f1(%08Lx) at %08Lx\n" 
-	saved_f1_rsp addr;*)
-      (*if (saved_f1_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L))*)
       if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
-	(Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n" 
-	  addr saved_f1_rsp;
-	 f1_write_addr_l <- f1_write_addr_l @ [addr] ;
-	)
-      else (
-	(*Printf.printf "FM#add_f1_store: %08Lx inside local scope(%08Lx)\n" 
-	  addr saved_f1_rsp;*)
-      );
+	( if !opt_trace_stores then
+	    Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n" 
+	      addr saved_f1_rsp;
+	  f1_write_addr_l <- f1_write_addr_l @ [addr] ;
+	);
       ()
    
     method private is_nonlocal_addr rsp addr =
@@ -668,23 +662,17 @@ struct
       else false
 	
     method add_f2_store addr = 
-      (*Printf.printf "FM#add_f2_store: mem store in f2(%08Lx) at %08Lx\n" 
-	saved_f2_rsp addr;*)
-      (*if (saved_f2_rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L))*)
       if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
-	(Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)\n" 
-	   addr saved_f2_rsp;
+	( if !opt_trace_stores then
+	    Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)\n" 
+	      addr saved_f2_rsp;
 	 if ((List.length f1_write_addr_l) > (List.length f2_write_addr_l)) &&
 	   ((List.nth f1_write_addr_l (List.length f2_write_addr_l)) = addr) then
 	   (f2_write_addr_l <- f2_write_addr_l @ [addr] ;)
 	 else (
 	   raise DisqualifiedPath;
 	 )
-	)
-      else (
-      (*Printf.printf "FM#add_f2_store: %08Lx inside local scope(%08Lx)\n" 
-	addr saved_f2_rsp;*)
-      );
+	);
       ()
 	
     method match_writes () = 
@@ -692,23 +680,17 @@ struct
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
-      (* Printf.printf "fm#save_arg_regs\n"; *)
       let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
       if (List.length saved_arg_regs) = 0 then (
 	for i = 0 to (Int64.to_int nargs)-1 do
 	  saved_arg_regs <- saved_arg_regs@
 	    [(self#get_reg_symbolic (List.nth arg_regs i))];
 	done
-      )
-      else (
-	Printf.printf "fm#save_arg_regs %d arg_regs already saved\n"
-	  (List.length saved_arg_regs);
-      )
+      );
    
     method get_saved_arg_regs () = saved_arg_regs
 
     method reset_saved_arg_regs = 
-      (* Printf.printf "fm#reset_saved_arg_regs\n"; *)
       saved_arg_regs <- [];
 
     method get_in_f1_range () = in_f1_range 
@@ -718,12 +700,9 @@ struct
     method add_f1_syscall_with_args syscall_num arg_list = 
       f1_syscalls <- f1_syscalls@[syscall_num] ;
       f1_syscalls_args <- f1_syscalls_args@arg_list;
-      (*Printf.printf "f1_syscalls length = %d\n" (List.length f1_syscalls);
-      Printf.printf "f1_syscalls_args length = %d\n" (List.length f1_syscalls_args);*)
     
     method check_f2_syscall syscall_num = 
       f2_syscalls_num <- 1 + f2_syscalls_num;
-      (*Printf.printf "f2_syscalls_num = %d\n" f2_syscalls_num;*)
       if ((List.length f1_syscalls) >= f2_syscalls_num) &&
 	(List.nth f1_syscalls (f2_syscalls_num-1)) = syscall_num then
 	true
@@ -731,12 +710,6 @@ struct
 	
     (* returns true if f2 syscall args diverge from f1 *)
     method check_f2_syscall_args arg_list syscall_num=
-      (*for i = 0 to (List.length f1_syscalls_args)-1 do
-	Printf.printf "f1_syscalls_args[%d] = %Ld\n" i (List.nth f1_syscalls_args i);
-      done;
-      for i = 0 to (List.length arg_list)-1 do
-	Printf.printf "arg_list[%d] = %Ld\n" i (List.nth arg_list i);
-      done; *)
       let start_ind = f2_syscalls_arg_num in
       let end_ind = (f2_syscalls_arg_num + (List.length arg_list)) in
       let ret = 
@@ -750,13 +723,13 @@ struct
 	      let arg2_exp = (D.to_symbolic_64 (
 		form_man#simplify64 (D.from_symbolic (
 		  List.nth arg_list (i-start_ind))))) in
-	      (*Printf.printf "f1_arg_exp = %s f2_arg_exp = %s\n" 
-		(V.exp_to_string arg1_exp)
-		(V.exp_to_string arg2_exp);*)
+	      if !opt_trace_syscalls then
+		Printf.printf "f1_arg_exp = %s f2_arg_exp = %s\n" 
+		  (V.exp_to_string arg1_exp)
+		  (V.exp_to_string arg2_exp);
 	      let exp = 
 		(* wait4 syscall uses only the low 32 bits of its 1st and 3rd argument*)
 		if (syscall_num = 61) && ((i = start_ind) || (i = start_ind+2))then (
-		  (*Printf.printf "check_f2_syscall_args type casting arg1_exp and arg2_exp to 32 bit\n";*)
 		  V.BinOp(V.NEQ, 
 			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg1_exp)), 
 			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg2_exp)))) 
@@ -764,13 +737,14 @@ struct
 	      in
 	      let preferred_dir = not !opt_adaptor_search_mode in
 	      let (b,choices) = (self#query_condition exp (Some preferred_dir) (0x6d00+i*10)) in
-	      (*let choices_str = 
+	      let choices_str = 
 		(match choices with
 		| Some true -> "is true"
 		| Some false -> "is false"
 		| None -> "can be true or false")
 	      in
-	      Printf.printf "chose branch %B with choices %s\n" b choices_str;*)
+	      if !opt_trace_syscalls then
+		Printf.printf "chose branch %B with choices %s\n" b choices_str;
 	      if b = true then (
 		is_diverge := true;
 		Printf.printf "diverged on syscall(%d) arg%d %s vs %s\n" syscall_num i 
@@ -781,8 +755,6 @@ struct
 	    !is_diverge
 	  )
 	else (
-	  (* Printf.printf "f1_syscalls_args.length = %d start_ind+end_ind = %d\n"
-	    (List.length f1_syscalls_args) end_ind;*)
 	  false
 	) 
       in
@@ -891,26 +863,6 @@ struct
 	Printf.printf "FM#compare_conc_se called\n";
       f2_se <- mem#get_level4;
       let f2_hash = (f2_se#get_mem) in
-      (* if !opt_trace_mem_snapshots then
-	(Printf.printf "f1 memory side-effects\n";
-	 Hashtbl.iter 
-	   (fun addr chunk ->
-	     let (exp,_) = GM.gran64_get_long chunk 
-	       f1_se#get_missing addr in
-	     Printf.printf "%Lx %s\n" addr 
-	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   f1_hash;
-	 Printf.printf "\nf2 memory side-effects\n";
-	 Hashtbl.iter 
-	   (fun addr chunk ->
-	     let (exp,_) = GM.gran64_get_long chunk 
-	       f2_se#get_missing addr in
-	     Printf.printf "%Lx %s\n" addr 
-	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   f2_hash;
-	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
-	); *)
-
       let f1_nonlocal_se = Hashtbl.create 0 in
       let f2_nonlocal_se = Hashtbl.create 0 in
       Hashtbl.iter (fun addr chunk ->
@@ -929,22 +881,6 @@ struct
 		addr saved_f2_rsp;
 	   Hashtbl.replace f2_nonlocal_se addr (D.to_symbolic_64 exp);)
       ) f2_hash;
-      
-      (* if !opt_trace_mem_snapshots then
-	(Printf.printf "f1 non-local memory side-effects\n";
-	 Hashtbl.iter 
-	   (fun addr exp ->
-	     Printf.printf "%Lx %s\n" addr 
-	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   f1_nonlocal_se;
-	 Printf.printf "\nf2 non-local memory side-effects\n";
-	 Hashtbl.iter 
-	   (fun addr exp ->
-	     Printf.printf "%Lx %s\n" addr 
-	       (Vine.exp_to_string (D.to_symbolic_64 exp));) 
-	   f2_nonlocal_se;
-	 Printf.printf "\n-x-x-x-x-fin-x-x-x-x-\n\n";
-	); *)
       
       (* Check for non-local memory side-effects equivalence here *)
       if f1_nonlocal_se = f2_nonlocal_se then
@@ -1230,14 +1166,13 @@ struct
     method private on_missing_symbol_m (m:GM.granular_memory) name =
       m#on_missing
 	(fun size addr -> 
-	  Printf.printf "FM#on_missing_symbol_m addr=%Lx\n" addr;
-	   match size with
-	     | 8  -> form_man#fresh_symbolic_mem_8  name addr
-	     | 16 -> form_man#fresh_symbolic_mem_16 name addr
-	     | 32 -> form_man#fresh_symbolic_mem_32 name addr
-	     | 64 -> form_man#fresh_symbolic_mem_64 name addr
-	     | _ -> failwith "Bad size in on_missing_symbol")
-    
+	  match size with
+	  | 8  -> form_man#fresh_symbolic_mem_8  name addr
+	  | 16 -> form_man#fresh_symbolic_mem_16 name addr
+	  | 32 -> form_man#fresh_symbolic_mem_32 name addr
+	  | 64 -> form_man#fresh_symbolic_mem_64 name addr
+	  | _ -> failwith "Bad size in on_missing_symbol")
+	
     method private on_missing_symbol_m_lim (m:GM.granular_memory) name lim =
       let contains s1 s2 =
 	let re = Str.regexp_string s2
@@ -1245,7 +1180,6 @@ struct
         try ignore (Str.search_forward re s1 0); true
         with Not_found -> false
       in
-      Printf.printf "FM#on_missing_symbol_m_lim lim=%Ld\n" lim;
       m#on_missing
 	(fun size addr -> 
 	  let ret_sym = ref false in
