@@ -121,7 +121,13 @@ struct
 	| V.Unknown(_) ->
 	    failwith "Unhandled unknown in narrow_bitwidth"
     in
-      FormMan.map_expr_temp form_man e f combine
+    let f_traced loop e =
+      Printf.printf "Narrow bitwidth of %s:\n" (V.exp_to_string e);
+      let i = f loop e in
+	Printf.printf "Narrow bitwidth of %s is %d\n" (V.exp_to_string e) i;
+	i
+    in
+      FormMan.map_expr_temp form_man e (if false then f_traced else f) combine
 
   (* Similar to narrow_bitwidth, but count negative numbers of small
      absolute value (i.e. with many leading 1s) as narrow as well. I
@@ -258,10 +264,28 @@ struct
 
   let split_terms e form_man =
     (*Printf.printf "split_terms e = %s\n" (V.exp_to_string e);*)
+    (* x | y = x - (x & m) + ((x & m) | y)
+       where m is a bitmask >= y. *)
+    let split_or loop e_wide e_narrow narrow_wd =
+      assert(narrow_wd >= 0); (* x & 0 should have been optimized away *)
+      let mask = Int64.pred (Int64.shift_left 1L narrow_wd) in
+      let ty_y = Vine_typecheck.infer_type None e_narrow in
+      let masked = V.BinOp(V.BITAND, e_narrow,
+			   V.Constant(V.Int(ty_y, mask))) in
+	(loop e_wide) @
+	  [V.UnOp(V.NEG, masked);
+	   V.BinOp(V.BITOR, masked, e_narrow)]
+    in
     let rec loop e =
       (*Printf.printf "    split_terms inside loop e = %s\n" (V.exp_to_string e);*)
       match e with
 	| V.BinOp(V.PLUS, e1, e2) -> (loop e1) @ (loop e2)
+	| V.Ite(cond, V.BinOp(V.PLUS, e1, e2), V.BinOp(V.PLUS, e1', e3))
+	    when e1 = e1 ->
+	    (loop e1) @ (loop (V.Ite(cond, e2, e3)))
+	| V.Ite(cond, V.BinOp(V.PLUS, e1, e2), V.BinOp(V.PLUS, e3, e2'))
+	    when e2 = e2' ->
+	    (loop (V.Ite(cond, e1, e3))) @ (loop e2)
 	| V.BinOp(V.BITAND, e, V.Constant(V.Int(ty, v)))
 	    when is_high_mask ty v ->
 	    (* x & 0xfffffff0 = x - (x & 0xf), etc. *)
@@ -270,27 +294,33 @@ struct
 		 (V.UnOp(V.NEG,
 			 V.BinOp(V.BITAND, e,
 				 V.UnOp(V.NOT, V.Constant(V.Int(ty, v)))))))
+	| V.BinOp(V.BITOR, e1, V.BinOp(V.BITOR, e2, e3))
+	| V.BinOp(V.BITOR, V.BinOp(V.BITOR, e1, e2), e3)
+	    ->
+	    let w1 = narrow_bitwidth form_man e1 and
+		w2 = narrow_bitwidth form_man e2 and
+		w3 = narrow_bitwidth form_man e3 in
+	      if min w1 (min w2 w3) <= 8 then
+		(if w1 <= w2 && w1 <= w3 then
+		   split_or loop (V.BinOp(V.BITOR, e2, e3)) e1 w1
+		 else if w2 <= w1 && w2 <= w3 then
+		   split_or loop (V.BinOp(V.BITOR, e1, e3)) e2 w2
+		 else
+		   (assert(w3 <= w1 && w3 <= w2);
+		    split_or loop (V.BinOp(V.BITOR, e1, e2)) e3 w3))
+	      else
+		[e]
 	| V.BinOp(V.BITOR, e1, e2) ->
-	    let (w1, w2) = (narrow_bitwidth form_man e1), (narrow_bitwidth form_man e2) in
+	    let w1 = narrow_bitwidth form_man e1 and
+		w2 = narrow_bitwidth form_man e2
+	    in
  	      (*Printf.printf "In %s (OR) %s, widths are %d and %d\n" 
  		(V.exp_to_string e1) (V.exp_to_string e2) w1 w2; *)
 	      if min w1 w2 <= 8 then
-		(* x | y = x - (x & m) + ((x & m) | y)
-		   where m is a bitmask >= y. *)
-		let (e_x, e_y, w) = 
-		  if w1 < w2 then
-		    (e2, e1, w1)
-		  else
-		    (e1, e2, w2)
-		in
-		  assert(w >= 0); (* x & 0 should have been optimized away *)
-		  let mask = Int64.pred (Int64.shift_left 1L w) in
-		  let ty_y = Vine_typecheck.infer_type None e_y in
-		  let masked = V.BinOp(V.BITAND, e_y,
-				       V.Constant(V.Int(ty_y, mask))) in
-		    (loop e_x) @ 
-		      [V.UnOp(V.NEG, masked);
-		       V.BinOp(V.BITOR, masked, e_y)]
+		(if w1 < w2 then
+		   split_or loop e2 e1 w1
+		 else
+		   split_or loop e1 e2 w2)
 	      else
 		[e] 
 	| V.Lval(V.Temp(var)) ->
