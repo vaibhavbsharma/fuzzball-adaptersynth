@@ -854,12 +854,13 @@ let ret_typeconv_adaptor fm in_nargs =
       let type_32_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_8 V.CAST_UNSIGNED) in
       let type_41_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_SIGNED) in
       let type_42_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_1 V.CAST_UNSIGNED) in
-      opt_extra_conditions :=  
+      (* these conditions should be getting added in exec_fuzzloop before symbolic_init 
+	opt_extra_conditions :=  
 	V.BinOp(
           V.BITOR,
           V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
           V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
-			    :: !opt_extra_conditions;
+			    :: !opt_extra_conditions; *)
       get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
 	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
 	 (get_ite_expr ret_type V.EQ V.REG_8 11L type_11_expr

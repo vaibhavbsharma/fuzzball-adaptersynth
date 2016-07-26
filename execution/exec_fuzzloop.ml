@@ -125,11 +125,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
       (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adaptor in
-      (*Printf.printf "Running simple+len adaptor in exec_fuzzloop\n";*)
       simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
-       let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
+	 let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
        let rec chartrans_loop n = 
 	 let var_name = "tableX" ^ (Printf.sprintf "%02x" n) in
 	 ignore(fm#get_fresh_symbolic var_name 8);
@@ -139,21 +138,32 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else if mode = "typeconv"
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
        else if (mode = "arithmetic_int")   
-            then (
-	      if (in_nargs <> 0L) then
-		Adaptor_synthesis.arithmetic_int_extra_conditions
-		  fm out_nargs ((Int64.to_int in_nargs)-1);)
+       then (
+	 if (in_nargs <> 0L) then
+	   Adaptor_synthesis.arithmetic_int_extra_conditions
+	     fm out_nargs ((Int64.to_int in_nargs)-1);)
        else if mode = "arithmetic_float"
-            then Adaptor_synthesis.arithmetic_float_extra_conditions
-                   fm out_nargs ((Int64.to_int in_nargs)-1)
+       then Adaptor_synthesis.arithmetic_float_extra_conditions
+         fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
-     if (List.length !opt_synth_ret_adaptor) <> 0 then (
-       ignore(fm#get_fresh_symbolic ("ret_type") 8);
-       ignore(fm#get_fresh_symbolic ("ret_val") 64););
- 
      
+     if (List.length !opt_synth_ret_adaptor) <> 0 then (
+       let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
+       let var_type = (fm#get_fresh_symbolic ("ret_type") 8) in
+       let var_val = (fm#get_fresh_symbolic ("ret_val") 64) in
+       if in_nargs > 0L then
+	 ( let tmp_cond = 
+	     V.BinOp(
+	       V.BITOR,
+	       V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
+	       V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,in_nargs)))) in
+	   opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
+	 (*Printf.printf "opt_extra_condition.length = %d in_nargs=%Lx tmp_cond = %s\n" 
+	   (List.length !opt_extra_conditions) in_nargs (V.exp_to_string tmp_cond);*)
+	 );
+     );
      
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);
