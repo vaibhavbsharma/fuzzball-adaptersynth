@@ -104,16 +104,23 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in
        (*ignore(fm#get_fresh_symbolic (var_name^"_val") 64);*)
        (*ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);*)
-       opt_extra_conditions :=
+       let var_type_type = 
+	 if type_size = 1 then V.REG_1 
+	 else if type_size = 8 then V.REG_8
+	 else failwith "unsupported type_size in exec_fuzzloop#simple_loop"
+       in
+       let tmp_cond = 
 	 (if out_nargs > 0L then 
 	   V.BinOp(
 	     V.BITOR,
-	     V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_1,1L))),
+	     V.BinOp(V.EQ,var_type,V.Constant(V.Int(var_type_type,1L))),
 	     V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
 	 else (
-           V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L)))
-	 )) :: !opt_extra_conditions;
-       (*Printf.printf "opt_extra_condition.length = %d\n" (List.length !opt_extra_conditions);*)
+           V.BinOp(V.EQ,var_type,V.Constant(V.Int(var_type_type,1L)))
+	 )) in
+       opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
+       (*Printf.printf "opt_extra_condition.length = %d n=%d out_nargs=%Lx tmp_cond = %s\n" 
+	 (List.length !opt_extra_conditions) n out_nargs (V.exp_to_string tmp_cond);*)
        if n > 0 then simple_loop (n-1) out_nargs type_name type_size; 
      in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then

@@ -726,7 +726,9 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
        max_input_string_length :=
 	 max (!max_input_string_length) (Int64.to_int i)
      in
-       opt_extra_conditions := [];
+       (* Dont set opt_extra_conditions here because it may contain 
+	  adaptor conditions *)
+       (* opt_extra_conditions := []; *)
        List.iter (fun (base, len) ->
 		    new_max len;
 		    fm#make_symbolic_region base (Int64.to_int len))
