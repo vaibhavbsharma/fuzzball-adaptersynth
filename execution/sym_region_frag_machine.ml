@@ -693,12 +693,14 @@ struct
 		      (new GM.granular_hash_memory)) and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
-      if !opt_zero_region_limit <> 0L then
-	spfm#on_missing_symbol_m_lim (region :> GM.granular_memory) name !opt_zero_region_limit
-      else if !opt_zero_memory then
-	spfm#on_missing_zero_m (region :> GM.granular_memory)
-      else
-	spfm#on_missing_symbol_m (region :> GM.granular_memory) name;
+      (match (!opt_region_limit, !opt_zero_memory) with
+	 | (Some lim, _) ->
+	     spfm#on_missing_symbol_m_lim (region :> GM.granular_memory)
+	       name lim
+	 | (_, true) ->
+	     spfm#on_missing_zero_m (region :> GM.granular_memory)
+	 | _ ->
+	     spfm#on_missing_symbol_m (region :> GM.granular_memory) name);
       if have_snap = true then region#make_snap ();
       new_idx
 

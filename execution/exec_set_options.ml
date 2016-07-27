@@ -304,8 +304,8 @@ let explore_cmdline_opts =
        (fun s -> opt_insn_limit := Int64.of_string s),
      "N Stop path after N instructions");
     ("-region-limit", Arg.String 
-      (fun s -> opt_zero_region_limit := Int64.of_string s),
-     "N Treat upto N byte offsets into a region as symbolic " ^
+      (fun s -> opt_region_limit := Some (Int64.of_string s)),
+     "N Treat only the first N bytes in a region as symbolic " ^
        "and everything else as containing zero");
     ("-check-store-sequence", Arg.Set(opt_check_store_sequence),
      " Track concrete addresses written to by f1, f2 and disqualify paths "^
