@@ -595,7 +595,7 @@ struct
 	| None -> ((sink_mem :> (GM.granular_memory)), 0L)
 	| Some 0 -> ((mem :> (GM.granular_memory)), 0L)
 	| Some r_num -> 
-	  let conc_addr = List.nth region_conc_addr_l r_num in
+	  let conc_addr = List.nth region_conc_addr_l (r_num-1) in
 	  if conc_addr = 0L then ((self#region r), 0L) 
 	  else ((self#region (Some 0)), conc_addr) 
       in
@@ -608,7 +608,6 @@ struct
       | _ -> failwith "wrong size password to region_store"
 
     method make_f1_sym_snap =
-      (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#make_sym_snap called\n";
       List.iter (fun m -> m#make_snap ();) regions;
@@ -616,7 +615,6 @@ struct
       ()
 	
     method save_f1_sym_se =
-      (* TODO: finish this method *)
       List.iteri (fun ind ele -> 
 	let f1_hash = Hashtbl.copy (ele#get_mem) in
 	f1_hash_list <- f1_hash_list @ [f1_hash];
@@ -628,7 +626,6 @@ struct
       ()
 
     method make_f2_sym_snap =
-      (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#make_f2_sym_snap called\n";
       List.iter (fun m -> 
@@ -639,7 +636,6 @@ struct
       ()
 
     method compare_sym_se =
-      (* TODO: finish this method *)
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#compare_sym_se called len(f1_h_l) = %d len(f2_h_l)=%d\n"
 	  (List.length f1_hash_list) (List.length f2_hash_list);
@@ -738,7 +734,7 @@ struct
 		      (new GM.granular_hash_memory)) and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
-      if (List.length regions) = (List.length region_conc_addr_l)+1 then
+      if (List.length regions) = ((List.length region_conc_addr_l)+1) then
 	(region_conc_addr_l <- region_conc_addr_l @ [0L];);
       (match (!opt_region_limit, !opt_zero_memory) with
 	 | (Some lim, _) ->
@@ -778,6 +774,7 @@ struct
 	    ret (V.exp_to_string e);
 	ret
       with Not_found ->
+	(* Try to eagerly concretize this address expression if it is a ITE expression *)
 	let const = ref [] in
 	let rec loop e =
 	  match e with
