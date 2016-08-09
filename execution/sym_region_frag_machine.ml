@@ -529,6 +529,7 @@ struct
     inherit SPFM.sym_path_frag_machine dt as spfm
 
     val mutable regions : GM.granular_snapshot_memory list = []
+    val mutable region_conc_addr_l : int64 list = []
     val region_vals = Hashtbl.create 101
 
     (* per execution path (region expression != 0) query is maintained in
@@ -569,6 +570,42 @@ struct
 	| None -> (sink_mem :> (GM.granular_memory))
 	| Some 0 -> (mem :> (GM.granular_memory))
 	| Some r_num -> ((List.nth regions (r_num - 1)) :> GM.granular_memory)
+
+    method private region_load r size addr =
+      let (mem, conc_addr) = 
+	match r with
+	| None -> ((sink_mem :> (GM.granular_memory)), 0L)
+	| Some 0 -> ((mem :> (GM.granular_memory)), 0L)
+	| Some r_num -> 
+	  let conc_addr = List.nth region_conc_addr_l (r_num-1) in
+	  if conc_addr = 0L then ((self#region r), 0L) 
+	  else ((self#region (Some 0)), conc_addr) 
+      in
+      let new_addr = (Int64.add conc_addr addr) in
+      match size with
+      | 8 -> mem#load_byte new_addr
+      | 16 -> mem#load_short new_addr
+      | 32 -> mem#load_word new_addr
+      | 64 -> mem#load_long new_addr
+      | _ -> failwith "wrong size password to region_load"
+
+    method private region_store r size addr value =
+      let (mem, conc_addr) = 
+	match r with
+	| None -> ((sink_mem :> (GM.granular_memory)), 0L)
+	| Some 0 -> ((mem :> (GM.granular_memory)), 0L)
+	| Some r_num -> 
+	  let conc_addr = List.nth region_conc_addr_l r_num in
+	  if conc_addr = 0L then ((self#region r), 0L) 
+	  else ((self#region (Some 0)), conc_addr) 
+      in
+      let new_addr = (Int64.add conc_addr addr) in
+      match size with
+      | 8 -> mem#store_byte new_addr value
+      | 16 -> mem#store_short new_addr value
+      | 32 -> mem#store_word new_addr value
+      | 64 -> mem#store_long new_addr value
+      | _ -> failwith "wrong size password to region_store"
 
     method make_f1_sym_snap =
       (* TODO: finish this method *)
@@ -620,38 +657,44 @@ struct
       if f1_hash_list_len <> 0 || f2_hash_list_len <> 0 then (
 	(* Compare each of f1's symbolic region writes with f2 *)
 	List.iteri ( fun ind ele ->
-	  if ind >= f2_hash_list_len then 
-	    failwith "region list became smaller after f2, panic!"
-	  else (
-	    Hashtbl.iter ( fun addr chunk ->
+	  (* If region has concrete address then fragment_machine#compare_conc_se
+	     will do the side-effect equivalence checking for this region *)
+	  if (List.nth region_conc_addr_l ind) = 0L then (
+	    if ind >= f2_hash_list_len then 
+	      failwith "region list became smaller after f2, panic!"
+	    else (
+	      Hashtbl.iter ( fun addr chunk ->
 	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
-	      let f1_exp = (List.nth regions ind)#load_long addr in
-	      (List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
-	      let f2_exp = (List.nth regions ind)#load_long addr in
-	      if !opt_trace_mem_snapshots = true then
-		Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
-		  ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
-	      self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
-	    ) ele;
-	  )
+		let f1_exp = (List.nth regions ind)#load_long addr in
+		(List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
+		let f2_exp = (List.nth regions ind)#load_long addr in
+		if !opt_trace_mem_snapshots = true then
+		  Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
+		    ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
+		self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
+	      ) ele;
+	    ));
 	) f1_hash_list;
 	
 	(* Compare each of f2's symbolic region writes with f1 *)
 	List.iteri ( fun ind ele ->
-	  if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
-	    inequiv := 1
-	  else (
-	    Hashtbl.iter ( fun addr chunk ->
-	      let f2_exp = (List.nth regions ind)#load_long addr in
-	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
-	      let f1_exp = (List.nth regions ind)#load_long addr in
-	      (List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
-	      if !opt_trace_mem_snapshots = true then
-		Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
-		  ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
-	      self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
-	    ) ele;
-	  )
+	  (* If region has concrete address then fragment_machine#compare_conc_se
+	     will do the side-effect equivalence checking for this region *)
+	  if (List.nth region_conc_addr_l ind) = 0L then (
+	    if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
+	      inequiv := 1
+	    else (
+	      Hashtbl.iter ( fun addr chunk ->
+		let f2_exp = (List.nth regions ind)#load_long addr in
+		(List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
+		let f1_exp = (List.nth regions ind)#load_long addr in
+		(List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
+		if !opt_trace_mem_snapshots = true then
+		  Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
+		    ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
+		self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
+	      ) ele;
+	    ));
 	) f2_hash_list;
 	
 	if !inequiv = 1 then
@@ -695,6 +738,8 @@ struct
 		      (new GM.granular_hash_memory)) and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
+      if (List.length regions) = (List.length region_conc_addr_l)+1 then
+	(region_conc_addr_l <- region_conc_addr_l @ [0L];);
       (match (!opt_region_limit, !opt_zero_memory) with
 	 | (Some lim, _) ->
 	     spfm#on_missing_symbol_m_lim (region :> GM.granular_memory)
@@ -716,7 +761,8 @@ struct
 	   Printf.printf "SRFM#region_for found in region_val_queried expr = %s\n"
 	     (V.exp_to_string e);
        with Not_found ->
-	 let (b_is_regexp_null,_) = self#query_condition (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
+	 let (b_is_regexp_null,_) = self#query_condition 
+	   (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
 	   (Some true) 0x6d01 in
 	 if !opt_trace_regions then
 	   Printf.printf "SRFM#region_for took branch %b in Not_found case expr = %s\n" 
@@ -732,6 +778,33 @@ struct
 	    ret (V.exp_to_string e);
 	ret
       with Not_found ->
+	let const = ref [] in
+	let rec loop e =
+	  match e with
+	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
+	  | V.Constant(V.Int(V.REG_64, _const)) -> 
+	    const := !const @ [_const];
+	    V.Constant(V.Int(V.REG_64, _const))
+	  | V.Ite(ce, te, fe) ->
+	    V.Ite((loop ce), (loop te), (loop fe))
+	  | _ -> e
+	in
+	let _ = loop e in
+	List.iter ( fun conc_addr -> 
+	  let exp = V.BinOp(V.EQ, e, V.Constant(V.Int(V.REG_64, conc_addr))) in
+	  let (b,_) = self#query_condition exp (Some true) 0x6dfe in
+	  if b = true then ( (* save this region's concrete value *)
+	    if !opt_trace_regions then
+	      Printf.printf "SRFM#region_for using concrete address %Lx for %s\n"
+		conc_addr (V.exp_to_string e);
+	    region_conc_addr_l <- region_conc_addr_l @ [conc_addr];)
+	  else ( 
+	    if !opt_trace_regions then
+	      Printf.printf "SRFM#region_for not using concrete address %Lx for %s\n"
+		conc_addr (V.exp_to_string e);
+	  )
+	) !const;
+
 	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
 	   same region, if e is equivalent to an expression already in 
 	   seen in this execution path then reuse that region *)
@@ -1186,18 +1259,18 @@ struct
 	  | _ -> (v1, v2)
 
     method private store_byte_region  r addr b =
-      (self#region r)#store_byte  addr b
+      self#region_store r 8 addr b
     method private store_short_region r addr s =
-      (self#region r)#store_short addr s
+      self#region_store r 16 addr s
     method private store_word_region  r addr w =
-      (self#region r)#store_word  addr w
+      self#region_store r 32 addr w
     method private store_long_region  r addr l =
-      (self#region r)#store_long  addr l
+      self#region_store r 64 addr l
 
-    method private load_byte_region  r addr = (self#region r)#load_byte  addr
-    method private load_short_region r addr = (self#region r)#load_short addr
-    method private load_word_region  r addr = (self#region r)#load_word  addr
-    method private load_long_region  r addr = (self#region r)#load_long  addr
+    method private load_byte_region  r addr = self#region_load r 8 addr
+    method private load_short_region r addr = self#region_load r 16 addr
+    method private load_word_region  r addr = self#region_load r 32 addr
+    method private load_long_region  r addr = self#region_load r 64 addr
 
     method private query_valid e =
       let (is_sat, _) = 
@@ -1438,13 +1511,13 @@ struct
       in
       let load_ent addr = match ty with
 	| V.REG_8  -> form_man#simplify8
-	    ((self#region (Some 0))#load_byte  addr)
+	  (self#region_load (Some 0) 8 addr)
 	| V.REG_16 -> form_man#simplify16
-	    ((self#region (Some 0))#load_short addr)
+	  (self#region_load (Some 0) 16 addr)
 	| V.REG_32 -> form_man#simplify32
-	    ((self#region (Some 0))#load_word  addr)
+	  (self#region_load (Some 0) 32 addr)
 	| V.REG_64 -> form_man#simplify64
-	    ((self#region (Some 0))#load_long  addr)
+	  (self#region_load (Some 0) 64 addr)
 	| _ -> failwith "Unexpected type in table_load"
       in
       let table = map_n
@@ -1478,13 +1551,13 @@ struct
       in
       let load_ent addr = match ty with
 	| V.REG_8  -> form_man#simplify8
-	    ((self#region (Some 0))#load_byte  addr)
+	  (self#region_load (Some 0) 8 addr)
 	| V.REG_16 -> form_man#simplify16
-	    ((self#region (Some 0))#load_short addr)
+	  (self#region_load (Some 0) 16 addr)
 	| V.REG_32 -> form_man#simplify32
-	    ((self#region (Some 0))#load_word  addr)
+	  (self#region_load (Some 0) 32 addr)
 	| V.REG_64 -> form_man#simplify64
-	    ((self#region (Some 0))#load_long  addr)
+	  (self#region_load (Some 0) 64 addr)
 	| _ -> failwith "Unexpected type in concretize_once_and_load"
       in
       let taut = V.BinOp(V.EQ, addr_e, addr_e) in
@@ -1752,20 +1825,20 @@ struct
     method private table_store cloc off_exp e maxval ty value =
       let load_ent addr = match ty with
 	| V.REG_8  -> form_man#simplify8
-	    ((self#region (Some 0))#load_byte  addr)
+	  (self#region_load (Some 0) 8 addr) 
 	| V.REG_16 -> form_man#simplify16
-	    ((self#region (Some 0))#load_short addr)
+	  (self#region_load (Some 0) 16 addr) 
 	| V.REG_32 -> form_man#simplify32
-	    ((self#region (Some 0))#load_word  addr)
+	  (self#region_load (Some 0) 32 addr) 
 	| V.REG_64 -> form_man#simplify64
-	    ((self#region (Some 0))#load_long  addr)
+	  (self#region_load (Some 0) 64 addr) 
 	| _ -> failwith "Unexpected type in table_store" 
       in
       let store_ent addr v = match ty with
-	| V.REG_8  -> (self#region (Some 0))#store_byte  addr v
-	| V.REG_16 -> (self#region (Some 0))#store_short addr v
-	| V.REG_32 -> (self#region (Some 0))#store_word  addr v
-	| V.REG_64 -> (self#region (Some 0))#store_long  addr v
+	| V.REG_8  ->self#region_store (Some 0) 8 addr v
+	| V.REG_16 ->self#region_store (Some 0) 16 addr v
+	| V.REG_32 ->self#region_store (Some 0) 32 addr v
+	| V.REG_64 ->self#region_store (Some 0) 64 addr v
 	| _ -> failwith "Unexpected store type in table_store"
       in
       let stride = stride form_man off_exp in
@@ -1804,10 +1877,10 @@ struct
 
     method private concretize_once_and_store addr_e ty value =
       let store_ent addr v = match ty with
-	| V.REG_8  -> (self#region (Some 0))#store_byte  addr v
-	| V.REG_16 -> (self#region (Some 0))#store_short addr v
-	| V.REG_32 -> (self#region (Some 0))#store_word  addr v
-	| V.REG_64 -> (self#region (Some 0))#store_long  addr v
+	| V.REG_8  ->self#region_store (Some 0) 8 addr v
+	| V.REG_16 ->self#region_store (Some 0) 16 addr v
+	| V.REG_32 ->self#region_store (Some 0) 32 addr v
+	| V.REG_64 ->self#region_store (Some 0) 64 addr v
 	| _ -> failwith "Unexpected store type in concretize_once_and_store"
       in
       let taut = V.BinOp(V.EQ, addr_e, addr_e) in
