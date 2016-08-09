@@ -620,7 +620,8 @@ struct
       if f1_hash_list_len <> 0 || f2_hash_list_len <> 0 then (
 	(* Compare each of f1's symbolic region writes with f2 *)
 	List.iteri ( fun ind ele ->
-	  if ind >= f2_hash_list_len then inequiv := 1
+	  if ind >= f2_hash_list_len then 
+	    failwith "region list became smaller after f2, panic!"
 	  else (
 	    Hashtbl.iter ( fun addr chunk ->
 	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
@@ -637,7 +638,8 @@ struct
 	
 	(* Compare each of f2's symbolic region writes with f1 *)
 	List.iteri ( fun ind ele ->
-	  if ind >= f1_hash_list_len then inequiv := 1
+	  if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
+	    inequiv := 1
 	  else (
 	    Hashtbl.iter ( fun addr chunk ->
 	      let f2_exp = (List.nth regions ind)#load_long addr in
