@@ -281,7 +281,7 @@ struct
       match e with
 	| V.BinOp(V.PLUS, e1, e2) -> (loop e1) @ (loop e2)
 	| V.Ite(cond, V.BinOp(V.PLUS, e1, e2), V.BinOp(V.PLUS, e1', e3))
-	    when e1 = e1 ->
+	    when e1 = e1' ->
 	    (loop e1) @ (loop (V.Ite(cond, e2, e3)))
 	| V.Ite(cond, V.BinOp(V.PLUS, e1, e2), V.BinOp(V.PLUS, e3, e2'))
 	    when e2 = e2' ->
