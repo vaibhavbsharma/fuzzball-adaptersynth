@@ -529,7 +529,7 @@ struct
     inherit SPFM.sym_path_frag_machine dt as spfm
 
     val mutable regions : GM.granular_snapshot_memory list = []
-    val mutable region_conc_addr_l : int64 list = []
+    val mutable region_conc_addr_h = Hashtbl.create 101
     val region_vals = Hashtbl.create 101
 
     (* per execution path (region expression != 0) query is maintained in
@@ -577,7 +577,11 @@ struct
 	| None -> ((sink_mem :> (GM.granular_memory)), 0L)
 	| Some 0 -> ((mem :> (GM.granular_memory)), 0L)
 	| Some r_num -> 
-	  let conc_addr = List.nth region_conc_addr_l (r_num-1) in
+	  let conc_addr = 
+	    if Hashtbl.mem region_conc_addr_h r_num then
+	      Hashtbl.find region_conc_addr_h r_num 
+	    else 0L 
+	  in
 	  if conc_addr = 0L then ((self#region r), 0L) 
 	  else ((self#region (Some 0)), conc_addr) 
       in
@@ -595,7 +599,11 @@ struct
 	| None -> ((sink_mem :> (GM.granular_memory)), 0L)
 	| Some 0 -> ((mem :> (GM.granular_memory)), 0L)
 	| Some r_num -> 
-	  let conc_addr = List.nth region_conc_addr_l (r_num-1) in
+	  let conc_addr = 
+	    if Hashtbl.mem region_conc_addr_h r_num then 
+	      Hashtbl.find region_conc_addr_h r_num 
+	    else 0L 
+	  in
 	  if conc_addr = 0L then ((self#region r), 0L) 
 	  else ((self#region (Some 0)), conc_addr) 
       in
@@ -655,7 +663,7 @@ struct
 	List.iteri ( fun ind ele ->
 	  (* If region has concrete address then fragment_machine#compare_conc_se
 	     will do the side-effect equivalence checking for this region *)
-	  if (List.nth region_conc_addr_l ind) = 0L then (
+	  if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
 	    if ind >= f2_hash_list_len then 
 	      failwith "region list became smaller after f2, panic!"
 	    else (
@@ -676,7 +684,7 @@ struct
 	List.iteri ( fun ind ele ->
 	  (* If region has concrete address then fragment_machine#compare_conc_se
 	     will do the side-effect equivalence checking for this region *)
-	  if (List.nth region_conc_addr_l ind) = 0L then (
+	  if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
 	    if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
 	      inequiv := 1
 	    else (
@@ -734,8 +742,6 @@ struct
 		      (new GM.granular_hash_memory)) and
 	  name = "region_" ^ (string_of_int new_idx) in
       regions <- regions @ [region];
-      if (List.length regions) = ((List.length region_conc_addr_l)+1) then
-	(region_conc_addr_l <- region_conc_addr_l @ [0L];);
       (match (!opt_region_limit, !opt_zero_memory) with
 	 | (Some lim, _) ->
 	     spfm#on_missing_symbol_m_lim (region :> GM.granular_memory)
@@ -780,25 +786,27 @@ struct
 	  match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
 	  | V.Constant(V.Int(V.REG_64, _const)) -> 
-	    const := !const @ [_const];
+	    if (Int64.abs (fix_s32 _const)) > 4096L then
+	      const := !const @ [_const];
 	    V.Constant(V.Int(V.REG_64, _const))
 	  | V.Ite(ce, te, fe) ->
 	    V.Ite((loop ce), (loop te), (loop fe))
 	  | _ -> e
 	in
+	let conc_addr = ref 0L in
 	let _ = loop e in
-	List.iter ( fun conc_addr -> 
-	  let exp = V.BinOp(V.EQ, e, V.Constant(V.Int(V.REG_64, conc_addr))) in
+	List.iter ( fun _conc_addr -> 
+	  let exp = V.BinOp(V.EQ, e, V.Constant(V.Int(V.REG_64, _conc_addr))) in
 	  let (b,_) = self#query_condition exp (Some true) 0x6dfe in
 	  if b = true then ( (* save this region's concrete value *)
 	    if !opt_trace_regions then
 	      Printf.printf "SRFM#region_for using concrete address %Lx for %s\n"
-		conc_addr (V.exp_to_string e);
-	    region_conc_addr_l <- region_conc_addr_l @ [conc_addr];)
+		_conc_addr (V.exp_to_string e);
+	    conc_addr := _conc_addr; )
 	  else ( 
 	    if !opt_trace_regions then
 	      Printf.printf "SRFM#region_for not using concrete address %Lx for %s\n"
-		conc_addr (V.exp_to_string e);
+		_conc_addr (V.exp_to_string e);
 	  )
 	) !const;
 
@@ -828,10 +836,11 @@ struct
 	  )
 	in
 	Hashtbl.replace region_vals_per_path e new_region;
-	  if !opt_trace_regions then
-	    Printf.printf "Address %s is region %d\n"
-	      (V.exp_to_string e) new_region;
-	  new_region
+	Hashtbl.replace region_conc_addr_h new_region !conc_addr;
+	if !opt_trace_regions then
+	  Printf.printf "Address %s is region %d\n"
+	    (V.exp_to_string e) new_region;
+	new_region
 
     method private is_region_base e =
       Hashtbl.mem region_vals e
@@ -2007,6 +2016,7 @@ struct
 	Printf.printf "SRFM#reset cleared regions\n";
       Hashtbl.clear region_val_queried;
       Hashtbl.clear region_vals_per_path;
+      Hashtbl.clear region_conc_addr_h;
       f1_hash_list <- [];
       f2_hash_list <- [];
       Hashtbl.clear concrete_cache
