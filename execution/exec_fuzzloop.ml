@@ -149,6 +149,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
+     if (List.length !opt_synth_struct_adaptor) <> 0 then (
+       ignore(fm#get_fresh_symbolic "field1" 8);
+       ignore(fm#get_fresh_symbolic "field2" 8);
+     );
+     
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
        let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
        let var_type = (fm#get_fresh_symbolic ("ret_type") 8) in

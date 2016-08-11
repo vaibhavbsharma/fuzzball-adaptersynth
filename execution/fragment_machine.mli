@@ -119,6 +119,9 @@ class virtual fragment_machine : object
   method virtual load_word_conc  : int64 -> int64
   method virtual load_long_conc  : int64 -> int64
 
+  method virtual load_sym : int64 -> int -> Vine.exp
+  method virtual store_sym : int64 -> int -> Vine.exp -> unit
+  
   method virtual load_byte_concolic  : int64 -> int
   method virtual load_byte_symbolic  : int64 -> Vine.exp
   method virtual store_byte_symbolic  : int64 -> Vine.exp -> unit
@@ -136,6 +139,7 @@ class virtual fragment_machine : object
 
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
+  method virtual apply_struct_adaptor: unit -> unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -364,6 +368,9 @@ sig
     method store_word  : int64 -> D.t -> unit
     method store_long  : int64 -> D.t -> unit
 
+    method load_sym : int64 -> int -> Vine.exp
+    method store_sym : int64 -> int -> Vine.exp -> unit
+    
     method store_byte_conc  : int64 -> int   -> unit
     method store_short_conc : int64 -> int   -> unit
     method store_word_conc  : int64 -> int64 -> unit
@@ -418,6 +425,7 @@ sig
 
     method make_snap : unit -> unit
     method reset : unit -> unit
+    method apply_struct_adaptor: unit -> unit
 
     method add_special_handler : special_handler -> unit
 

@@ -114,6 +114,7 @@ let opt_extra_env = Hashtbl.create 10
 let opt_skip_call_addr = ref []
 let opt_synth_adaptor = ref []
 let opt_synth_ret_adaptor = ref []
+let opt_synth_struct_adaptor = ref []
 let opt_adaptor_search_mode  = ref false
 let opt_synth_simplelen_adaptor = ref []
 let synth_extra_conditions = ref []
@@ -227,6 +228,21 @@ let add_delimited_simplelen_info opt char s =
    (Int64.of_string (List.nth list_str 3)), 
    (Int64.of_string (List.nth list_str 4))) :: !opt
 
+let add_delimited_info_6 opt char s =
+  let rec loop arg_str =
+    try 
+      let delim_loc = String.index arg_str char in
+      let str1 = String.sub arg_str 0 delim_loc in
+      let str2 = String.sub arg_str (delim_loc + 1) 
+                   ((String.length arg_str) - delim_loc - 1) in
+      [(Int64.of_string str1)] @ (loop str2)
+    with Not_found -> [(Int64.of_string arg_str)]
+  in
+  let list_str = loop s in
+  opt := ((List.nth list_str 0), (List.nth list_str 1), (List.nth list_str 2), 
+	  (List.nth list_str 3), (List.nth list_str 4), (List.nth list_str 5))
+  :: !opt
+  
 let add_delimited_info opt char s =
   let rec loop arg_str =
     try 

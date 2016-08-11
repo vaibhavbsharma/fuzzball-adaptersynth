@@ -85,21 +85,25 @@ let call_replacements fm last_eip eip =
           if adaptor_mode = "simple" 
           then Some (fun () -> 
 	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
+	    Adaptor_synthesis.struct_adaptor fm;
             (Some in_addr))
 	  else if adaptor_mode = "typeconv"
 	  then Some (fun () -> 
 	    Adaptor_synthesis.typeconv_adaptor fm out_nargs in_nargs;
+	    Adaptor_synthesis.struct_adaptor fm;
 	    (*Adaptor_synthesis.float_typeconv_adaptor fm out_nargs in_nargs;*)
             (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)
           else if adaptor_mode = "arithmetic_int" 
             then Some (fun () -> 
               Adaptor_synthesis.arithmetic_int_adaptor fm out_nargs in_nargs;
+	      Adaptor_synthesis.struct_adaptor fm;
               (Some in_addr))
           (*** adaptor using trees of arithmetic (SSE floating point) expressions ***)
           else if adaptor_mode = "arithmetic_float" 
             then Some (fun () -> 
               Adaptor_synthesis.arithmetic_float_adaptor fm out_nargs in_nargs;
+	      Adaptor_synthesis.struct_adaptor fm;
               (Some in_addr))
           (*** character translation adaptor ***)
           else if adaptor_mode = "chartrans"
@@ -271,6 +275,7 @@ let call_replacements fm last_eip eip =
 	     if n > 0 then decision_loop (n-1);
 	   in
 	   decision_loop ((Int64.to_int in_nargs)-1);
+	   Adaptor_synthesis.struct_adaptor fm;
            (Some in_addr))
       | _ -> failwith "Contradictory replacement options"
 

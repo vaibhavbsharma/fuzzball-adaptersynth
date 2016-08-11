@@ -530,6 +530,7 @@ struct
 
     val mutable regions : GM.granular_snapshot_memory list = []
     val mutable region_conc_addr_h = Hashtbl.create 101
+    val mutable sym_input_region_l = []
     val region_vals = Hashtbl.create 101
 
     (* per execution path (region expression != 0) query is maintained in
@@ -826,17 +827,26 @@ struct
 		(V.exp_to_string exp);
 	    new_rnum := region;)
 	) region_vals_per_path;
+	let is_sym_input_region_l = ref false in
 	let new_region =
 	  if !new_rnum <> 0 then !new_rnum 
 	  else if Hashtbl.mem region_vals e then Hashtbl.find region_vals e 
 	  else ( 
 	    let rnum' = self#fresh_region in
 	    Hashtbl.replace region_vals e rnum';
+	    if !opt_adaptor_search_mode = false then
+	    (match e with
+	    | V.Lval(V.Temp((i,s,ty))) -> 
+		Printf.printf "found symbolic input(%s) as address \n" s;
+	      is_sym_input_region_l := true;
+	    | _ -> ());
 	    rnum'
 	  )
 	in
 	Hashtbl.replace region_vals_per_path e new_region;
 	Hashtbl.replace region_conc_addr_h new_region !conc_addr;
+	if !is_sym_input_region_l = true then
+	  sym_input_region_l <- sym_input_region_l @ [new_region];
 	if !opt_trace_regions then
 	  Printf.printf "Address %s is region %d\n"
 	    (V.exp_to_string e) new_region;
@@ -2017,8 +2027,31 @@ struct
       Hashtbl.clear region_val_queried;
       Hashtbl.clear region_vals_per_path;
       Hashtbl.clear region_conc_addr_h;
+      sym_input_region_l <- [];
       f1_hash_list <- [];
       f2_hash_list <- [];
       Hashtbl.clear concrete_cache
+
+    method apply_struct_adaptor () = 
+      if !opt_adaptor_search_mode = false then
+	let get_ite_expr arg op const_type const then_val else_val = 
+	  V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
+		then_val,
+		else_val)
+	in
+	List.iter ( fun rnum ->
+	  let field1_val = D.to_symbolic_32 (self#region_load (Some rnum) 32 0L) in 
+	  let field2_val = D.to_symbolic_32 (self#region_load (Some rnum) 32 4L) in
+	  let field1 = spfm#get_fresh_symbolic "field1" 8 in
+	  let field2 = spfm#get_fresh_symbolic "field2" 8 in
+	  let field1_expr = 
+	    get_ite_expr field1 V.EQ V.REG_8 1L field1_val field2_val in
+	  let field2_expr = 
+	    get_ite_expr field2 V.EQ V.REG_8 1L field1_val field2_val in
+	  self#region_store (Some rnum) 32 0L (D.from_symbolic field1_expr);
+	  self#region_store (Some rnum) 32 4L (D.from_symbolic field2_expr);	
+	) sym_input_region_l;
+
   end
+
 end

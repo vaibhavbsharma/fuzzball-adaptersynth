@@ -17,3 +17,5 @@ val ret_typeconv_adaptor :
   Fragment_machine.fragment_machine -> int64 -> unit
 val ret_simplelen_adaptor :
   Fragment_machine.fragment_machine -> int64 -> unit
+val struct_adaptor: 
+  Fragment_machine.fragment_machine -> unit

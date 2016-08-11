@@ -343,6 +343,9 @@ class virtual fragment_machine = object
   method virtual store_word_conc  : int64 -> int64 -> unit
   method virtual store_long_conc  : int64 -> int64 -> unit
 
+  method virtual load_sym : int64 -> int -> Vine.exp
+  method virtual store_sym : int64 -> int -> Vine.exp -> unit
+  
   method virtual store_page_conc  : int64 -> string -> unit
 
   method virtual load_byte_conc  : int64 -> int
@@ -367,6 +370,7 @@ class virtual fragment_machine = object
 
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
+  method virtual apply_struct_adaptor: unit -> unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -2038,6 +2042,23 @@ struct
     method store_word  addr w = mem#store_word  addr w
     method store_long  addr l = mem#store_long  addr l
 
+    method load_sym addr size = 
+      match size with
+      | 8 -> D.to_symbolic_8 (mem#load_byte addr)
+      | 16 -> D.to_symbolic_16 (mem#load_short addr)
+      | 32 -> D.to_symbolic_32 (mem#load_word addr)
+      | 64 -> D.to_symbolic_64 (mem#load_long addr)
+      | _ -> failwith "Unsupported size in FM#load_sym"
+
+    method store_sym addr size value_s =
+      let value = D.from_symbolic value_s in
+      match size with
+      | 8 -> mem#store_byte addr value
+      | 16 -> mem#store_short addr value
+      | 32 -> mem#store_word addr value
+      | 64 -> mem#store_long addr value
+      | _ -> failwith "Unsupported size in FM#store_sym"
+
     method store_byte_conc  addr b = mem#store_byte addr (D.from_concrete_8 b)
     method store_short_conc addr s = mem#store_short addr(D.from_concrete_16 s)
     method store_word_conc  addr w = mem#store_word addr (D.from_concrete_32 w)
@@ -2144,7 +2165,10 @@ struct
 	self#reset_syscalls ;
       List.iter (fun h -> h#reset) special_handler_list
 
-    method add_special_handler (h:special_handler) =
+  method apply_struct_adaptor () = 
+    Printf.printf "FM#apply_struct_adaptor should not have been called\n";
+  
+  method add_special_handler (h:special_handler) =
       special_handler_list <- h :: special_handler_list
 
     method handle_special str =

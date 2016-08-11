@@ -168,24 +168,6 @@ let concrete_state_cmdline_opts =
        (add_delimited_pair opt_skip_func_addr '='),
      "addr=retval Replace the function at address 'addr' with a nop, and "^
      "return 'retval' in EAX");
-    ("-synthesize-adaptor", Arg.String
-       (add_delimited_info opt_synth_adaptor ':'),
-     "string:addr1:nargs1:addr2:nargs2 Using adaptor of type 'string', "^
-     "replace the outer function call at 'addr1' "^
-     "which takes 'nargs1' arguments with a call to function at "^
-     "address 'addr2' which uses 'nargs2' arguments");
-    ("-synthesize-simple+len-adaptor", Arg.String 
-    (add_delimited_simplelen_info opt_synth_simplelen_adaptor ':'),
-    "addr1:nargs1:addr2:nargs2:length Using the simple+length adaptor, "^
-    "replace the outer function call at 'addr1' "^
-    "which takes 'nargs1' arguments with a call to function at "^
-    "address 'addr2' which users 'nargs2' arguments");
-    ("-synthesize-return-adaptor", Arg.String
-       (add_delimited_info_s_i_i_i opt_synth_ret_adaptor ':'),
-     "string:addr1:addr2:N Using adaptor of type 'string', "^
-       "save N argument registers at addr1, " ^
-       "replace the return value at instruction with address 'addr2' "^
-       "with an adaptor symbolic formula ");
   ]
 
 let symbolic_state_cmdline_opts =
@@ -237,6 +219,29 @@ let symbolic_state_cmdline_opts =
     ("-skip-call-ret-symbol-once", Arg.String
        (add_delimited_num_str_pair opt_skip_call_addr_symbol_once '='),
      "addr=symname Like -s-c-r-s, but always the same variable");
+    ("-synthesize-adaptor", Arg.String
+      (add_delimited_info opt_synth_adaptor ':'),
+     "string:addr1:nargs1:addr2:nargs2 Using adaptor of type 'string', "^
+       "replace the outer function call at 'addr1' "^
+       "which takes 'nargs1' arguments with a call to function at "^
+       "address 'addr2' which uses 'nargs2' arguments");
+    ("-synthesize-simple+len-adaptor", Arg.String 
+      (add_delimited_simplelen_info opt_synth_simplelen_adaptor ':'),
+     "addr1:nargs1:addr2:nargs2:length Using the simple+length adaptor, "^
+       "replace the outer function call at 'addr1' "^
+       "which takes 'nargs1' arguments with a call to function at "^
+       "address 'addr2' which users 'nargs2' arguments");
+    ("-synthesize-return-adaptor", Arg.String
+      (add_delimited_info_s_i_i_i opt_synth_ret_adaptor ':'),
+     "string:addr1:addr2:N Using adaptor of type 'string', "^
+       "save N argument registers at addr1, " ^
+       "replace the return value at instruction with address 'addr2' "^
+       "with an adaptor symbolic formula ");
+    ("-synthesize-structure-adaptor", Arg.String
+      (add_delimited_info_6 opt_synth_struct_adaptor ':'),
+     "addr1:addr2:addr3:addr4:addr5:addr6 Using structure adaptor grammar, "^
+       "write grammar at upto region-limit bytes at addr1, addr2, addr3, addr4" ^
+       ", addr5 ,addr6");
   ]
 
 let slurp_file fname =

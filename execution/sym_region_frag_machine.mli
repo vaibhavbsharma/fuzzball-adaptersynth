@@ -62,6 +62,8 @@ sig
 
     method reset : unit -> unit
 
+    method apply_struct_adaptor: unit -> unit
+
     method after_exploration : unit
 
     method get_depth : int
@@ -125,6 +127,10 @@ sig
     method store_short : int64 -> D.t -> unit
     method store_word  : int64 -> D.t -> unit
     method store_long  : int64 -> D.t -> unit
+
+    method load_sym : int64 -> int -> Vine.exp
+    method store_sym : int64 -> int -> Vine.exp -> unit
+
     method store_byte_conc  : int64 -> int   -> unit
     method store_short_conc : int64 -> int   -> unit
     method store_word_conc  : int64 -> int64 -> unit

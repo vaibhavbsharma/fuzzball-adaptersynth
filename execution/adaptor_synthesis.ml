@@ -6,6 +6,7 @@ module V = Vine;;
 open Fragment_machine;;
 open Exec_options;;
 open Exec_exceptions;;
+open Exec_utils;;
 
 (*** general helper code used in multiple adaptors ***)
 
@@ -890,6 +891,7 @@ let ret_typeconv_adaptor fm in_nargs =
   
 (* Return value type conversion adaptor code ends here *)
 
+
 (*
    type = 0 -> leave the return value unchanged, ret_val ignored
    type = 1 -> constant in ret_val
@@ -926,12 +928,36 @@ let ret_simplelen_adaptor fm in_nargs =
 	       (* get_ite_expr ret_type V.EQ V.REG_8 3L*) ite_saved_arg_expr
 	    )))
     in
-      opt_extra_conditions :=
-	V.BinOp(
-	  V.BITOR,
-	  V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
-	  V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
-      :: !opt_extra_conditions;
-      fm#reset_saved_arg_regs;
-      (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
-      fm#set_reg_symbolic R_RAX arg
+    opt_extra_conditions :=
+      V.BinOp(
+	V.BITOR,
+	V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
+	V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
+    :: !opt_extra_conditions;
+    fm#reset_saved_arg_regs;
+    (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
+    fm#set_reg_symbolic R_RAX arg
+
+let struct_adaptor fm =
+  if (List.length !opt_synth_struct_adaptor) <> 0 then (
+    Printf.printf "Starting structure adaptor\n";
+    let (addr1, addr2, addr3, addr4, addr5, addr6) = 
+      (List.hd !opt_synth_struct_adaptor) in
+    let addr_list = [addr1; addr2; addr3; addr4; addr5; addr6] in
+    List.iter ( fun addr -> 
+      if (Int64.abs (fix_s32 addr)) > 4096L then (
+	let field1 = fm#get_fresh_symbolic "field1" 8 in
+	let field2 = fm#get_fresh_symbolic "field2" 8 in
+	let field1_val = fm#load_sym addr 32 in
+	let field2_val = fm#load_sym (Int64.add addr 4L) 32 in
+	let field1_expr = 
+	  get_ite_expr field1 V.EQ V.REG_8 1L field1_val field2_val in
+	let field2_expr = 
+	  get_ite_expr field2 V.EQ V.REG_8 1L field1_val field2_val in
+	fm#store_sym addr 32 field1_expr;
+	fm#store_sym (Int64.add addr 4L) 32 field2_expr;
+      );
+    ) addr_list;
+    fm#apply_struct_adaptor ();
+  );
+  Printf.printf "Completed structure adaptor\n";
