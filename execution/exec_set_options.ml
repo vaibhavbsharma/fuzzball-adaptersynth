@@ -238,8 +238,8 @@ let symbolic_state_cmdline_opts =
        "replace the return value at instruction with address 'addr2' "^
        "with an adaptor symbolic formula ");
     ("-synthesize-structure-adaptor", Arg.String
-      (add_delimited_info_6 opt_synth_struct_adaptor ':'),
-     "addr1:addr2:addr3:addr4:addr5:addr6 Using structure adaptor grammar, "^
+      (add_delimited_info_10 opt_synth_struct_adaptor ':'),
+     "addr1:addr2:addr3:addr4:addr5:addr6:addr7:addr8:addr9:addr10 Using structure adaptor grammar, "^
        "write grammar at upto region-limit bytes at addr1, addr2, addr3, addr4" ^
        ", addr5 ,addr6");
   ]

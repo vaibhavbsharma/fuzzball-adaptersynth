@@ -2055,78 +2055,131 @@ struct
 	  let addr_4  = (Int64.add addr 4L) in
 	  let addr_8  = (Int64.add addr 8L) in
 	 
-	  let f1_val_0_1  = upcast 
-	    (D.to_symbolic_8 (self#region_load (Some rnum) 8   addr)) V.CAST_SIGNED 32 in
-	  let f1_val_0_2  = upcast 
-	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr)) V.CAST_SIGNED 32 in
-	  let f1_val_0_4  = upcast 
-	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr)) V.CAST_SIGNED 32 in
+	  let f1_val_0_1_1  = upcast 
+	    (D.to_symbolic_8 (self#region_load (Some rnum) 8   addr)) V.CAST_SIGNED   32 in
+	  let f1_val_0_1_0  = upcast 
+	    (D.to_symbolic_8 (self#region_load (Some rnum) 8   addr)) V.CAST_UNSIGNED 32 in
+	  let f1_val_0_2_1  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr)) V.CAST_SIGNED   32 in
+	  let f1_val_0_2_0  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr)) V.CAST_UNSIGNED 32 in
+	  let f1_val_0_4_1  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr)) V.CAST_SIGNED   32 in
+	  let f1_val_0_4_0  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr)) V.CAST_UNSIGNED 32 in
 	  let f1_val_0_8  = upcast 
-	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr)) V.CAST_LOW    32 in
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr)) V.CAST_LOW      32 in
 	  
-	  let f2_val_1_1  = upcast 
-	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_1)) V.CAST_SIGNED 32 in
-	  let f2_val_1_2  = upcast 
-	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_1)) V.CAST_SIGNED 32 in
+	  let f2_val_1_1_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_1)) V.CAST_SIGNED   32 in
+	  let f2_val_1_1_0  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_1)) V.CAST_UNSIGNED 32 in
+	  let f2_val_1_2_1  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_1)) V.CAST_SIGNED   32 in
+	  let f2_val_1_2_0  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_1)) V.CAST_UNSIGNED 32 in
 
-	  let f2_val_2_1  = upcast 
-	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_2)) V.CAST_SIGNED 32 in
-	  let f2_val_2_2  = upcast 
-	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_2)) V.CAST_SIGNED 32 in
+	  let f2_val_2_1_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_2)) V.CAST_SIGNED   32 in
+	  let f2_val_2_1_0  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_2)) V.CAST_UNSIGNED 32 in
+	  let f2_val_2_2_1  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_2)) V.CAST_SIGNED   32 in
+	  let f2_val_2_2_0  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_2)) V.CAST_UNSIGNED 32 in
 
-	  let f2_val_4_1  = upcast 
-	    (D.to_symbolic_8 (self#region_load (Some rnum) 8  addr_4)) V.CAST_SIGNED 32 in
-	  let f2_val_4_2  = upcast 
-	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_4)) V.CAST_SIGNED 32 in
-	  let f2_val_4_4  = upcast 
-	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_4)) V.CAST_SIGNED 32 in
+	  let f2_val_4_1_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_4)) V.CAST_SIGNED   32 in
+	  let f2_val_4_1_0  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_4)) V.CAST_UNSIGNED 32 in
+	  let f2_val_4_2_1  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_4)) V.CAST_SIGNED   32 in
+	  let f2_val_4_2_0  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_4)) V.CAST_UNSIGNED 32 in
+	  let f2_val_4_4_1  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_4)) V.CAST_SIGNED   32 in
+	  let f2_val_4_4_0  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_4)) V.CAST_UNSIGNED 32 in
 	  let f2_val_4_8  = upcast 
-	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_4)) V.CAST_LOW    32 in
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_4)) V.CAST_LOW      32 in
 	  
-	  let f2_val_8_1  = upcast 
-	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_8)) V.CAST_SIGNED 32 in
-	  let f2_val_8_2  = upcast 
-	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_8)) V.CAST_SIGNED 32 in
-	  let f2_val_8_4  = upcast 
-	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_8)) V.CAST_SIGNED 32 in
+	  let f2_val_8_1_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_8)) V.CAST_SIGNED   32 in
+	  let f2_val_8_1_0  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_8)) V.CAST_UNSIGNED 32 in
+	  let f2_val_8_2_1  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_8)) V.CAST_SIGNED   32 in
+	  let f2_val_8_2_0  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_8)) V.CAST_UNSIGNED 32 in
+	  let f2_val_8_4_1  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_8)) V.CAST_SIGNED   32 in
+	  let f2_val_8_4_0  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_8)) V.CAST_UNSIGNED 32 in
 	  let f2_val_8_8  = upcast 
-	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_8)) V.CAST_LOW    32 in
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_8)) V.CAST_LOW      32 in
+
 
 	  let field1_expr = 
-	    get_ite_expr f1_type V.EQ V.REG_8 1L f1_val_0_1 
-	      (get_ite_expr f1_type V.EQ V.REG_8 2L f1_val_0_2 
-		 (get_ite_expr f1_type V.EQ V.REG_8 4L f1_val_0_4 
-		    (get_ite_expr f1_type V.EQ V.REG_8 8L f1_val_0_8
-		       (get_ite_expr f1_type V.EQ V.REG_8 11L f2_val_1_1
-			  (get_ite_expr f1_type V.EQ V.REG_8 12L f2_val_1_2
-			     (get_ite_expr f1_type V.EQ V.REG_8 21L f2_val_2_1
-				(get_ite_expr f1_type V.EQ V.REG_8 22L f2_val_2_2
-				   (get_ite_expr f1_type V.EQ V.REG_8 41L f2_val_4_1
-				      (get_ite_expr f1_type V.EQ V.REG_8 42L f2_val_4_2
-					 (get_ite_expr f1_type V.EQ V.REG_8 44L f2_val_4_4
-					    (get_ite_expr f1_type V.EQ V.REG_8 48L f2_val_4_8
-					       (get_ite_expr f1_type V.EQ V.REG_8 81L f2_val_8_1
-						  (get_ite_expr f1_type V.EQ V.REG_8 82L f2_val_8_2
-						     (get_ite_expr f1_type V.EQ V.REG_8 84L f2_val_8_4 
-							f2_val_8_8 ))))))))))))))
+           get_ite_expr f1_type V.EQ V.REG_8 11L f1_val_0_1_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 10L f1_val_0_1_0 
+          (get_ite_expr f1_type V.EQ V.REG_8 21L f1_val_0_2_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 20L f1_val_0_2_0 
+	  (get_ite_expr f1_type V.EQ V.REG_8 41L f1_val_0_4_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 40L f1_val_0_4_0 
+          (get_ite_expr f1_type V.EQ V.REG_8 8L f1_val_0_8
+          (get_ite_expr f1_type V.EQ V.REG_8 111L f2_val_1_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 110L f2_val_1_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 121L f2_val_1_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 120L f2_val_1_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 211L f2_val_2_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 210L f2_val_2_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 221L f2_val_2_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 220L f2_val_2_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 411L f2_val_4_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 410L f2_val_4_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 421L f2_val_4_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 420L f2_val_4_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 441L f2_val_4_4_1
+          (get_ite_expr f1_type V.EQ V.REG_8 440L f2_val_4_4_0
+          (get_ite_expr f1_type V.EQ V.REG_8 48L f2_val_4_8
+          (get_ite_expr f1_type V.EQ V.REG_8 811L f2_val_8_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 810L f2_val_8_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 821L f2_val_8_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 820L f2_val_8_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 841L f2_val_8_4_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 840L f2_val_8_4_0 
+          f2_val_8_8 )))))))))))))))))))))))))))
 	  in
 	  let field2_expr = 
-	    get_ite_expr f2_type V.EQ V.REG_8 1L f1_val_0_1 
-	      (get_ite_expr f2_type V.EQ V.REG_8 2L f1_val_0_2 
-		 (get_ite_expr f2_type V.EQ V.REG_8 4L f1_val_0_4 
-		    (get_ite_expr f2_type V.EQ V.REG_8 8L f1_val_0_8
-		       (get_ite_expr f2_type V.EQ V.REG_8 11L f2_val_1_1
-			  (get_ite_expr f2_type V.EQ V.REG_8 12L f2_val_1_2
-			     (get_ite_expr f2_type V.EQ V.REG_8 21L f2_val_2_1
-				(get_ite_expr f2_type V.EQ V.REG_8 22L f2_val_2_2
-				   (get_ite_expr f2_type V.EQ V.REG_8 41L f2_val_4_1
-				      (get_ite_expr f2_type V.EQ V.REG_8 42L f2_val_4_2
-					 (get_ite_expr f2_type V.EQ V.REG_8 44L f2_val_4_4
-					    (get_ite_expr f2_type V.EQ V.REG_8 48L f2_val_4_8
-					       (get_ite_expr f2_type V.EQ V.REG_8 81L f2_val_8_1
-						  (get_ite_expr f2_type V.EQ V.REG_8 82L f2_val_8_2
-						     (get_ite_expr f2_type V.EQ V.REG_8 84L f2_val_8_4 
-							f2_val_8_8 ))))))))))))))
+           get_ite_expr f2_type V.EQ V.REG_8 11L f1_val_0_1_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 10L f1_val_0_1_0 
+          (get_ite_expr f2_type V.EQ V.REG_8 21L f1_val_0_2_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 20L f1_val_0_2_0 
+	  (get_ite_expr f2_type V.EQ V.REG_8 41L f1_val_0_4_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 40L f1_val_0_4_0 
+          (get_ite_expr f2_type V.EQ V.REG_8 8L f1_val_0_8
+          (get_ite_expr f2_type V.EQ V.REG_8 111L f2_val_1_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 110L f2_val_1_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 121L f2_val_1_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 120L f2_val_1_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 211L f2_val_2_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 210L f2_val_2_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 221L f2_val_2_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 220L f2_val_2_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 411L f2_val_4_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 410L f2_val_4_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 421L f2_val_4_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 420L f2_val_4_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 441L f2_val_4_4_1
+          (get_ite_expr f2_type V.EQ V.REG_8 440L f2_val_4_4_0
+          (get_ite_expr f2_type V.EQ V.REG_8 48L f2_val_4_8
+          (get_ite_expr f2_type V.EQ V.REG_8 811L f2_val_8_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 810L f2_val_8_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 821L f2_val_8_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 820L f2_val_8_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 841L f2_val_8_4_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 840L f2_val_8_4_0 
+          f2_val_8_8 )))))))))))))))))))))))))))
 	  in
 	  Printf.printf "SRFM#field1_expr = %s\n" (V.exp_to_string field1_expr);
 	  

@@ -942,32 +942,39 @@ let ret_simplelen_adaptor fm in_nargs =
    similar implementaton in SRFM for symbolic regions *) 
 
 (*
-  field1      = 1  -> use field1
-  field1      = 2  -> use field2
+  f1_type = 011 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, sign-extend to 32 bit
+  f1_type = 010 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, zero-extend to 32 bit
+  f1_type = 021 -> 0 to 2 sign-extend to 32 bit
+  f1_type = 020 -> 0 to 2 zero-extend to 32 bit
+  f1_type = 041 -> 0 to 4 sign-extend to 32 bit
+  f1_type = 040 -> 0 to 4 zero-extend to 32 bit
+  f1_type = 08  -> 0 to 8 low 32 bits of 64-bit value
   
-  if field1_size = 1 && field2_size = 1 -> field2_offset = 1
-  else if field1_size <> 8 -> field2_offset = 4
-  else if field1_size = 8 -> field2_offset = 8
+  f2_type = 111 -> 1 to 2 sign-extend to 32 bit
+  f2_type = 110 -> 1 to 2 zero-extend to 32 bit
+  f2_type = 121 -> 1 to 3 sign-extend to 32 bit
+  f2_type = 120 -> 1 to 3 zero-extend to 32 bit
 
-  f1_type = 01 -> 0 to 1
-  f1_type = 02 -> 0 to 2
-  f1_type = 04 -> 0 to 4
-  f1_type = 08 -> 0 to 8
-  
-  f2_type = 11 -> 1 to 2
-  f2_type = 12 -> 1 to 3
+  f2_type = 211 -> 2 to 3 sign-extend to 32 bit
+  f2_type = 210 -> 2 to 3 zero-extend to 32 bit
+  f2_type = 221 -> 2 to 4 sign-extend to 32 bit
+  f2_type = 220 -> 2 to 4 zero-extend to 32 bit
 
-  f2_type = 21 -> 2 to 3
-  f2_type = 22 -> 2 to 4
+  f2_type = 411 -> 4 to 5 sign-extend to 32 bit
+  f2_type = 410 -> 4 to 5 zero-extend to 32 bit
+  f2_type = 421 -> 4 to 6 sign-extend to 32 bit
+  f2_type = 420 -> 4 to 6 zero-extend to 32 bit
+  f2_type = 441 -> 4 to 8 sign-extend to 32 bit
+  f2_type = 440 -> 4 to 8 zero-extend to 32 bit
+  f2_type = 48  -> 4 to 12 low 32 bits of 64-bit value
 
-  f2_type = 41 -> 4 to 5
-  f2_type = 42 -> 4 to 6
-  f2_type = 44 -> 4 to 8
-  f2_type = 48 -> 4 to 12
-  f2_type = 81 -> 8 to 9
-  f2_type = 82 -> 8 to 10
-  f2_type = 84 -> 8 to 12
-  f2_type = 88 -> 8 to 16
+  f2_type = 811 -> 8 to 9 sign-extend to 32 bit
+  f2_type = 810 -> 8 to 9 zero-extend to 32 bit
+  f2_type = 821 -> 8 to 10 sign-extend to 32 bit
+  f2_type = 820 -> 8 to 10 zero-extend to 32 bit
+  f2_type = 841 -> 8 to 12 sign-extend to 32 bit
+  f2_type = 840 -> 8 to 12 zero-extend to 32 bit
+  f2_type = 88  -> 8 to 16 low 32 bits of 64-bit value
 
 *)
 
@@ -980,9 +987,10 @@ let upcast expr extend_op end_sz =
 let struct_adaptor fm = 
   if (List.length !opt_synth_struct_adaptor) <> 0 then (
     Printf.printf "Starting structure adaptor\n";
-    let (addr1, addr2, addr3, addr4, addr5, addr6) = 
+    let (addr1, addr2, addr3, addr4, addr5, addr6, addr7, addr8, addr9, addr10) = 
       (List.hd !opt_synth_struct_adaptor) in
-    let addr_list = [addr1; addr2; addr3; addr4; addr5; addr6] in
+    let addr_list = [addr1; addr2; addr3; addr4; addr5; 
+		     addr6; addr7; addr8; addr9; addr10] in
     List.iter ( fun addr -> 
       if (Int64.abs (fix_s32 addr)) > 4096L then (
 	let f1_type = fm#get_fresh_symbolic "f1_type" 8 in
@@ -992,62 +1000,101 @@ let struct_adaptor fm =
 	let addr_4 = (Int64.add addr 4L) in
 	let addr_8 = (Int64.add addr 8L) in
 	
-	let f1_val_0_1  = upcast (fm#load_sym addr 8 ) V.CAST_SIGNED 32 in
-	let f1_val_0_2  = upcast (fm#load_sym addr 16) V.CAST_SIGNED 32 in
-	let f1_val_0_4  = upcast (fm#load_sym addr 32) V.CAST_SIGNED 32 in
-	let f1_val_0_8  = upcast (fm#load_sym addr 64) V.CAST_LOW    32 in
-	
-	let f2_val_1_1  = upcast (fm#load_sym addr_1 8 ) V.CAST_SIGNED 32 in
-	let f2_val_1_2  = upcast (fm#load_sym addr_1 16) V.CAST_SIGNED 32 in
-	
-	let f2_val_2_1  = upcast (fm#load_sym addr_2 8 ) V.CAST_SIGNED 32 in
-	let f2_val_2_2  = upcast (fm#load_sym addr_2 16) V.CAST_SIGNED 32 in
-	
-	let f2_val_4_1  = upcast (fm#load_sym addr_4 8 ) V.CAST_SIGNED 32 in
-	let f2_val_4_2  = upcast (fm#load_sym addr_4 16) V.CAST_SIGNED 32 in
-	let f2_val_4_4  = upcast (fm#load_sym addr_4 32) V.CAST_SIGNED 32 in
-	let f2_val_4_8  = upcast (fm#load_sym addr_4 64) V.CAST_LOW    32 in
+	let f1_val_0_1_1  = upcast (fm#load_sym addr 8 ) V.CAST_SIGNED   32 in
+	let f1_val_0_1_0  = upcast (fm#load_sym addr 8 ) V.CAST_UNSIGNED 32 in
+	let f1_val_0_2_1  = upcast (fm#load_sym addr 16) V.CAST_SIGNED   32 in
+	let f1_val_0_2_0  = upcast (fm#load_sym addr 16) V.CAST_UNSIGNED 32 in
+	let f1_val_0_4_1  = upcast (fm#load_sym addr 32) V.CAST_SIGNED   32 in
+	let f1_val_0_4_0  = upcast (fm#load_sym addr 32) V.CAST_UNSIGNED 32 in
+	let f1_val_0_8    = upcast (fm#load_sym addr 64) V.CAST_LOW      32 in
 
-	let f2_val_8_1  = upcast (fm#load_sym addr_8 8 ) V.CAST_SIGNED 32 in
-	let f2_val_8_2  = upcast (fm#load_sym addr_8 16) V.CAST_SIGNED 32 in
-	let f2_val_8_4  = upcast (fm#load_sym addr_8 32) V.CAST_SIGNED 32 in
-	let f2_val_8_8  = upcast (fm#load_sym addr_8 64) V.CAST_LOW    32 in
+	let f2_val_1_1_1  = upcast (fm#load_sym addr_1 8 ) V.CAST_SIGNED   32 in
+	let f2_val_1_1_0  = upcast (fm#load_sym addr_1 8 ) V.CAST_UNSIGNED 32 in
+	let f2_val_1_2_1  = upcast (fm#load_sym addr_1 16) V.CAST_SIGNED   32 in
+	let f2_val_1_2_0  = upcast (fm#load_sym addr_1 16) V.CAST_UNSIGNED 32 in
+	
+	let f2_val_2_1_1  = upcast (fm#load_sym addr_2 8 ) V.CAST_SIGNED   32 in
+	let f2_val_2_1_0  = upcast (fm#load_sym addr_2 8 ) V.CAST_UNSIGNED 32 in
+	let f2_val_2_2_1  = upcast (fm#load_sym addr_2 16) V.CAST_SIGNED   32 in
+	let f2_val_2_2_0  = upcast (fm#load_sym addr_2 16) V.CAST_UNSIGNED 32 in
+	
+	let f2_val_4_1_1  = upcast (fm#load_sym addr_4 8 ) V.CAST_SIGNED   32 in
+	let f2_val_4_1_0  = upcast (fm#load_sym addr_4 8 ) V.CAST_UNSIGNED 32 in
+	let f2_val_4_2_1  = upcast (fm#load_sym addr_4 16) V.CAST_SIGNED   32 in
+	let f2_val_4_2_0  = upcast (fm#load_sym addr_4 16) V.CAST_UNSIGNED 32 in
+	let f2_val_4_4_1  = upcast (fm#load_sym addr_4 32) V.CAST_SIGNED   32 in
+	let f2_val_4_4_0  = upcast (fm#load_sym addr_4 32) V.CAST_UNSIGNED 32 in
+	let f2_val_4_8    = upcast (fm#load_sym addr_4 64) V.CAST_LOW      32 in
+
+	let f2_val_8_1_1  = upcast (fm#load_sym addr_8 8 ) V.CAST_SIGNED   32 in
+	let f2_val_8_1_0  = upcast (fm#load_sym addr_8 8 ) V.CAST_UNSIGNED 32 in
+	let f2_val_8_2_1  = upcast (fm#load_sym addr_8 16) V.CAST_SIGNED   32 in
+	let f2_val_8_2_0  = upcast (fm#load_sym addr_8 16) V.CAST_UNSIGNED 32 in
+	let f2_val_8_4_1  = upcast (fm#load_sym addr_8 32) V.CAST_SIGNED   32 in
+	let f2_val_8_4_0  = upcast (fm#load_sym addr_8 32) V.CAST_UNSIGNED 32 in
+	let f2_val_8_8    = upcast (fm#load_sym addr_8 64) V.CAST_LOW      32 in
 
 	let field1_expr = 
-	  get_ite_expr f1_type V.EQ V.REG_8 1L f1_val_0_1 
-	    (get_ite_expr f1_type V.EQ V.REG_8 2L f1_val_0_2 
-	       (get_ite_expr f1_type V.EQ V.REG_8 4L f1_val_0_4 
-		  (get_ite_expr f1_type V.EQ V.REG_8 8L f1_val_0_8
-		     (get_ite_expr f1_type V.EQ V.REG_8 11L f2_val_1_1
-			(get_ite_expr f1_type V.EQ V.REG_8 12L f2_val_1_2
-			   (get_ite_expr f1_type V.EQ V.REG_8 21L f2_val_2_1
-			      (get_ite_expr f1_type V.EQ V.REG_8 22L f2_val_2_2
-				 (get_ite_expr f1_type V.EQ V.REG_8 41L f2_val_4_1
-				    (get_ite_expr f1_type V.EQ V.REG_8 42L f2_val_4_2
-				       (get_ite_expr f1_type V.EQ V.REG_8 44L f2_val_4_4
-					  (get_ite_expr f1_type V.EQ V.REG_8 48L f2_val_4_8
-					     (get_ite_expr f1_type V.EQ V.REG_8 81L f2_val_8_1
-						(get_ite_expr f1_type V.EQ V.REG_8 82L f2_val_8_2
-						   (get_ite_expr f1_type V.EQ V.REG_8 84L f2_val_8_4 
-						      f2_val_8_8 ))))))))))))))
+           get_ite_expr f1_type V.EQ V.REG_8 11L f1_val_0_1_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 10L f1_val_0_1_0 
+          (get_ite_expr f1_type V.EQ V.REG_8 21L f1_val_0_2_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 20L f1_val_0_2_0 
+	  (get_ite_expr f1_type V.EQ V.REG_8 41L f1_val_0_4_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 40L f1_val_0_4_0 
+          (get_ite_expr f1_type V.EQ V.REG_8 8L f1_val_0_8
+          (get_ite_expr f1_type V.EQ V.REG_8 111L f2_val_1_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 110L f2_val_1_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 121L f2_val_1_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 120L f2_val_1_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 211L f2_val_2_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 210L f2_val_2_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 221L f2_val_2_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 220L f2_val_2_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 411L f2_val_4_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 410L f2_val_4_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 421L f2_val_4_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 420L f2_val_4_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 441L f2_val_4_4_1
+          (get_ite_expr f1_type V.EQ V.REG_8 440L f2_val_4_4_0
+          (get_ite_expr f1_type V.EQ V.REG_8 48L f2_val_4_8
+          (get_ite_expr f1_type V.EQ V.REG_8 811L f2_val_8_1_1
+          (get_ite_expr f1_type V.EQ V.REG_8 810L f2_val_8_1_0
+          (get_ite_expr f1_type V.EQ V.REG_8 821L f2_val_8_2_1
+          (get_ite_expr f1_type V.EQ V.REG_8 820L f2_val_8_2_0
+          (get_ite_expr f1_type V.EQ V.REG_8 841L f2_val_8_4_1 
+          (get_ite_expr f1_type V.EQ V.REG_8 840L f2_val_8_4_0 
+          f2_val_8_8 )))))))))))))))))))))))))))
 	in
 	let field2_expr = 
-	  get_ite_expr f2_type V.EQ V.REG_8 1L f1_val_0_1 
-	    (get_ite_expr f2_type V.EQ V.REG_8 2L f1_val_0_2 
-	       (get_ite_expr f2_type V.EQ V.REG_8 4L f1_val_0_4 
-		  (get_ite_expr f2_type V.EQ V.REG_8 8L f1_val_0_8
-		     (get_ite_expr f2_type V.EQ V.REG_8 11L f2_val_1_1
-			(get_ite_expr f2_type V.EQ V.REG_8 12L f2_val_1_2
-			   (get_ite_expr f2_type V.EQ V.REG_8 21L f2_val_2_1
-			      (get_ite_expr f2_type V.EQ V.REG_8 22L f2_val_2_2
-				 (get_ite_expr f2_type V.EQ V.REG_8 41L f2_val_4_1
-				    (get_ite_expr f2_type V.EQ V.REG_8 42L f2_val_4_2
-				       (get_ite_expr f2_type V.EQ V.REG_8 44L f2_val_4_4
-					  (get_ite_expr f2_type V.EQ V.REG_8 48L f2_val_4_8
-					     (get_ite_expr f2_type V.EQ V.REG_8 81L f2_val_8_1
-						(get_ite_expr f2_type V.EQ V.REG_8 82L f2_val_8_2
-						   (get_ite_expr f2_type V.EQ V.REG_8 84L f2_val_8_4 
-						      f2_val_8_8 ))))))))))))))
+           get_ite_expr f2_type V.EQ V.REG_8 11L f1_val_0_1_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 10L f1_val_0_1_0 
+          (get_ite_expr f2_type V.EQ V.REG_8 21L f1_val_0_2_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 20L f1_val_0_2_0 
+	  (get_ite_expr f2_type V.EQ V.REG_8 41L f1_val_0_4_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 40L f1_val_0_4_0 
+          (get_ite_expr f2_type V.EQ V.REG_8 8L f1_val_0_8
+          (get_ite_expr f2_type V.EQ V.REG_8 111L f2_val_1_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 110L f2_val_1_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 121L f2_val_1_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 120L f2_val_1_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 211L f2_val_2_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 210L f2_val_2_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 221L f2_val_2_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 220L f2_val_2_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 411L f2_val_4_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 410L f2_val_4_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 421L f2_val_4_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 420L f2_val_4_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 441L f2_val_4_4_1
+          (get_ite_expr f2_type V.EQ V.REG_8 440L f2_val_4_4_0
+          (get_ite_expr f2_type V.EQ V.REG_8 48L f2_val_4_8
+          (get_ite_expr f2_type V.EQ V.REG_8 811L f2_val_8_1_1
+          (get_ite_expr f2_type V.EQ V.REG_8 810L f2_val_8_1_0
+          (get_ite_expr f2_type V.EQ V.REG_8 821L f2_val_8_2_1
+          (get_ite_expr f2_type V.EQ V.REG_8 820L f2_val_8_2_0
+          (get_ite_expr f2_type V.EQ V.REG_8 841L f2_val_8_4_1 
+          (get_ite_expr f2_type V.EQ V.REG_8 840L f2_val_8_4_0 
+          f2_val_8_8 )))))))))))))))))))))))))))
 	in
 	fm#store_sym addr 32 field1_expr;
 	fm#store_sym (Int64.add addr 4L) 32 field2_expr;
