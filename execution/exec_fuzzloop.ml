@@ -150,8 +150,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
      if (List.length !opt_synth_struct_adaptor) <> 0 then (
-       ignore(fm#get_fresh_symbolic "field1" 8);
-       ignore(fm#get_fresh_symbolic "field2" 8);
+       ignore(fm#get_fresh_symbolic "f1_type" 8);
+       ignore(fm#get_fresh_symbolic "f2_type" 8);
      );
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (

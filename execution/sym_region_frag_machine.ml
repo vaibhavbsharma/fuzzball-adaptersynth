@@ -2033,25 +2033,108 @@ struct
       Hashtbl.clear concrete_cache
 
     method apply_struct_adaptor () = 
-      if !opt_adaptor_search_mode = false then
+      if !opt_adaptor_search_mode = false then	
 	let get_ite_expr arg op const_type const then_val else_val = 
 	  V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
 		then_val,
 		else_val)
 	in
 	List.iter ( fun rnum ->
-	  let field1_val = D.to_symbolic_32 (self#region_load (Some rnum) 32 0L) in 
-	  let field2_val = D.to_symbolic_32 (self#region_load (Some rnum) 32 4L) in
-	  let field1 = spfm#get_fresh_symbolic "field1" 8 in
-	  let field2 = spfm#get_fresh_symbolic "field2" 8 in
+	  let upcast expr extend_op end_sz =
+	    match end_sz with
+	    | 32 -> V.Cast(extend_op, V.REG_32, expr)
+	    | 64 -> V.Cast(extend_op, V.REG_64, expr)
+	    | _ -> failwith "unsupported upcast end size"
+	  in
+
+	  let f1_type = spfm#get_fresh_symbolic "f1_type" 8 in
+	  let f2_type = spfm#get_fresh_symbolic "f2_type" 8 in
+	  let addr    = 0L in
+	  let addr_1  = (Int64.add addr 1L) in
+	  let addr_2  = (Int64.add addr 2L) in
+	  let addr_4  = (Int64.add addr 4L) in
+	  let addr_8  = (Int64.add addr 8L) in
+	 
+	  let f1_val_0_1  = upcast 
+	    (D.to_symbolic_8 (self#region_load (Some rnum) 8   addr)) V.CAST_SIGNED 32 in
+	  let f1_val_0_2  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr)) V.CAST_SIGNED 32 in
+	  let f1_val_0_4  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr)) V.CAST_SIGNED 32 in
+	  let f1_val_0_8  = upcast 
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr)) V.CAST_LOW    32 in
+	  
+	  let f2_val_1_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_1)) V.CAST_SIGNED 32 in
+	  let f2_val_1_2  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_1)) V.CAST_SIGNED 32 in
+
+	  let f2_val_2_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_2)) V.CAST_SIGNED 32 in
+	  let f2_val_2_2  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_2)) V.CAST_SIGNED 32 in
+
+	  let f2_val_4_1  = upcast 
+	    (D.to_symbolic_8 (self#region_load (Some rnum) 8  addr_4)) V.CAST_SIGNED 32 in
+	  let f2_val_4_2  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_4)) V.CAST_SIGNED 32 in
+	  let f2_val_4_4  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_4)) V.CAST_SIGNED 32 in
+	  let f2_val_4_8  = upcast 
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_4)) V.CAST_LOW    32 in
+	  
+	  let f2_val_8_1  = upcast 
+	    (D.to_symbolic_8  (self#region_load (Some rnum) 8  addr_8)) V.CAST_SIGNED 32 in
+	  let f2_val_8_2  = upcast 
+	    (D.to_symbolic_16 (self#region_load (Some rnum) 16 addr_8)) V.CAST_SIGNED 32 in
+	  let f2_val_8_4  = upcast 
+	    (D.to_symbolic_32 (self#region_load (Some rnum) 32 addr_8)) V.CAST_SIGNED 32 in
+	  let f2_val_8_8  = upcast 
+	    (D.to_symbolic_64 (self#region_load (Some rnum) 64 addr_8)) V.CAST_LOW    32 in
+
 	  let field1_expr = 
-	    get_ite_expr field1 V.EQ V.REG_8 1L field1_val field2_val in
+	    get_ite_expr f1_type V.EQ V.REG_8 1L f1_val_0_1 
+	      (get_ite_expr f1_type V.EQ V.REG_8 2L f1_val_0_2 
+		 (get_ite_expr f1_type V.EQ V.REG_8 4L f1_val_0_4 
+		    (get_ite_expr f1_type V.EQ V.REG_8 8L f1_val_0_8
+		       (get_ite_expr f1_type V.EQ V.REG_8 11L f2_val_1_1
+			  (get_ite_expr f1_type V.EQ V.REG_8 12L f2_val_1_2
+			     (get_ite_expr f1_type V.EQ V.REG_8 21L f2_val_2_1
+				(get_ite_expr f1_type V.EQ V.REG_8 22L f2_val_2_2
+				   (get_ite_expr f1_type V.EQ V.REG_8 41L f2_val_4_1
+				      (get_ite_expr f1_type V.EQ V.REG_8 42L f2_val_4_2
+					 (get_ite_expr f1_type V.EQ V.REG_8 44L f2_val_4_4
+					    (get_ite_expr f1_type V.EQ V.REG_8 48L f2_val_4_8
+					       (get_ite_expr f1_type V.EQ V.REG_8 81L f2_val_8_1
+						  (get_ite_expr f1_type V.EQ V.REG_8 82L f2_val_8_2
+						     (get_ite_expr f1_type V.EQ V.REG_8 84L f2_val_8_4 
+							f2_val_8_8 ))))))))))))))
+	  in
 	  let field2_expr = 
-	    get_ite_expr field2 V.EQ V.REG_8 1L field1_val field2_val in
+	    get_ite_expr f2_type V.EQ V.REG_8 1L f1_val_0_1 
+	      (get_ite_expr f2_type V.EQ V.REG_8 2L f1_val_0_2 
+		 (get_ite_expr f2_type V.EQ V.REG_8 4L f1_val_0_4 
+		    (get_ite_expr f2_type V.EQ V.REG_8 8L f1_val_0_8
+		       (get_ite_expr f2_type V.EQ V.REG_8 11L f2_val_1_1
+			  (get_ite_expr f2_type V.EQ V.REG_8 12L f2_val_1_2
+			     (get_ite_expr f2_type V.EQ V.REG_8 21L f2_val_2_1
+				(get_ite_expr f2_type V.EQ V.REG_8 22L f2_val_2_2
+				   (get_ite_expr f2_type V.EQ V.REG_8 41L f2_val_4_1
+				      (get_ite_expr f2_type V.EQ V.REG_8 42L f2_val_4_2
+					 (get_ite_expr f2_type V.EQ V.REG_8 44L f2_val_4_4
+					    (get_ite_expr f2_type V.EQ V.REG_8 48L f2_val_4_8
+					       (get_ite_expr f2_type V.EQ V.REG_8 81L f2_val_8_1
+						  (get_ite_expr f2_type V.EQ V.REG_8 82L f2_val_8_2
+						     (get_ite_expr f2_type V.EQ V.REG_8 84L f2_val_8_4 
+							f2_val_8_8 ))))))))))))))
+	  in
+	  Printf.printf "SRFM#field1_expr = %s\n" (V.exp_to_string field1_expr);
+	  
 	  self#region_store (Some rnum) 32 0L (D.from_symbolic field1_expr);
 	  self#region_store (Some rnum) 32 4L (D.from_symbolic field2_expr);	
 	) sym_input_region_l;
-
+	
   end
-
+    
 end
+    
