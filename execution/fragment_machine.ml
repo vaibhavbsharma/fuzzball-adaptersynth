@@ -513,6 +513,7 @@ class virtual fragment_machine = object
     -> (bool * Query_engine.sat_assign)
 
   method virtual query_condition : Vine.exp -> bool option -> int -> (bool * bool option) 
+  method virtual add_to_path_cond : Vine.exp -> unit
 
   method virtual match_input_var : string -> int option
 
@@ -3161,6 +3162,7 @@ struct
     method query_condition (e:Vine.exp) (b:bool option) 
 	(i:int) : (bool * bool option) =
       (false,None)
+    method add_to_path_cond (e:Vine.exp) = ()
     method match_input_var (s:string) : int option = None
     method get_path_cond : Vine.exp list = []
     method on_missing_random : unit =

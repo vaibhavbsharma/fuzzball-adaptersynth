@@ -521,6 +521,8 @@ let cmdline_opts =
      " Print calls and returns");
     ("-trace-regions", Arg.Set(opt_trace_regions),
      " Print symbolic memory regions");
+    ("-trace-struct-adaptor", Arg.Set(opt_trace_struct_adaptor),
+     " Print formulae created by the structure adaptor");
     ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
      " Print memory snapshot/reset operations");
     ("-trace-registers", Arg.Set(opt_trace_registers),

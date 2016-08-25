@@ -152,6 +152,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      if (List.length !opt_synth_struct_adaptor) <> 0 then (
        ignore(fm#get_fresh_symbolic "f1_type" 16);
        ignore(fm#get_fresh_symbolic "f2_type" 16);
+       ignore(fm#get_fresh_symbolic "field1_size" 16);
+       ignore(fm#get_fresh_symbolic "field2_size" 16);
      );
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
