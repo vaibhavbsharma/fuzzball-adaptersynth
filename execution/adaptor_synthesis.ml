@@ -995,89 +995,6 @@ let struct_adaptor fm =
 		     addr6; addr7; addr8; addr9; addr10] in
     List.iteri ( fun addr_list_ind addr -> 
       if (Int64.abs (fix_s32 addr)) > 4096L then (
-	let get_t_field_expr field_num field_size =
-	  let target_fsize_expr target_sz start_addr ex_op =
-	    let cast_op =
-	      if target_sz <= field_size then 
-		if ex_op = 1 then V.CAST_SIGNED 
-		else V.CAST_UNSIGNED
-	      else V.CAST_LOW
-	    in
-	    upcast (fm#load_sym start_addr target_sz ) cast_op field_size
-	  in
-	  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-	  let f_type = fm#get_fresh_symbolic f_type_str 16 in
-	  let addr_1 = (Int64.add addr 1L) in
-	  let addr_2 = (Int64.add addr 2L) in
-	  let addr_4 = (Int64.add addr 4L) in
-	  let addr_8 = (Int64.add addr 8L) in
-	  
-	  let f1_val_0_1_1  = target_fsize_expr 8   addr   1 in
-	  let f1_val_0_1_0  = target_fsize_expr 8   addr   0 in
-	  let f1_val_0_2_1  = target_fsize_expr 16  addr   1 in
-	  let f1_val_0_2_0  = target_fsize_expr 16  addr   0 in
-	  let f1_val_0_4_1  = target_fsize_expr 32  addr   1 in
-	  let f1_val_0_4_0  = target_fsize_expr 32  addr   0 in
-
-	  let f2_val_1_1_1  = target_fsize_expr 8   addr_1 1 in
-	  let f2_val_1_1_0  = target_fsize_expr 8   addr_1 0 in
-	  let f2_val_1_2_1  = target_fsize_expr 16  addr_1 1 in
-	  let f2_val_1_2_0  = target_fsize_expr 16  addr_1 0 in
-
-	  let f2_val_2_1_1  = target_fsize_expr 8   addr_2 1 in
-	  let f2_val_2_1_0  = target_fsize_expr 8   addr_2 0 in
-	  let f2_val_2_2_1  = target_fsize_expr 16  addr_2 1 in
-	  let f2_val_2_2_0  = target_fsize_expr 16  addr_2 0 in
-
-	  let f2_val_4_1_1  = target_fsize_expr 8   addr_4 1 in
-	  let f2_val_4_1_0  = target_fsize_expr 8   addr_4 0 in
-	  let f2_val_4_2_1  = target_fsize_expr 16  addr_4 1 in
-	  let f2_val_4_2_0  = target_fsize_expr 16  addr_4 0 in
-	  let f2_val_4_4_1  = target_fsize_expr 32  addr_4 1 in
-	  let f2_val_4_4_0  = target_fsize_expr 32  addr_4 0 in
-
-	  let f2_val_8_1_1  = target_fsize_expr 8   addr_8 1 in
-	  let f2_val_8_1_0  = target_fsize_expr 8   addr_8 0 in
-	  let f2_val_8_2_1  = target_fsize_expr 16  addr_8 1 in
-	  let f2_val_8_2_0  = target_fsize_expr 16  addr_8 0 in
-	  let f2_val_8_4_1  = target_fsize_expr 32  addr_8 1 in
-	  let f2_val_8_4_0  = target_fsize_expr 32  addr_8 0 in
-	  
-	  let f1_val_0_8    = target_fsize_expr 64  addr   1 in
-	  let f2_val_4_8    = target_fsize_expr 64  addr_4 1 in
-	  let f2_val_8_8    = target_fsize_expr 64  addr_8 1 in
-  	  
-           get_ite_expr f_type V.EQ V.REG_16 11L f1_val_0_1_1 
-          (get_ite_expr f_type V.EQ V.REG_16 10L f1_val_0_1_0 
-          (get_ite_expr f_type V.EQ V.REG_16 21L f1_val_0_2_1 
-          (get_ite_expr f_type V.EQ V.REG_16 20L f1_val_0_2_0 
-	  (get_ite_expr f_type V.EQ V.REG_16 41L f1_val_0_4_1 
-          (get_ite_expr f_type V.EQ V.REG_16 40L f1_val_0_4_0 
-          (get_ite_expr f_type V.EQ V.REG_16 8L f1_val_0_8
-          (get_ite_expr f_type V.EQ V.REG_16 111L f2_val_1_1_1
-          (get_ite_expr f_type V.EQ V.REG_16 110L f2_val_1_1_0
-          (get_ite_expr f_type V.EQ V.REG_16 121L f2_val_1_2_1
-          (get_ite_expr f_type V.EQ V.REG_16 120L f2_val_1_2_0
-          (get_ite_expr f_type V.EQ V.REG_16 211L f2_val_2_1_1
-          (get_ite_expr f_type V.EQ V.REG_16 210L f2_val_2_1_0
-          (get_ite_expr f_type V.EQ V.REG_16 221L f2_val_2_2_1
-          (get_ite_expr f_type V.EQ V.REG_16 220L f2_val_2_2_0
-          (get_ite_expr f_type V.EQ V.REG_16 411L f2_val_4_1_1
-          (get_ite_expr f_type V.EQ V.REG_16 410L f2_val_4_1_0
-          (get_ite_expr f_type V.EQ V.REG_16 421L f2_val_4_2_1
-          (get_ite_expr f_type V.EQ V.REG_16 420L f2_val_4_2_0
-          (get_ite_expr f_type V.EQ V.REG_16 441L f2_val_4_4_1
-          (get_ite_expr f_type V.EQ V.REG_16 440L f2_val_4_4_0
-          (get_ite_expr f_type V.EQ V.REG_16 48L f2_val_4_8
-          (get_ite_expr f_type V.EQ V.REG_16 811L f2_val_8_1_1
-          (get_ite_expr f_type V.EQ V.REG_16 810L f2_val_8_1_0
-          (get_ite_expr f_type V.EQ V.REG_16 821L f2_val_8_2_1
-          (get_ite_expr f_type V.EQ V.REG_16 820L f2_val_8_2_0
-          (get_ite_expr f_type V.EQ V.REG_16 841L f2_val_8_4_1 
-          (get_ite_expr f_type V.EQ V.REG_16 840L f2_val_8_4_0 
-          f2_val_8_8 )))))))))))))))))))))))))))
-	in
-
 	let n_fields = 2 in
 	let from_concrete v sz = 
 	  match sz with 
@@ -1149,12 +1066,62 @@ let struct_adaptor fm =
 	let unique l = List.fold_left f [] l in
 	let field_ranges_l = List.sort cmp (unique (get_offsets_l n_fields)) in
 	let byte_expr_l = ref [] in
-	
+
+	let rec get_t_field_expr field_num field_size ind f_type_val_list =
+	  let target_fsize_expr target_sz start_addr ex_op =
+	    let cast_op =
+	      if target_sz <= field_size then 
+		if ex_op = 1 then V.CAST_SIGNED 
+		else V.CAST_UNSIGNED
+	      else V.CAST_LOW
+	    in
+	    upcast (fm#load_sym start_addr target_sz ) cast_op field_size
+	  in
+	  let (_, start_byte, end_byte, _) = List.nth field_ranges_l ind in
+	  let t_size = ((end_byte+1-start_byte)*8) in
+	  let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
+	  if ind = ((List.length field_ranges_l)-1) then (
+	    (* Assuming only a sign-extension widening is possible on the last entry
+	       in field_ranges_l *)
+	    target_fsize_expr t_size start_addr 1
+	  ) else (
+	    let is_extend_req = (end_byte+1-start_byte)-8 in
+	    if is_extend_req <> 0 then (
+	      let sign_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+1) in 
+	      let zero_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+0) in 
+	      if ((List.mem sign_extend_val f_type_val_list) = false) && 
+		((List.mem zero_extend_val f_type_val_list) = false) then (
+		  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
+		  let f_type = fm#get_fresh_symbolic f_type_str 16 in
+		  let sign_extend_expr = target_fsize_expr t_size start_addr 1 in
+		  let zero_extend_expr = target_fsize_expr t_size start_addr 0 in
+		  get_ite_expr f_type V.EQ V.REG_16 sign_extend_val sign_extend_expr 
+		    (get_ite_expr f_type V.EQ V.REG_16 zero_extend_val zero_extend_expr
+		       (get_t_field_expr field_num field_size (ind+1) 
+			  (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])))
+		  ) else (
+		  get_t_field_expr field_num field_size (ind+1) f_type_val_list
+		  )
+	    ) else (
+	      let sign_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+1) in 
+	      if ((List.mem sign_extend_val f_type_val_list) = false) then (
+		let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
+		let f_type = fm#get_fresh_symbolic f_type_str 16 in
+		let sign_extend_expr = target_fsize_expr t_size start_addr 1 in
+		get_ite_expr f_type V.EQ V.REG_16 sign_extend_val sign_extend_expr 
+		  (get_t_field_expr field_num field_size (ind+1) 
+		     (f_type_val_list @ [sign_extend_val]))
+	      ) else (
+		get_t_field_expr field_num field_size (ind+1) f_type_val_list
+	      )
+	    )
+	  )
+	in
 	let get_byte expr sz pos =
 	  V.Cast(V.CAST_LOW, V.REG_8, 
 		 V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
 	in
-	let rec get_ite_byte_expr ind i_byte = 
+	let rec get_ite_ai_byte_expr ind i_byte = 
 	  (* i_byte = interesting_byte *)
 	  if ind >= (List.length field_ranges_l) then 
 	    (fm#load_sym (Int64.add addr (Int64.of_int i_byte)) 8)
@@ -1170,26 +1137,26 @@ let struct_adaptor fm =
 	      let q_exp = 
 		V.BinOp(V.EQ, field_size_temp, 
 			(get_byte 
-			   (get_t_field_expr field (size*8)) 
+			   (get_t_field_expr field (size*8) 0 []) 
 			   size (i_byte-start_byte))) in
 	      fm#add_to_path_cond q_exp;
 	      if !opt_trace_struct_adaptor = true then
-		Printf.printf "AS#get_ite_byte_expr t_field exp: %s\n" 
+		Printf.printf "AS#get_ite_ai_byte_expr t_field exp: %s\n" 
 		  (V.exp_to_string q_exp);
-	      V.Ite(cond, field_size_temp, (get_ite_byte_expr (ind+1) i_byte))
+	      V.Ite(cond, field_size_temp, (get_ite_ai_byte_expr (ind+1) i_byte))
 	    ) else (
-	      get_ite_byte_expr (ind+1) i_byte
+	      get_ite_ai_byte_expr (ind+1) i_byte
 	    )
 	  )
 	in
 	for i=0 to (n_fields*8)-1 do
-	  let byte_expr = (get_ite_byte_expr 0 i) in
+	  let byte_expr = (get_ite_ai_byte_expr 0 i) in
 	  let byte_expr_sym_str = "ai_byte_"^(Printf.sprintf "%d_%d" i addr_list_ind) in
 	  let byte_expr_sym = fm#get_fresh_symbolic byte_expr_sym_str 8 in
 	  let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
 	  fm#add_to_path_cond q_exp; 
 	  if !opt_trace_struct_adaptor = true then
-	    Printf.printf "AS#get_ite_byte_expr for byte %d: %s\n\n" i 
+	    Printf.printf "AS#get_ite_ai_byte_expr for byte %d: %s\n\n" i 
 	      (V.exp_to_string q_exp);
 	  byte_expr_l := !byte_expr_l @ [byte_expr_sym]; 
 	done;
@@ -1198,13 +1165,6 @@ let struct_adaptor fm =
 	  fm#store_sym (Int64.add addr (Int64.of_int i)) 8 (List.nth !byte_expr_l i);
 	done;
 	
-	
-	(* let ai_field1_size = 64 in
-	let ai_field2_size = 64 in
-	let field1_expr = get_t_field_expr 1 ai_field1_size in
-	let field2_expr = get_t_field_expr 2 ai_field2_size in
-	fm#store_sym addr ai_field1_size field1_expr;
-	fm#store_sym (Int64.add addr 8L) ai_field2_size field2_expr; *)
       );
       
     ) addr_list;
