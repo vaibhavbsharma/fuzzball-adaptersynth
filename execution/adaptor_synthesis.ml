@@ -942,39 +942,37 @@ let ret_simplelen_adaptor fm in_nargs =
    similar implementaton in SRFM for symbolic regions *) 
 
 (*
-  f_type = 011 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, sign-extend to 32 bit
-  f_type = 010 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, zero-extend to 32 bit
-  f_type = 021 -> 0 to 2 sign-extend to 32 bit
-  f_type = 020 -> 0 to 2 zero-extend to 32 bit
-  f_type = 041 -> 0 to 4 sign-extend to 32 bit
-  f_type = 040 -> 0 to 4 zero-extend to 32 bit
-  f_type = 08  -> 0 to 8 low 32 bits of 64-bit value
+  target structure field key for 2 fields
+  f_type = 0x011 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, sign-extend to 32 bit
+  f_type = 0x010 -> 0 to 1 of concretely-addressed/symbolically-addressed memory, zero-extend to 32 bit
+  f_type = 0x021 -> 0 to 2 sign-extend to 32 bit
+  f_type = 0x020 -> 0 to 2 zero-extend to 32 bit
+  f_type = 0x041 -> 0 to 4 sign-extend to 32 bit
+  f_type = 0x040 -> 0 to 4 zero-extend to 32 bit
+  f_type = 0x081 -> 0 to 8 low 32 bits of 64-bit value
   
-  f_type = 111 -> 1 to 2 sign-extend to 32 bit
-  f_type = 110 -> 1 to 2 zero-extend to 32 bit
-  f_type = 121 -> 1 to 3 sign-extend to 32 bit
-  f_type = 120 -> 1 to 3 zero-extend to 32 bit
+  f_type = 0x121 -> 1 to 2 sign-extend to 32 bit
+  f_type = 0x120 -> 1 to 2 zero-extend to 32 bit
 
-  f_type = 211 -> 2 to 3 sign-extend to 32 bit
-  f_type = 210 -> 2 to 3 zero-extend to 32 bit
-  f_type = 221 -> 2 to 4 sign-extend to 32 bit
-  f_type = 220 -> 2 to 4 zero-extend to 32 bit
+  f_type = 0x231 -> 2 to 3 sign-extend to 32 bit
+  f_type = 0x230 -> 2 to 3 zero-extend to 32 bit
+  f_type = 0x241 -> 2 to 4 sign-extend to 32 bit
+  f_type = 0x240 -> 2 to 4 zero-extend to 32 bit
 
-  f_type = 411 -> 4 to 5 sign-extend to 32 bit
-  f_type = 410 -> 4 to 5 zero-extend to 32 bit
-  f_type = 421 -> 4 to 6 sign-extend to 32 bit
-  f_type = 420 -> 4 to 6 zero-extend to 32 bit
-  f_type = 441 -> 4 to 8 sign-extend to 32 bit
-  f_type = 440 -> 4 to 8 zero-extend to 32 bit
-  f_type = 48  -> 4 to 12 low 32 bits of 64-bit value
+  f_type = 0x451 -> 4 to 5 sign-extend to 32 bit
+  f_type = 0x450 -> 4 to 5 zero-extend to 32 bit
+  f_type = 0x461 -> 4 to 6 sign-extend to 32 bit
+  f_type = 0x460 -> 4 to 6 zero-extend to 32 bit
+  f_type = 0x481 -> 4 to 8 sign-extend to 32 bit
+  f_type = 0x480 -> 4 to 8 zero-extend to 32 bit
 
-  f_type = 811 -> 8 to 9 sign-extend to 32 bit
-  f_type = 810 -> 8 to 9 zero-extend to 32 bit
-  f_type = 821 -> 8 to 10 sign-extend to 32 bit
-  f_type = 820 -> 8 to 10 zero-extend to 32 bit
-  f_type = 841 -> 8 to 12 sign-extend to 32 bit
-  f_type = 840 -> 8 to 12 zero-extend to 32 bit
-  f_type = 88  -> 8 to 16 low 32 bits of 64-bit value
+  f_type = 0x891 -> 8 to 9 sign-extend to 32 bit
+  f_type = 0x890 -> 8 to 9 zero-extend to 32 bit
+  f_type = 0x8a1 -> 8 to 10 sign-extend to 32 bit
+  f_type = 0x8a0 -> 8 to 10 zero-extend to 32 bit
+  f_type = 0x8c1 -> 8 to 12 sign-extend to 32 bit
+  f_type = 0x8c0 -> 8 to 12 zero-extend to 32 bit
+  f_type = none-of-the-above -> 8 to 16 low 32 bits of 64-bit value
 
 *)
 
