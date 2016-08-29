@@ -93,7 +93,7 @@ val opt_extra_env : (string, string) Hashtbl.t
 val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
 val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
-val opt_synth_struct_adaptor : (int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64) list ref
+val opt_synth_struct_adaptor : int64 list ref
 val opt_adaptor_search_mode : bool ref
 val opt_synth_simplelen_adaptor : (int64 * int64 * int64 * int64 * int64) list ref
 val synth_extra_conditions : Vine.exp list ref

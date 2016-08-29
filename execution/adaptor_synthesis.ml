@@ -986,11 +986,8 @@ let upcast expr extend_op end_sz =
 
 let struct_adaptor fm = 
   if (List.length !opt_synth_struct_adaptor) <> 0 then (
-    Printf.printf "Starting structure adaptor\n";
-    let (addr1, addr2, addr3, addr4, addr5, addr6, addr7, addr8, addr9, addr10) = 
-      (List.hd !opt_synth_struct_adaptor) in
-    let addr_list = [addr1; addr2; addr3; addr4; addr5; 
-		     addr6; addr7; addr8; addr9; addr10] in
+    if !opt_trace_struct_adaptor = true then
+      Printf.printf "Starting structure adaptor\n";
     List.iteri ( fun addr_list_ind addr -> 
       if (Int64.abs (fix_s32 addr)) > 4096L then (
 	let n_fields = 2 in
@@ -1165,7 +1162,7 @@ let struct_adaptor fm =
 	
       );
       
-    ) addr_list;
+    ) !opt_synth_struct_adaptor;
     fm#apply_struct_adaptor ();
     
   );
