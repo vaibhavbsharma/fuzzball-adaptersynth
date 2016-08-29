@@ -116,6 +116,7 @@ let opt_skip_call_addr = ref []
 let opt_synth_adaptor = ref []
 let opt_synth_ret_adaptor = ref []
 let opt_synth_struct_adaptor = ref []
+let opt_struct_adaptor_nfields = ref 0
 let opt_adaptor_search_mode  = ref false
 let opt_synth_simplelen_adaptor = ref []
 let synth_extra_conditions = ref []

@@ -242,6 +242,10 @@ let symbolic_state_cmdline_opts =
 	!opt_synth_struct_adaptor @ [(Int64.of_string s)];),
      "addr Using structure adaptor grammar, "^
        "write grammar at upto region-limit bytes at addr");
+    ("-structure-adaptor-field-limit", Arg.String
+      (fun s -> opt_struct_adaptor_nfields := (int_of_string s);),
+     "N Structure adaptor will try to map upto N fields in target and "^
+       "inner structures");
   ]
 
 let slurp_file fname =

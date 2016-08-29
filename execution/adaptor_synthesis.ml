@@ -990,7 +990,7 @@ let struct_adaptor fm =
       Printf.printf "Starting structure adaptor\n";
     List.iteri ( fun addr_list_ind addr -> 
       if (Int64.abs (fix_s32 addr)) > 4096L then (
-	let n_fields = 2 in
+	let n_fields = !opt_struct_adaptor_nfields in
 	let from_concrete v sz = 
 	  match sz with 
 	  | 8 -> assert(v >= -128 && v <= 0xff);

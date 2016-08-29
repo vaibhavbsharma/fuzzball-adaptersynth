@@ -2070,7 +2070,7 @@ struct
 	    upcast (to_sym_op (self#region_load (Some rnum) target_sz start_addr)) cast_op in_field_sz
 	  in
 	  
-	  let n_fields = 2 in
+	  let n_fields = !opt_struct_adaptor_nfields in
 	  let from_concrete v sz = 
 	    match sz with 
 	    | 8 -> assert(v >= -128 && v <= 0xff);
