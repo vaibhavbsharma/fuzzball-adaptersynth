@@ -149,12 +149,12 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
-     if true then ( (* the 1st CE search wont give any concrete regions *)
-       ignore(fm#get_fresh_symbolic "f1_type" 16);
-       ignore(fm#get_fresh_symbolic "f2_type" 16);
-       ignore(fm#get_fresh_symbolic "field1_size" 16);
-       ignore(fm#get_fresh_symbolic "field2_size" 16);
-     );
+     for i=1 to !opt_struct_adaptor_nfields do 
+       let f_type_str = Printf.sprintf "f%d_type" i in
+       let field_size_str = Printf.sprintf "field%d_size" i in
+       ignore(fm#get_fresh_symbolic f_type_str 16);
+       ignore(fm#get_fresh_symbolic field_size_str 16);
+     done;
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
        let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
