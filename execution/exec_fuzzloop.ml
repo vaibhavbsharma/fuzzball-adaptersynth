@@ -153,7 +153,20 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "field%d_size" i in
        ignore(fm#get_fresh_symbolic f_type_str 16);
-       ignore(fm#get_fresh_symbolic field_size_str 16);
+       let field_sz_sym = fm#get_fresh_symbolic field_size_str 16 in
+       let tmp_cond = 
+	 V.BinOp(
+	   V.BITOR, V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,0L))),
+	   V.BinOp(V.BITOR, 
+		   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,1L))),
+		   V.BinOp(V.BITOR,
+			   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,2L))),
+			   V.BinOp(V.BITOR,
+				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,4L))),
+				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,8L)
+				   )))))) in
+       Printf.printf "exec_fuzzloop#adding extra_cond = %s\n" (V.exp_to_string tmp_cond);
+       opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
      done;
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
