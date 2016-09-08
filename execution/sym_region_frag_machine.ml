@@ -2155,8 +2155,8 @@ struct
 	    ) else (
 	      let is_extend_req = (end_byte+1-start_byte)-8 in
 	      if is_extend_req <> 0 then (
-		let sign_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+1) in 
-		let zero_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+0) in 
+		let sign_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+1) in 
+		let zero_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+0) in 
 		if ((List.mem sign_extend_val f_type_val_list) = false) && 
 		  ((List.mem zero_extend_val f_type_val_list) = false) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
@@ -2171,7 +2171,7 @@ struct
 		    get_t_field_expr field_num field_size (ind+1) f_type_val_list
 		    )
 	      ) else (
-		let sign_extend_val = Int64.of_int ((start_byte*256)+((end_byte+1)*16)+1) in 
+		let sign_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+1) in 
 		if ((List.mem sign_extend_val f_type_val_list) = false) then (
 		  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		  let f_type = spfm#get_fresh_symbolic f_type_str 16 in
