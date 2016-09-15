@@ -149,10 +149,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
+     
      for i=1 to !opt_struct_adaptor_nfields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "field%d_size" i in
-       ignore(fm#get_fresh_symbolic f_type_str 16);
        let field_sz_sym = fm#get_fresh_symbolic field_size_str 16 in
        let tmp_cond = 
 	 V.BinOp(
@@ -165,8 +165,37 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,4L))),
 				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,8L)
 				   )))))) in
-       Printf.printf "exec_fuzzloop#adding extra_cond = %s\n" (V.exp_to_string tmp_cond);
        opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
+       
+       let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
+       let i_start_b = V.BinOp(V.RSHIFT, f_type_sym, 
+			       V.Constant(V.Int(V.REG_8, 32L))) in
+       let i_end_b = V.BinOp(
+	 V.BITAND, 
+	 V.Constant(V.Int(V.REG_64, 65535L)), 
+	 V.BinOp(V.RSHIFT, f_type_sym, 
+		 V.Constant(V.Int(V.REG_8, 16L)))) in
+       for j=1 to !opt_struct_adaptor_nfields do
+	 if i <> j then (
+	   let f2_type_sym = fm#get_fresh_symbolic (Printf.sprintf "f%d_type" j) 64 in
+	   let j_start_b = V.BinOp(V.RSHIFT, f2_type_sym, 
+				   V.Constant(V.Int(V.REG_8, 32L))) in
+	   let j_end_b = V.BinOp(
+	     V.BITAND, V.Constant(V.Int(V.REG_64, 65535L)), 
+	     V.BinOp(V.RSHIFT, f2_type_sym, 
+		     V.Constant(V.Int(V.REG_8, 16L)))) in
+	   let expr_s_b = V.BinOp(V.BITAND, 
+				  V.BinOp(V.LE, j_start_b, i_start_b), 
+				  V.BinOp(V.LE, i_start_b, j_end_b  )) in
+	   let expr_e_b = V.BinOp(V.BITAND, 
+				  V.BinOp(V.LE, j_start_b, i_end_b), 
+				  V.BinOp(V.LE, i_end_b,   j_end_b)) in
+	   let tmp_cond2 = V.UnOp(V.NOT, V.BinOp(V.BITOR, expr_s_b, expr_e_b)) in
+	   Printf.printf "exec_fuzzloop adding tmp_cond2 = %s\n"
+	     (V.exp_to_string tmp_cond2);
+	   opt_extra_conditions := tmp_cond2 :: !opt_extra_conditions; 
+	 );
+       done;
      done;
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (

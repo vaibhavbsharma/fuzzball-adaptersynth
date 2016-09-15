@@ -2155,28 +2155,28 @@ struct
 	    ) else (
 	      let is_extend_req = (end_byte+1-start_byte)-8 in
 	      if is_extend_req <> 0 then (
-		let sign_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+1) in 
-		let zero_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+0) in 
+		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
+		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
 		if ((List.mem sign_extend_val f_type_val_list) = false) && 
 		  ((List.mem zero_extend_val f_type_val_list) = false) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		    let f_type = spfm#get_fresh_symbolic f_type_str 16 in
+		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = target_fsize_expr t_size start_addr 1 field_size in
 		    let zero_extend_expr = target_fsize_expr t_size start_addr 0 field_size in
-		    get_ite_expr f_type V.EQ V.REG_16 sign_extend_val sign_extend_expr 
-		      (get_ite_expr f_type V.EQ V.REG_16 zero_extend_val zero_extend_expr
+		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
+		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
 			 (get_t_field_expr field_num field_size (ind+1) 
 			    (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])))
 		    ) else (
 		    get_t_field_expr field_num field_size (ind+1) f_type_val_list
 		    )
 	      ) else (
-		let sign_extend_val = Int64.of_int ((start_byte*256)+(end_byte*16)+1) in 
+		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 		if ((List.mem sign_extend_val f_type_val_list) = false) then (
 		  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		  let f_type = spfm#get_fresh_symbolic f_type_str 16 in
+		  let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		  let sign_extend_expr = target_fsize_expr t_size start_addr 1 field_size in
-		  get_ite_expr f_type V.EQ V.REG_16 sign_extend_val sign_extend_expr 
+		  get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		    (get_t_field_expr field_num field_size (ind+1) 
 		       (f_type_val_list @ [sign_extend_val]))
 		) else (
@@ -2192,12 +2192,13 @@ struct
 	  let rec get_ite_ai_byte_expr ind i_byte = 
 	    (* i_byte = interesting_byte *)
 	    if ind >= (List.length field_ranges_l) then 
-	      D.to_symbolic_8 (self#region_load (Some rnum) 8 (Int64.of_int i_byte))
+	      (* D.to_symbolic_8 (self#region_load (Some rnum) 8 (Int64.of_int i_byte)) *)
+	      from_concrete 0 8
 	    else (
 	      let (field, start_byte, end_byte, cond) = List.nth field_ranges_l ind in
 	      if (i_byte >= start_byte) && (i_byte <= end_byte) then (
 		let size = end_byte - start_byte + 1 in
-		let field_size_temp_str = "t_field_"^
+		let field_size_temp_str = "srfm_t_field_"^
 		  (Printf.sprintf "%d_%d_%d_%d" field (size*8) 
 		     (i_byte-start_byte) sym_input_region_l_ind) in
 		let field_size_temp = spfm#get_fresh_symbolic field_size_temp_str 8 in
@@ -2207,9 +2208,7 @@ struct
 			     (get_t_field_expr field (size*8) 0 []) 
 			     size (i_byte-start_byte))) in
 		spfm#add_to_path_cond q_exp;
-		if !opt_trace_struct_adaptor = true then (
-		  Hashtbl.replace t_field_h field_size_temp q_exp;
-		);
+		Hashtbl.replace t_field_h field_size_temp q_exp;
 		V.Ite(cond, field_size_temp, (get_ite_ai_byte_expr (ind+1) i_byte))
 	      ) else (
 		get_ite_ai_byte_expr (ind+1) i_byte
@@ -2229,7 +2228,7 @@ struct
 	  done;
 	  if !opt_trace_struct_adaptor = true then
 	    Hashtbl.iter (fun key value ->
-	      Printf.printf "SRFM#get_ite_ai_byte_expr t_field[%s] = %s\n" 
+	      Printf.printf "SRFM#apply_struct_adaptor t_field_h[%s] = %s\n" 
 		(V.exp_to_string key) (V.exp_to_string value);
 	    ) t_field_h; 
 	  
