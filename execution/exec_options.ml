@@ -116,7 +116,7 @@ let opt_skip_call_addr = ref []
 let opt_synth_adaptor = ref []
 let opt_synth_ret_adaptor = ref []
 let opt_synth_struct_adaptor = ref []
-let opt_struct_adaptor_nfields = ref 0
+let opt_struct_adaptor_params = ref (0,0)
 let opt_adaptor_search_mode  = ref false
 let opt_synth_simplelen_adaptor = ref []
 let synth_extra_conditions = ref []
@@ -330,6 +330,10 @@ let add_delimited_str_num_pair opt char s =
 let add_delimited_int64_int_pair opt char s= 
   let (s1, s2) = split_string char s in
     opt := ((Int64.of_string s1), (int_of_string s2)) :: !opt
+
+let add_delimited_int_int_pair opt char s= 
+  let (s1, s2) = split_string char s in
+  opt := ((int_of_string s1), (int_of_string s2))
 
 let opt_program_name = ref None
 let opt_start_addr = ref None

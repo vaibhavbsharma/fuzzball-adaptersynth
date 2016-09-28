@@ -238,14 +238,13 @@ let symbolic_state_cmdline_opts =
        "replace the return value at instruction with address 'addr2' "^
        "with an adaptor symbolic formula ");
     ("-synth-struct-adaptor", Arg.String
-      (fun s -> opt_synth_struct_adaptor := 
-	!opt_synth_struct_adaptor @ [(Int64.of_string s)];),
+      (fun s -> opt_synth_struct_adaptor := !opt_synth_struct_adaptor @ [(Int64.of_string s)];),
      "addr Using structure adaptor grammar, "^
-       "write formulae at upto -struct-adaptor-nfields*8 bytes at addr");
-    ("-struct-adaptor-nfields", Arg.String
-      (fun s -> opt_struct_adaptor_nfields := (int_of_string s);),
-     "N Structure adaptor will try to map upto N fields in target and "^
-       "inner structures");
+       "write formulae at upto size bytes at addr");
+    ("-struct-adaptor-params", Arg.String
+      (add_delimited_int_int_pair opt_struct_adaptor_params ':'),
+     "N:size  Structure adaptor will try to map upto N fields in target and "^
+       "inner structures at upto size bytes");
   ]
 
 let slurp_file fname =

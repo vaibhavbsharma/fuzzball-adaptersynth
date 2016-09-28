@@ -94,7 +94,7 @@ val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
 val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
 val opt_synth_struct_adaptor : int64 list ref
-val opt_struct_adaptor_nfields : int ref
+val opt_struct_adaptor_params : (int * int) ref
 val opt_adaptor_search_mode : bool ref
 val opt_synth_simplelen_adaptor : (int64 * int64 * int64 * int64 * int64) list ref
 val synth_extra_conditions : Vine.exp list ref
@@ -206,6 +206,8 @@ val add_delimited_str_num_pair :
   (string * int64) list ref -> char -> string -> unit
 val add_delimited_int64_int_pair :
   (int64 * int) list ref -> char -> string -> unit
+val add_delimited_int_int_pair :
+  (int * int) ref -> char -> string -> unit
 
 val opt_program_name : string option ref
 val opt_start_addr : int64 option ref
