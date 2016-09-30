@@ -2118,64 +2118,6 @@ struct
 	      ) offsets_l;
 	      (!ret_offsets_l @ offsets_l)
 	  in
-
-	  (* let rec get_offsets_l field = 
-	    match field with
-	    | 1 -> 
-	      let field_sz = spfm#get_fresh_symbolic "field1_size" 16 in
-	      [(1, 0, 0, V.BinOp(V.EQ, field_sz, (from_concrete 1 16))); 
-	       (1, 0, 1, V.BinOp(V.EQ, field_sz, (from_concrete 2 16))); 
-	       (1, 0, 3, V.BinOp(V.EQ, field_sz, (from_concrete 4 16))); 
-	       (1, 0, 7, V.BinOp(V.EQ, field_sz, (from_concrete 8 16)));]
-	    | k -> 
-	      let ret_offsets_l = ref [] in
-	      let offsets_l = get_offsets_l (k-1) in
-	      List.iter ( fun (field_num, start_byte, end_byte, cond) ->
-		if field_num = k-1 then (
-		  let f_sz_str = ("field"^(Printf.sprintf "%d" k)^"_size") in
-		  let field_sz = spfm#get_fresh_symbolic f_sz_str 16 in
-		  let ele = end_byte + 1 in
-		  let cond_1 = V.BinOp(V.BITAND, cond, 
-				       V.BinOp(V.EQ, field_sz, (from_concrete 1 16)))
-		  in
-		  ret_offsets_l := !ret_offsets_l @ [(field, ele, ele, cond_1)];
-		  let (s2,e2) = 
-		    if (ele mod 2) = 0 then (
-		      (ele, (ele+1))) else (
-		      ((ele+1), (ele+2))) in
-		  let cond_2 = V.BinOp(V.BITAND, cond, 
-				       V.BinOp(V.EQ, field_sz, (from_concrete 2 16)))
-		  in
-		  ret_offsets_l := !ret_offsets_l @ [(field, s2, e2, cond_2)];
-		  let next_word = ((ele+3)/4)*4 in
-		  let (s4, e4) =
-		    if (ele mod 4) = 0 then (
-		      (ele, (ele+3))) else (
-		      (next_word, next_word+3))
-		  in
-		  let cond_4 = V.BinOp(V.BITAND, cond, 
-				       V.BinOp(V.EQ, field_sz, (from_concrete 4 16)))
-		  in
-		  ret_offsets_l := !ret_offsets_l @ [(field, s4, e4, cond_4)];
-		  let next_long = ((ele+7)/8)*8 in
-		  if (next_long mod 8) = 0 then ( 
-		    let cond_8 = V.BinOp(V.BITAND, cond, 
-					 V.BinOp(V.EQ, field_sz, (from_concrete 8 16)))
-		    in
-		    ret_offsets_l := !ret_offsets_l @ [(field, next_long, next_long+7, cond_8)];
-		  );
-		);
-	      ) offsets_l;
-	      (!ret_offsets_l @ offsets_l)
-	  in
-	  let cmp (field1,start1,end1, _) (field2, start2, end2, _) =
-	    if field1 > field2 then 1 else if field1 < field2 then -1 else (
-	      if start1 > start2 then 1 else if start1 < start2 then -1 else (
-		if end1 > end2 then 1 else if end1 < end2 then -1 else 0
-	      )
-	    )
-	  in
-	  let field_ranges_l = List.sort cmp (unique (get_offsets_l n_fields)) in *)
 	  let t_field_h = Hashtbl.create 100 in
 
 	  let cmp_arr (field1,start1,end1, n1, f_sz1, _) (field2, start2, end2, n2, f_sz2, _) =
@@ -2218,7 +2160,8 @@ struct
 				     (unique (get_array_offsets_l n_fields)));
 	  
 	  let array_field_ranges_l = !tmp_l in
-	  Printf.printf "AS#array_field_ranges_l.length = %d" (List.length array_field_ranges_l);
+	  if !opt_trace_struct_adaptor = true then
+	    Printf.printf "SRFM#array_field_ranges_l.length = %d\n" (List.length array_field_ranges_l);
 	  if !opt_trace_struct_adaptor = true then
 	    List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
 	      Printf.printf "array_field_ranges_l[%d]= (%d, %x, %x, %s)\n"
@@ -2304,104 +2247,16 @@ struct
 			  (get_arr_t_field_expr field array_field_ranges_l []
 			     (i_byte-start_byte) ai_f_sz ai_n)) in
 		spfm#add_to_path_cond q_exp; 
-		Hashtbl.replace t_field_h field_size_temp q_exp;
+		
+		if !opt_trace_struct_adaptor = true then 
+		  Hashtbl.replace t_field_h field_size_temp q_exp;
+		
 		V.Ite(cond, field_size_temp, (get_arr_ite_ai_byte_expr tail i_byte))
 	      ) else (
 		get_arr_ite_ai_byte_expr tail i_byte
 	      )
 	  in
 	  
-	  (* let rec get_t_field_expr field_num field_size ind f_type_val_list =
-	    let target_fsize_expr target_sz start_addr ex_op in_field_sz =
-	      let cast_op =
-		if target_sz <= in_field_sz then 
-		  if ex_op = 1 then V.CAST_SIGNED 
-		  else V.CAST_UNSIGNED
-		else V.CAST_LOW
-	      in
-	      upcast 
-		(to_sym_op 
-		   (self#region_load (Some rnum) target_sz start_addr) target_sz) 
-		cast_op in_field_sz
-	    in
-	    let (_, start_byte, end_byte, _) = List.nth field_ranges_l ind in
-	    let t_size = ((end_byte+1-start_byte)*8) in
-	    let addr = 0L in
-	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
-	    if ind = ((List.length field_ranges_l)-1) then (
-	      (* Assuming only a sign-extension widening is possible on the last entry
-		 in field_ranges_l *)
-	      target_fsize_expr t_size start_addr 1 field_size
-	    ) else (
-	      let is_extend_req = (end_byte+1-start_byte)-8 in
-	      if is_extend_req <> 0 then (
-		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
-		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
-		if ((List.mem sign_extend_val f_type_val_list) = false) && 
-		  ((List.mem zero_extend_val f_type_val_list) = false) then (
-		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
-		    let sign_extend_expr = target_fsize_expr t_size start_addr 1 field_size in
-		    let zero_extend_expr = target_fsize_expr t_size start_addr 0 field_size in
-		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
-		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
-			 (get_t_field_expr field_num field_size (ind+1) 
-			    (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])))
-		    ) else (
-		    get_t_field_expr field_num field_size (ind+1) f_type_val_list
-		    )
-	      ) else (
-		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
-		if ((List.mem sign_extend_val f_type_val_list) = false) then (
-		  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		  let f_type = spfm#get_fresh_symbolic f_type_str 64 in
-		  let sign_extend_expr = target_fsize_expr t_size start_addr 1 field_size in
-		  get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
-		    (get_t_field_expr field_num field_size (ind+1) 
-		       (f_type_val_list @ [sign_extend_val]))
-		) else (
-		  get_t_field_expr field_num field_size (ind+1) f_type_val_list
-		)
-	      )
-	    )
-	  in
-	  let rec get_ite_ai_byte_expr ind i_byte = 
-	    (* i_byte = interesting_byte *)
-	    if ind >= (List.length field_ranges_l) then 
-	      from_concrete 0 8
-	    else (
-	      let (field, start_byte, end_byte, cond) = List.nth field_ranges_l ind in
-	      if (i_byte >= start_byte) && (i_byte <= end_byte) then (
-		let size = end_byte - start_byte + 1 in
-		let field_size_temp_str = "srfm_t_field_"^
-		  (Printf.sprintf "%d_%d_%d_%d" field (size*8) 
-		     (i_byte-start_byte) sym_input_region_l_ind) in
-		let field_size_temp = spfm#get_fresh_symbolic field_size_temp_str 8 in
-		let q_exp = 
-		  V.BinOp(V.EQ, field_size_temp, 
-			  (get_byte 
-			     (get_t_field_expr field (size*8) 0 []) 
-			     (i_byte-start_byte))) in
-		spfm#add_to_path_cond q_exp;
-		Hashtbl.replace t_field_h field_size_temp q_exp;
-		V.Ite(cond, field_size_temp, (get_ite_ai_byte_expr (ind+1) i_byte))
-	      ) else (
-		get_ite_ai_byte_expr (ind+1) i_byte
-	      )
-	    )
-	  in
-	  for i=0 to (n_fields*8)-1 do
-	    let byte_expr = D.from_symbolic (get_ite_ai_byte_expr 0 i) in
-	    let byte_expr_sym_str = "ai_byte_"^(Printf.sprintf "%d_%d" i sym_input_region_l_ind) in
-	    let byte_expr_sym = spfm#get_fresh_symbolic byte_expr_sym_str 8 in
-	    let q_exp = V.BinOp(V.EQ, byte_expr_sym, (D.to_symbolic_8 byte_expr)) in
-	    spfm#add_to_path_cond q_exp; 
-	    if !opt_trace_struct_adaptor = true then
-	      Printf.printf "SRFM#get_ite_ai_byte_expr for byte %d: %s\n\n" i 
-		(V.exp_to_string q_exp); 
-	    byte_expr_l := !byte_expr_l @ [(D.from_symbolic byte_expr_sym)]; 
-	  done; *)
-
 	  let byte_expr_l = ref [] in
 	  for i=0 to (max_size-1) do 
 	    let byte_expr = (get_arr_ite_ai_byte_expr array_field_ranges_l i) in
