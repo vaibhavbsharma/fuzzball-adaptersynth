@@ -2167,6 +2167,31 @@ struct
 	      Printf.printf "array_field_ranges_l[%d]= (%d, %x, %x, %s)\n"
 		ind field_num start_b end_b (V.exp_to_string cond);
 	    ) array_field_ranges_l;
+	  let i_byte_arr = ref (Array.make 0 (ref [])) in
+	  for i = 1 to max_size do
+	    i_byte_arr := Array.append !i_byte_arr (Array.make 1 (ref []));
+	  done;
+
+	  let rec populate_i_byte l = 
+	    match l with
+	    | (_, s, e, _, _, _)::tail -> 
+	      for i = s to e do
+		((!i_byte_arr).(i)) := !((!i_byte_arr).(i)) @ [(List.hd l)];
+	      done;
+	      populate_i_byte tail
+	    | [] -> ()
+	  in
+	  populate_i_byte array_field_ranges_l;
+
+	  for i=0 to max_size-1 do
+	    Printf.printf "for byte %d: \n" i;
+	    let l = !((!i_byte_arr).(i)) in
+	    for j=0 to (List.length l)-1 do
+	      let (_, s, e, _, _, _) = (List.nth l j) in
+	      Printf.printf "(%d, %d), " s e;
+	    done;
+	    Printf.printf "\n";
+	  done;
 	  
 	  let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 	      f_type_val_list ai_byte ai_f_sz ai_n =
@@ -2231,7 +2256,7 @@ struct
 		   )
 	      )
 	  in
-	  let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte = 
+	  let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte =
 	    (* i_byte = interesting_byte *)
 	    match this_array_field_ranges_l with
 	    | [] -> from_concrete 0 8
@@ -2259,7 +2284,8 @@ struct
 	  
 	  let byte_expr_l = ref [] in
 	  for i=0 to (max_size-1) do 
-	    let byte_expr = (get_arr_ite_ai_byte_expr array_field_ranges_l i) in
+	    let byte_expr = (get_arr_ite_ai_byte_expr (!((!i_byte_arr).(i))) i) in
+	    (* let byte_expr = (get_arr_ite_ai_byte_expr array_field_ranges_l i) in *)
 	    let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i sym_input_region_l_ind) in
 	    let byte_expr_sym = spfm#get_fresh_symbolic byte_expr_sym_str 8 in
 	    let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
