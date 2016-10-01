@@ -189,6 +189,7 @@ sig
     method get_fresh_symbolic : string -> int -> Vine.exp
     method get_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp
+    method query_exp : Vine.exp -> Vine.exp -> unit
     method set_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp -> unit
    

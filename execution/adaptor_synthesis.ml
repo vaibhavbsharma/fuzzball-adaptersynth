@@ -985,6 +985,7 @@ let upcast expr extend_op end_sz =
   | _ -> failwith "unsupported upcast end size"
 
 let struct_adaptor fm = 
+  let else_sym_ind = ref 0 in
   let from_concrete v sz = 
     match sz with 
     | 8 -> assert(v >= -128 && v <= 0xff);
@@ -1115,18 +1116,20 @@ let struct_adaptor fm =
 	in
 	populate_i_byte array_field_ranges_l;
 	
-	for i=0 to max_size-1 do
-	  Printf.printf "for byte %d: \n" i;
-	  let l = !((!i_byte_arr).(i)) in
-	  for j=0 to (List.length l)-1 do
-	    let (_, s, e, _, _, _) = (List.nth l j) in
-	    Printf.printf "(%d, %d), " s e;
+	if !opt_trace_struct_adaptor = true then (
+	  for i=0 to max_size-1 do
+	    Printf.printf "for byte %d: \n" i;
+	    let l = !((!i_byte_arr).(i)) in
+	    for j=0 to (List.length l)-1 do
+	      let (_, s, e, _, _, _) = (List.nth l j) in
+	      Printf.printf "(%d, %d), " s e;
+	    done;
+	    Printf.printf "\n";
 	  done;
-	  Printf.printf "\n";
-	done;
+	);
 	
 	let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
-	    f_type_val_list ai_byte ai_f_sz ai_n =
+	    f_type_val_list ai_byte ai_f_sz ai_n cur_depth=
 	  (* Assume ai_n equals target_n for now *)
 	  let get_ai_byte_expr target_n target_sz start_addr ex_op =
 	    let cast_op =
@@ -1161,14 +1164,28 @@ let struct_adaptor fm =
 		  let f_type = fm#get_fresh_symbolic f_type_str 64 in
 		  let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		  let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
+		  
+		  let else_depth = if cur_depth >= 8 then 0 else cur_depth+2 in
+		  let else_expr =
+		    (get_arr_t_field_expr field_num tail 
+		       (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])
+		       ai_byte ai_f_sz ai_n else_depth) in
+		  let final_else_expr = 
+		    if cur_depth >= 8 then (
+		      let else_sym_str = Printf.sprintf "else_%d_%d_%d_%d_%d_%d" 
+			field_num start_byte end_byte n f_sz !else_sym_ind in
+		      let else_sym = fm#get_fresh_symbolic else_sym_str 8 in
+		      else_sym_ind := !else_sym_ind + 1;
+		      fm#query_exp else_sym else_expr;
+		      else_sym
+		    ) else ( else_expr ) in
+		  
 		  get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		    (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
-		       (get_arr_t_field_expr field_num tail 
-			  (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])
-			  ai_byte ai_f_sz ai_n))
+		       final_else_expr )
 		  ) else (
 		  get_arr_t_field_expr field_num tail f_type_val_list 
-		    ai_byte ai_f_sz ai_n
+		    ai_byte ai_f_sz ai_n cur_depth
 		  )
 	    ) else (
 	      let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
@@ -1177,11 +1194,28 @@ let struct_adaptor fm =
 		let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		let f_type = fm#get_fresh_symbolic f_type_str 64 in
 		let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
-		get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
+
+		let else_depth = if cur_depth >= 8 then 0 else cur_depth+2 in
+		let else_expr =
 		  (get_arr_t_field_expr field_num tail 
-		     (f_type_val_list @ [sign_extend_val]) ai_byte ai_f_sz ai_n)
+		     (f_type_val_list @ [sign_extend_val]) ai_byte 
+		     ai_f_sz ai_n else_depth) in
+		let final_else_expr = 
+		  if cur_depth >= 8 then (
+		    let else_sym_str = Printf.sprintf "else_%d_%d_%d_%d_%d_%d" 
+		      field_num start_byte end_byte n f_sz !else_sym_ind in
+		    let else_sym = fm#get_fresh_symbolic else_sym_str 8 in
+		    else_sym_ind := !else_sym_ind + 1;
+		    fm#query_exp else_sym else_expr;
+		    else_sym
+		  ) else ( else_expr ) in
+
+		
+		get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
+		  final_else_expr
 	      ) else (
-		get_arr_t_field_expr field_num tail f_type_val_list ai_byte ai_f_sz ai_n
+		get_arr_t_field_expr field_num tail f_type_val_list ai_byte 
+		  ai_f_sz ai_n cur_depth
 	      )
 	    )
 	in
@@ -1199,7 +1233,7 @@ let struct_adaptor fm =
 	      let q_exp = 
 		V.BinOp(V.EQ, field_size_temp, 
 			(get_arr_t_field_expr field array_field_ranges_l []
-			   (i_byte-start_byte) ai_f_sz ai_n)) in
+			   (i_byte-start_byte) ai_f_sz ai_n 0)) in
 	      fm#add_to_path_cond q_exp;
 	      
 	      if !opt_trace_struct_adaptor = true then
@@ -1214,7 +1248,6 @@ let struct_adaptor fm =
 	let byte_expr_l = ref [] in 
 	for i=0 to (max_size-1) do 
 	  let byte_expr = (get_arr_ite_ai_byte_expr (!((!i_byte_arr).(i))) i) in
-	  (* let byte_expr = (get_arr_ite_ai_byte_expr array_field_ranges_l i) in *)
 	  let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i addr_list_ind) in
 	  let byte_expr_sym = fm#get_fresh_symbolic byte_expr_sym_str 8 in
 	  let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in

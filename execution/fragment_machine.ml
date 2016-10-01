@@ -405,6 +405,7 @@ class virtual fragment_machine = object
 
   method virtual get_fresh_symbolic : string -> int -> Vine.exp
   method virtual get_reg_symbolic : register_name -> Vine.exp
+  method virtual query_exp : Vine.exp -> Vine.exp -> unit
   method virtual save_arg_regs : int64 -> unit
   method virtual get_saved_arg_regs : unit -> Vine.exp list
   method virtual reset_saved_arg_regs : unit
@@ -926,7 +927,7 @@ struct
 	
     (* Check if two expressions are syntactically or semantically equal,
        disqualify the path if not *)
-    method private query_exp exp1 exp2 =
+    method query_exp exp1 exp2 =
       if exp1 = exp2 then
 	(if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equal side-effects %s = %s\n"
