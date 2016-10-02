@@ -1176,7 +1176,7 @@ let struct_adaptor fm =
 			field_num start_byte end_byte n f_sz !else_sym_ind in
 		      let else_sym = fm#get_fresh_symbolic else_sym_str 8 in
 		      else_sym_ind := !else_sym_ind + 1;
-		      fm#query_exp else_sym else_expr;
+		      fm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
 		      else_sym
 		    ) else ( else_expr ) in
 		  
@@ -1206,7 +1206,7 @@ let struct_adaptor fm =
 		      field_num start_byte end_byte n f_sz !else_sym_ind in
 		    let else_sym = fm#get_fresh_symbolic else_sym_str 8 in
 		    else_sym_ind := !else_sym_ind + 1;
-		    fm#query_exp else_sym else_expr;
+		    fm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
 		    else_sym
 		  ) else ( else_expr ) in
 

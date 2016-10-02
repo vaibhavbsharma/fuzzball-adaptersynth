@@ -2247,7 +2247,7 @@ struct
 			  field_num start_byte end_byte n f_sz !else_sym_ind in
 			let else_sym = spfm#get_fresh_symbolic else_sym_str 8 in
 			else_sym_ind := !else_sym_ind + 1;
-			self#query_exp else_sym else_expr;
+			spfm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
 			else_sym
 		      ) else ( else_expr ) in
 		    
@@ -2276,7 +2276,7 @@ struct
 			  field_num start_byte end_byte n f_sz !else_sym_ind in
 			let else_sym = spfm#get_fresh_symbolic else_sym_str 8 in
 			else_sym_ind := !else_sym_ind + 1;
-			self#query_exp else_sym else_expr;
+			spfm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
 			else_sym
 		      ) else ( else_expr ) in
 
