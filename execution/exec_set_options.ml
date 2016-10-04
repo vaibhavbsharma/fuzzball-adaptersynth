@@ -480,6 +480,9 @@ let cmdline_opts =
      " Print branch conditions");
     ("-trace-decisions", Arg.Set(opt_trace_decisions),
      " Print symbolic branch choices");
+    ("-split-target-formulas", Arg.Set(opt_split_target_formulas),
+     " Split large formulas when generating formulas for target structure fields, "^
+       "will be false if left unspecified");
     ("-adaptor-search-mode", Arg.Set(opt_adaptor_search_mode),
      " Run in adaptor search mode, FuzzBALL will run in counter example mode"^
        " if left unspecified");

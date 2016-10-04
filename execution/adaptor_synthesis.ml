@@ -1165,7 +1165,11 @@ let struct_adaptor fm =
 		  let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		  let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
 		  
-		  let else_depth = if cur_depth >= 8 then 0 else cur_depth+2 in
+		  let else_depth = 
+		      if !opt_split_target_formulas = true then (
+			if cur_depth >= 8 then 0 else cur_depth+2 )
+		      else 0 
+		  in
 		  let else_expr =
 		    (get_arr_t_field_expr field_num tail 
 		       (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])
@@ -1195,7 +1199,11 @@ let struct_adaptor fm =
 		let f_type = fm#get_fresh_symbolic f_type_str 64 in
 		let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 
-		let else_depth = if cur_depth >= 8 then 0 else cur_depth+2 in
+		let else_depth = 
+		  if !opt_split_target_formulas = true then (
+		    if cur_depth >= 8 then 0 else cur_depth+2 )
+		  else 0 
+		in
 		let else_expr =
 		  (get_arr_t_field_expr field_num tail 
 		     (f_type_val_list @ [sign_extend_val]) ai_byte 
