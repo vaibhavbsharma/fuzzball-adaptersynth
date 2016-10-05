@@ -679,7 +679,7 @@ when special_ec_vars\n"; *)
 		them, so something is going wrong if they get way to big
 		at once: *)
 	     (* assert(expr_size e' < 1000); *)
-	     if expr_size e' < 10 then
+	     if expr_size e' < !opt_t_expr_size then
 	       e'
 	     else
 	       V.Lval(V.Temp(self#make_temp_var e' ty))
@@ -709,7 +709,7 @@ when special_ec_vars\n"; *)
 		   (match (f e2 ty) with
 		      | Some e3 -> e3
 		      | None ->
-			  (if expr_size e2 < 10 then
+			  (if expr_size e2 < !opt_t_expr_size then
 			     e2
 			   else
 			      (V.Lval(V.Temp(self#make_temp_var e2 ty)))))

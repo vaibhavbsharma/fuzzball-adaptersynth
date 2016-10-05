@@ -375,6 +375,29 @@ let rec constant_fold ctx e =
 	Cast(CAST_LOW, REG_16, e)
     | Cast(CAST_LOW, REG_32, BinOp(BITAND, e, Constant(Int(_,0xffffffffL)))) ->
 	Cast(CAST_LOW, REG_32, e)
+    (* Low cast gets only 0 due to left shift *)
+    | Cast(CAST_LOW, cty, BinOp(LSHIFT, e, Constant(Int(_, amt))))
+	when amt >= Int64.of_int (bits_of_width cty) ->
+	Constant(Int(cty, 0L))
+    (* A different way a mask can be redundant with a cast *)
+    | BinOp(BITAND,
+	    (Cast(CAST_UNSIGNED, (REG_16|REG_32|REG_64), e) as thecast),
+            Constant(Int(_, mask)))
+	when ((Vine_typecheck.infer_type None e) = REG_8) &&
+          (Int64.logand mask 0xffL) = 0xffL ->
+	thecast
+    | BinOp(BITAND,
+	    (Cast(CAST_UNSIGNED, (REG_32|REG_64), e) as thecast),
+            Constant(Int(_, mask)))
+	when ((Vine_typecheck.infer_type None e) = REG_16) &&
+          (Int64.logand mask 0xffffL) = 0xffffL ->
+	thecast
+    | BinOp(BITAND,
+	    (Cast(CAST_UNSIGNED, REG_64, e) as thecast),
+            Constant(Int(_, mask)))
+	when ((Vine_typecheck.infer_type None e) = REG_32) &&
+          (Int64.logand mask 0xffffffffL) = 0xffffffffL ->
+	thecast
     (* A more complex way of writing sign extension *)
     | BinOp(BITOR, Cast(CAST_UNSIGNED, REG_64, e1),
 	    BinOp(LSHIFT,
@@ -531,6 +554,21 @@ let rec constant_fold ctx e =
     | BinOp(EQ, BinOp(PLUS, x, (Constant(_) as c)),
 	    Constant(Int(ty, 0L))) ->
 	BinOp(EQ, x, (constant_fold ctx (UnOp(NEG, c))))
+    (* a + -b = 0 ==> a == b *)
+    | BinOp(EQ, BinOp(PLUS, a, UnOp(NEG, b)),
+	    Constant(Int(ty, 0L))) ->
+	BinOp(EQ, a, b)
+    (* a ^ b = 0 ==> a == b *)
+    | BinOp(EQ, BinOp(XOR, a, b), Constant(Int(ty, 0L))) ->
+	BinOp(EQ, a, b)
+    (* a < b | a == b ==> a <= b*)
+    | BinOp(BITOR, BinOp(LT, a1, b1), BinOp(EQ, a2, b2))
+	 when a1 = a2 && b1 = b2 ->
+	BinOp(LE, a1, b1)
+    (* a <$ b | a == b ==> a <=$ b*)
+    | BinOp(BITOR, BinOp(SLT, a1, b1), BinOp(EQ, a2, b2))
+	 when a1 = a2 && b1 = b2 ->
+	BinOp(SLE, a1, b1)
     | _ -> e (* leave other expressions as they are *)
 
 
