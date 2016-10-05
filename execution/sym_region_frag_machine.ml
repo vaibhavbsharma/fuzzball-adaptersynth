@@ -2297,6 +2297,7 @@ struct
 		   )
 	      )
 	  in
+	  let field_exprs = Hashtbl.create 1001 in
 	  let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte =
 	    (* i_byte = interesting_byte *)
 	    match this_array_field_ranges_l with
@@ -2309,10 +2310,17 @@ struct
 		in
 		let field_size_temp = spfm#get_fresh_symbolic field_size_temp_str 8 in
 		let q_exp = 
-		  V.BinOp(V.EQ, field_size_temp, 
-			  (get_arr_t_field_expr field array_field_ranges_l []
-			     (i_byte-start_byte) ai_f_sz ai_n 0)) in
-		spfm#add_to_path_cond q_exp; 
+		  (try
+		     Hashtbl.find field_exprs field_size_temp_str
+		   with Not_found ->
+		     let new_q_exp =
+		       V.BinOp(V.EQ, field_size_temp,
+			       (get_arr_t_field_expr field array_field_ranges_l []
+				  (i_byte-start_byte) ai_f_sz ai_n 0)) in
+		       Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
+		       spfm#add_to_path_cond new_q_exp;
+		       new_q_exp)
+		in
 		
 		if !opt_trace_struct_adaptor = true then 
 		  Hashtbl.replace t_field_h field_size_temp q_exp;
