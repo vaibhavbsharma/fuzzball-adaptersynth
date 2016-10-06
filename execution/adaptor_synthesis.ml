@@ -1001,6 +1001,12 @@ let struct_adaptor fm =
 	   V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
   in
   let unique = Vine_util.list_unique in
+  (* This simplifies formulas and introduces t-variables for comple
+     sub-expressions. Doing this generally speeds things up, but it
+     may make debugging the formulas less convenient, so you can disable
+     it by make "simplify" be the identity function. *)
+  let simplify e = fm#simplify_exp e in
+  (* let simplify e = e in *)
 
   let start_time = Sys.time () in
   if (List.length !opt_synth_struct_adaptor) <> 0 then (
@@ -1050,6 +1056,7 @@ let struct_adaptor fm =
 	      if field_num = k-1 then (
 		List.iter ( fun (field_num, start_b, end_b, n, f_sz, this_field_cond) ->
 		  let cond' = V.BinOp(V.BITAND, cond, this_field_cond) in
+		  let cond' = simplify cond' in
 		  ret_offsets_l := !ret_offsets_l @ 
 		    [(field_num, start_b, end_b, n, f_sz, cond')]
 		) (get_array_field_ranges_l k (end_byte+1)););
@@ -1085,7 +1092,7 @@ let struct_adaptor fm =
 		if (field1=field2) && (start1=start2) && (end1=end2) && (n1=n2) 
 		  && (f_sz1=f_sz2) then (
 		    assert(cond1 <> cond2);
-		    cond := V.BinOp(V.BITOR, !cond, cond2);
+		    cond := simplify (V.BinOp(V.BITOR, !cond, cond2));
 		    tail := t2;
 		  ) 
 		else 
@@ -1180,7 +1187,8 @@ let struct_adaptor fm =
 		      else 0 
 		  in
 		  let else_expr =
-		    (get_arr_t_field_expr field_num tail 
+		    simplify
+		      (get_arr_t_field_expr field_num tail
 		       (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])
 		       ai_byte ai_f_sz ai_n else_depth) in
 		  let final_else_expr = 
@@ -1197,8 +1205,8 @@ let struct_adaptor fm =
 		    (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
 		       final_else_expr )
 		  ) else (
-		  get_arr_t_field_expr field_num tail f_type_val_list 
-		    ai_byte ai_f_sz ai_n cur_depth
+		  simplify (get_arr_t_field_expr field_num tail
+			      f_type_val_list ai_byte ai_f_sz ai_n cur_depth)
 		  )
 	    ) else (
 	      let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
@@ -1214,9 +1222,10 @@ let struct_adaptor fm =
 		  else 0 
 		in
 		let else_expr =
-		  (get_arr_t_field_expr field_num tail 
-		     (f_type_val_list @ [sign_extend_val]) ai_byte 
-		     ai_f_sz ai_n else_depth) in
+		  simplify
+		    (get_arr_t_field_expr field_num tail
+		       (f_type_val_list @ [sign_extend_val]) ai_byte
+		       ai_f_sz ai_n else_depth) in
 		let final_else_expr = 
 		  if cur_depth >= 8 then (
 		    let else_sym_str = Printf.sprintf "else_%d_%d_%d_%d_%d_%d" 
@@ -1231,8 +1240,8 @@ let struct_adaptor fm =
 		get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		  final_else_expr
 	      ) else (
-		get_arr_t_field_expr field_num tail f_type_val_list ai_byte 
-		  ai_f_sz ai_n cur_depth
+		  simplify (get_arr_t_field_expr field_num tail
+			      f_type_val_list ai_byte ai_f_sz ai_n cur_depth)
 	      )
 	    )
 	in

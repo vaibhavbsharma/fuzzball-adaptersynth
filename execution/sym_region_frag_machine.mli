@@ -190,6 +190,7 @@ sig
     method get_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp
     method query_exp : Vine.exp -> Vine.exp -> unit
+    method simplify_exp : Vine.exp -> Vine.exp
     method set_reg_symbolic : 
       Fragment_machine.register_name -> Vine.exp -> unit
    

@@ -406,6 +406,7 @@ class virtual fragment_machine = object
   method virtual get_fresh_symbolic : string -> int -> Vine.exp
   method virtual get_reg_symbolic : register_name -> Vine.exp
   method virtual query_exp : Vine.exp -> Vine.exp -> unit
+  method virtual simplify_exp : Vine.exp -> Vine.exp
   method virtual save_arg_regs : int64 -> unit
   method virtual get_saved_arg_regs : unit -> Vine.exp list
   method virtual reset_saved_arg_regs : unit
@@ -948,7 +949,17 @@ struct
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	)
       )
-	
+
+    method simplify_exp e =
+      let v = D.from_symbolic e in
+	match Vine_typecheck.infer_type_fast e with
+	  | V.REG_1  -> D.to_symbolic_1  (form_man#simplify1  v)
+	  | V.REG_8  -> D.to_symbolic_8  (form_man#simplify8  v)
+	  | V.REG_16 -> D.to_symbolic_16 (form_man#simplify16 v)
+	  | V.REG_32 -> D.to_symbolic_32 (form_man#simplify32 v)
+	  | V.REG_64 -> D.to_symbolic_64 (form_man#simplify64 v)
+	  | _ -> failwith "Bad size in simplify_exp"
+
     method get_reg_symbolic reg =
       D.to_symbolic_64 (self#get_int_var (Hashtbl.find reg_to_var reg))
     
