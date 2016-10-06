@@ -1000,13 +1000,19 @@ let struct_adaptor fm =
     V.Cast(V.CAST_LOW, V.REG_8, 
 	   V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
   in
-  let f res e = if List.mem e res then res else e::res in
-  let unique l = List.fold_left f [] l in
-  
+  let unique = Vine_util.list_unique in
+
+  let start_time = Sys.time () in
   if (List.length !opt_synth_struct_adaptor) <> 0 then (
     if !opt_trace_struct_adaptor = true then
       Printf.printf "Starting structure adaptor\n";
+    if !opt_time_stats then
+      (Printf.printf "Generating structure adaptor formulas...";
+       flush stdout);
     List.iteri ( fun addr_list_ind addr -> 
+      if !opt_time_stats then
+	(Printf.printf "(0x%08Lx)..." addr;
+	 flush stdout);
       if (Int64.abs (fix_s32 addr)) > 4096L then (
 	let (n_fields, max_size) = !opt_struct_adaptor_params in
 	
@@ -1088,6 +1094,9 @@ let struct_adaptor fm =
 	    tmp_l := !tmp_l @ [(field1, start1, end1, n1, f_sz1, !cond)];
 	    (merge_same_field_ranges !tail)
 	in
+	if !opt_time_stats then
+	  (Printf.printf "field ranges...";
+	   flush stdout);
 	merge_same_field_ranges (List.sort cmp_arr 
 				   (unique (get_array_offsets_l n_fields)));
 	
@@ -1262,6 +1271,9 @@ let struct_adaptor fm =
 	      get_arr_ite_ai_byte_expr tail i_byte
 	    )
 	in
+	if !opt_time_stats then
+	  (Printf.printf "byte expressions...";
+	   flush stdout);
 	let byte_expr_l = ref [] in 
 	for i=0 to (max_size-1) do 
 	  let byte_expr = (get_arr_ite_ai_byte_expr (!((!i_byte_arr).(i))) i) in
@@ -1290,4 +1302,7 @@ let struct_adaptor fm =
     ) !opt_synth_struct_adaptor;
     
   );
+  if !opt_time_stats then
+    (Printf.printf "ready to apply (%f sec).\n" (Sys.time () -. start_time);
+     flush stdout);
   fm#apply_struct_adaptor ();

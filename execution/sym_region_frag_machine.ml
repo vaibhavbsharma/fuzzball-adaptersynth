@@ -2066,8 +2066,7 @@ struct
 	V.Cast(V.CAST_LOW, V.REG_8, 
 	       V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
       in
-      let f res e = if List.mem e res then res else e::res in
-      let unique l = List.fold_left f [] l in
+      let unique = Vine_util.list_unique in
 
       if !opt_trace_struct_adaptor = true then
 	Printf.printf "SRFM#apply_struct_adaptor starting...\n";
