@@ -2071,7 +2071,7 @@ struct
 	 comple sub-expressions. Doing this generally speeds things up,
 	 but it may make debugging the formulas less convenient, so you
 	 can disable it by make "simplify" be the identity function. *)
-      let simplify e = fm#simplify_exp e in
+      let simplify e = spfm#simplify_exp e in
       (* let simplify e = e in *)
 
       if !opt_trace_struct_adaptor = true then
@@ -2363,7 +2363,7 @@ struct
 	  done;
 	  
 	) sym_input_region_l;
-	
+
   end
     
 end
