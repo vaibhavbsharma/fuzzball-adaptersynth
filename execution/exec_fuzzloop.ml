@@ -157,13 +157,14 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
      let (n_fields, _) = !opt_struct_adaptor_params in 
+     if n_fields <> 0 then Adaptor_synthesis.create_field_ranges_l fm;
      for i=1 to n_fields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
-       let field_size_str = Printf.sprintf "field%d_size" i in
-       let field_n_str = Printf.sprintf "field%d_n" i in
+       let field_size_str = Printf.sprintf "f%d_size" i in
+       let field_n_str = Printf.sprintf "f%d_n" i in
        ignore(fm#get_fresh_symbolic field_n_str 16);
        let field_sz_sym = fm#get_fresh_symbolic field_size_str 16 in
-       let tmp_cond = 
+       let tmp_cond = (* f1_size == (0 || 1 || 2 || 4 || 8) *)
 	 V.BinOp(
 	   V.BITOR, V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,0L))),
 	   V.BinOp(V.BITOR, 
@@ -175,7 +176,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,8L)
 				   )))))) in
        opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
-       
+      
+       (* this target field cannot overlap with another target field *)
        let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
        let i_start_b = V.BinOp(V.RSHIFT, f_type_sym, 
 			       V.Constant(V.Int(V.REG_8, 32L))) in

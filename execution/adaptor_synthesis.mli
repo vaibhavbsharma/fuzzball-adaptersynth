@@ -17,5 +17,8 @@ val ret_typeconv_adaptor :
   Fragment_machine.fragment_machine -> int64 -> unit
 val ret_simplelen_adaptor :
   Fragment_machine.fragment_machine -> int64 -> unit
+val create_field_ranges_l : 
+  Fragment_machine.fragment_machine -> unit 
+val array_field_ranges_l' : (int * int * int * int * int * Vine.exp) list ref
 val struct_adaptor: 
   Fragment_machine.fragment_machine -> unit

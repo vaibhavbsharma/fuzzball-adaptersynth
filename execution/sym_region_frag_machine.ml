@@ -2035,7 +2035,6 @@ struct
       Hashtbl.clear concrete_cache
 
     method apply_struct_adaptor () = 
-      let else_sym_ind = ref 0 in
       let upcast expr extend_op end_sz =
 	match end_sz with
 	| 8  -> V.Cast(extend_op, V.REG_8 , expr)
@@ -2066,108 +2065,37 @@ struct
 	V.Cast(V.CAST_LOW, V.REG_8, 
 	       V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
       in
-      let unique = Vine_util.list_unique in
+      (* let unique = Vine_util.list_unique in *)
       (* This simplifies formulas and introduces t-variables for
 	 comple sub-expressions. Doing this generally speeds things up,
 	 but it may make debugging the formulas less convenient, so you
 	 can disable it by make "simplify" be the identity function. *)
-      let simplify e = spfm#simplify_exp e in
+      let simplify e = 
+	if !opt_split_target_formulas = true then spfm#simplify_exp e else e in
       (* let simplify e = e in *)
 
       if !opt_trace_struct_adaptor = true then
 	Printf.printf "SRFM#apply_struct_adaptor starting...\n";
+      if !opt_time_stats then
+	(Printf.printf "SRFM#Generating structure adaptor formulas...";
+	 flush stdout);
       if !opt_adaptor_search_mode = false then	
 	let get_ite_expr arg op const_type const then_val else_val = 
 	  V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
 		then_val,
 		else_val)
 	in
+	let start_time = Sys.time () in
 	List.iteri ( fun sym_input_region_l_ind rnum ->
 	  let (n_fields, max_size) = !opt_struct_adaptor_params in
 
-	  let get_array_field_ranges_l field_num start_byte =
-	    let get_ent f_sz_t =
-	      let ret_offsets_l = ref [] in
-	      let f_sz_str = ("field"^(Printf.sprintf "%d" field_num)^"_size") in
-	      let f_n_str  = ("field"^(Printf.sprintf "%d" field_num)^"_n") in 
-	      let field_sz = spfm#get_fresh_symbolic f_sz_str 16 in
-	      let field_n  = spfm#get_fresh_symbolic f_n_str 16 in
-	      let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
-	      let num_bytes_remaining = 
-		(max_size - new_s_b - (n_fields - field_num)) in
-	      let max_n = (num_bytes_remaining/f_sz_t) in
-	      for n = 1 to max_n do
-		let end_byte = new_s_b + n*f_sz_t - 1 in
-		let cond = 
-		  V.BinOp(V.BITAND, 
-			  V.BinOp(V.EQ, field_sz, (from_concrete f_sz_t 16)),
-			  V.BinOp(V.EQ, field_n,  (from_concrete n 16))) in
-		ret_offsets_l := !ret_offsets_l @ 
-		  [(field_num, new_s_b, end_byte, n, f_sz_t, cond)];
-	      done;
-	      !ret_offsets_l
-	    in
-	    (get_ent 1) @ (get_ent 2) @ (get_ent 4) @ (get_ent 8)
-	  in
-	  let rec get_array_offsets_l field = 
-	    match field with
-	    | 1 -> get_array_field_ranges_l 1 0 
-	    | k -> 
-	      let ret_offsets_l = ref [] in
-	      let offsets_l = get_array_offsets_l (k-1) in
-	      List.iter ( fun (field_num, _, end_byte, _, _, cond) ->
-		if field_num = k-1 then (
-		  List.iter ( fun (field_num, start_b, end_b, n, f_sz, this_field_cond) ->
-		    let cond' = V.BinOp(V.BITAND, cond, this_field_cond) in
-		    let cond' = simplify cond' in
-		    ret_offsets_l := !ret_offsets_l @ 
-		      [(field_num, start_b, end_b, n, f_sz, cond')]
-		  ) (get_array_field_ranges_l k (end_byte+1)););
-	      ) offsets_l;
-	      (!ret_offsets_l @ offsets_l)
-	  in
-	  let t_field_h = Hashtbl.create 100 in
+	  if !opt_time_stats then
+	    (Printf.printf "(%d)..." rnum;
+	     flush stdout);
 
-	  let cmp_arr (field1,start1,end1, n1, f_sz1, _) (field2, start2, end2, n2, f_sz2, _) =
-	    if field1 > field2 then 1 else if field1 < field2 then -1 else (
-	      if start1 > start2 then 1 else if start1 < start2 then -1 else (
-		if end1 > end2 then 1 else if end1 < end2 then -1 else (
-		  if n1 > n2 then 1 else if n1 < n2 then -1 else (
-		    if f_sz1 > f_sz2 then 1 else if f_sz1 < f_sz2 then -1 else 0
-		  )
-		)
-	      )
-	    )
-	  in
-	  let tmp_l = ref [] in
-	  let rec merge_same_field_ranges l =
-	    match l with
-	    | [] -> ()
-	    | [a] -> tmp_l := !tmp_l @ [a];()
-	    | (field1, start1, end1, n1, f_sz1, cond1)::t ->
-	      let same_field_range = ref true in
-	      let cond = ref cond1 in
-	      let tail = ref t in
-	      while !same_field_range do
-		match !tail with
-		| [] -> same_field_range:= false;
-		| (field2, start2, end2, n2, f_sz2, cond2)::t2 ->
-		  if (field1=field2) && (start1=start2) && (end1=end2) && (n1=n2) 
-		    && (f_sz1=f_sz2) then (
-		      assert(cond1 <> cond2);
-		      cond := simplify (V.BinOp(V.BITOR, !cond, cond2));
-		      tail := t2;
-		    ) 
-		  else 
-		    same_field_range := false; 
-	      done;
-	      tmp_l := !tmp_l @ [(field1, start1, end1, n1, f_sz1, !cond)];
-	      (merge_same_field_ranges !tail)
-	  in
-	  merge_same_field_ranges (List.sort cmp_arr 
-				     (unique (get_array_offsets_l n_fields)));
-	  
-	  let array_field_ranges_l = !tmp_l in
+	  (* Moving array_field_ranges_l computation from here to AS.ml *)	
+
+	  let array_field_ranges_l = !(Adaptor_synthesis.array_field_ranges_l') in
 	  if !opt_trace_struct_adaptor = true then
 	    Printf.printf "SRFM#array_field_ranges_l.length = %d\n" (List.length array_field_ranges_l);
 	  if !opt_trace_struct_adaptor = true then
@@ -2184,7 +2112,7 @@ struct
 	    match l with
 	    | (_, s, e, _, _, _)::tail -> 
 	      for i = s to e do
-		((!i_byte_arr).(i)) := !((!i_byte_arr).(i)) @ [(List.hd l)];
+		((!i_byte_arr).(i)) := (List.hd l) :: !((!i_byte_arr).(i));
 	      done;
 	      populate_i_byte tail
 	    | [] -> ()
@@ -2203,8 +2131,10 @@ struct
 	    done;
 	  );
 	  
+	  let f_type_val_list = Hashtbl.create 1000 in
+	  
 	  let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
-	      f_type_val_list ai_byte ai_f_sz ai_n cur_depth =
+	      ai_byte ai_f_sz ai_n =
 	  (* Assume ai_n equals target_n for now *)
 	    let get_ai_byte_expr target_n target_sz start_addr ex_op =
 	      let cast_op =
@@ -2235,76 +2165,45 @@ struct
 	      if is_extend_req <> 0 then (
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
-		if ((List.mem sign_extend_val f_type_val_list) = false) && 
-		  ((List.mem zero_extend_val f_type_val_list) = false) &&
+		if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) && 
+		  ((Hashtbl.mem f_type_val_list zero_extend_val) = false) &&
 		  (n = ai_n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
-
-		    let else_depth = 
-		      if !opt_split_target_formulas = true then (
-			if cur_depth >= 8 then 0 else cur_depth+2 )
-		      else 0
-		    in
-		    let else_expr = 
-		      simplify
-			(get_arr_t_field_expr field_num tail
-			   (f_type_val_list @ [sign_extend_val] @ [zero_extend_val])
-			   ai_byte ai_f_sz ai_n else_depth) in
-		    let final_else_expr = 
-		      if cur_depth >= 8 then (
-			let else_sym_str = Printf.sprintf "else_%d_%d_%d_%d_%d_%d" 
-			  field_num start_byte end_byte n f_sz !else_sym_ind in
-			let else_sym = spfm#get_fresh_symbolic else_sym_str 8 in
-			else_sym_ind := !else_sym_ind + 1;
-			spfm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
-			else_sym
-		      ) else ( else_expr ) in
-		    
+		    Hashtbl.replace f_type_val_list sign_extend_val 1;
+		    Hashtbl.replace f_type_val_list zero_extend_val 1;
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
-			 final_else_expr )
+			 (simplify
+			    (get_arr_t_field_expr field_num tail
+			       ai_byte ai_f_sz ai_n) ) 
+		      )
 		   ) else (
 		    simplify (get_arr_t_field_expr field_num tail
-				f_type_val_list ai_byte ai_f_sz ai_n cur_depth)
+				ai_byte ai_f_sz ai_n)
 		   )
 	      ) else (
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
-		if ((List.mem sign_extend_val f_type_val_list) = false) &&
+		if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) &&
 		  (ai_n = n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
-		    let else_depth = 
-		      if !opt_split_target_formulas = true then (
-			if cur_depth >= 8 then 0 else cur_depth+2 )
-		      else 0
-		    in
-		    let else_expr = 
-		      simplify (get_arr_t_field_expr field_num tail
-				  (f_type_val_list @ [sign_extend_val])
-				  ai_byte ai_f_sz ai_n else_depth) in
-		    let final_else_expr = 
-		      if cur_depth >= 8 then (
-			let else_sym_str = Printf.sprintf "else_%d_%d_%d_%d_%d_%d" 
-			  field_num start_byte end_byte n f_sz !else_sym_ind in
-			let else_sym = spfm#get_fresh_symbolic else_sym_str 8 in
-			else_sym_ind := !else_sym_ind + 1;
-			spfm#add_to_path_cond (V.BinOp(V.EQ, else_sym, else_expr));
-			else_sym
-		      ) else ( else_expr ) in
-
+		    Hashtbl.replace f_type_val_list sign_extend_val 1;
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
-		      final_else_expr
+		      (simplify (get_arr_t_field_expr field_num tail
+				  ai_byte ai_f_sz ai_n))
 		   ) else (
 		    simplify (get_arr_t_field_expr field_num tail
-				f_type_val_list ai_byte ai_f_sz ai_n cur_depth)
+				ai_byte ai_f_sz ai_n)
 		   )
 	      )
 	  in
 	  let field_exprs = Hashtbl.create 1001 in
+	  let t_field_h = Hashtbl.create 100 in
+
 	  let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte =
 	    (* i_byte = interesting_byte *)
 	    match this_array_field_ranges_l with
@@ -2320,13 +2219,14 @@ struct
 		  (try
 		     Hashtbl.find field_exprs field_size_temp_str
 		   with Not_found ->
+		     Hashtbl.clear f_type_val_list;
 		     let new_q_exp =
 		       V.BinOp(V.EQ, field_size_temp,
-			       (get_arr_t_field_expr field array_field_ranges_l []
-				  (i_byte-start_byte) ai_f_sz ai_n 0)) in
-		       Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
-		       spfm#add_to_path_cond new_q_exp;
-		       new_q_exp)
+			       (get_arr_t_field_expr field array_field_ranges_l
+				  (i_byte-start_byte) ai_f_sz ai_n)) in
+		     Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
+		     spfm#add_to_path_cond new_q_exp;
+		     new_q_exp)
 		in
 		
 		if !opt_trace_struct_adaptor = true then 
@@ -2338,9 +2238,13 @@ struct
 	      )
 	  in
 	  
+	  if !opt_time_stats then
+	    (Printf.printf "byte expressions...";
+	     flush stdout);
+	  
 	  let byte_expr_l = ref [] in
 	  for i=0 to (max_size-1) do 
-	    let byte_expr = (get_arr_ite_ai_byte_expr (!((!i_byte_arr).(i))) i) in
+	    let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((!i_byte_arr).(i))) i) in
 	    let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i sym_input_region_l_ind) in
 	    let byte_expr_sym = spfm#get_fresh_symbolic byte_expr_sym_str 8 in
 	    let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
@@ -2348,14 +2252,16 @@ struct
 	      Printf.printf "SRFM#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		(V.exp_to_string q_exp);
 	    spfm#add_to_path_cond q_exp; 
-	    byte_expr_l := !byte_expr_l @ [(D.from_symbolic byte_expr_sym)];
+	    byte_expr_l := (D.from_symbolic byte_expr_sym) :: !byte_expr_l;
 	  done;
 
-	if !opt_trace_struct_adaptor = true then 
-	  Hashtbl.iter (fun key value ->
-	    Printf.printf "SRFM#apply_struct_adaptor t_field_h[%s] = %s\n" 
-	      (V.exp_to_string key) (V.exp_to_string value);
-	  ) t_field_h; 
+	  byte_expr_l := (List.rev !byte_expr_l);
+
+	  if !opt_trace_struct_adaptor = true then 
+	    Hashtbl.iter (fun key value ->
+	      Printf.printf "SRFM#apply_struct_adaptor t_field_h[%s] = %s\n" 
+		(V.exp_to_string key) (V.exp_to_string value);
+	    ) t_field_h; 
 	
 	  
 	  for i=0 to (max_size-1) do
@@ -2363,6 +2269,9 @@ struct
 	  done;
 	  
 	) sym_input_region_l;
+	if !opt_time_stats then
+	  (Printf.printf "SRFM#ready to apply (%f sec).\n" (Sys.time () -. start_time);
+	   flush stdout);
 
   end
     

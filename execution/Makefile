@@ -41,6 +41,7 @@ export SOURCES = \
 	binary_decision_tree.mli binary_decision_tree.ml \
 	exec_no_influence.mli exec_no_influence.ml \
 	sym_path_frag_machine.mli sym_path_frag_machine.ml \
+	adaptor_synthesis.mli adaptor_synthesis.ml \
 	sym_region_frag_machine.mli sym_region_frag_machine.ml \
 	special_handlers.mli special_handlers.ml \
 	noop_syscalls.mli noop_syscalls.ml \
@@ -48,7 +49,6 @@ export SOURCES = \
 	linux_loader.mli linux_loader.ml \
 	state_loader.mli state_loader.ml \
 	exec_run_common.mli exec_run_common.ml \
-	adaptor_synthesis.mli adaptor_synthesis.ml \
 	exec_runloop.mli exec_runloop.ml \
 	exec_stats.mli exec_stats.ml \
 	exec_fuzzloop.mli exec_fuzzloop.ml \
