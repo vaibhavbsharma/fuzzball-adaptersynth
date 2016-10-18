@@ -2093,71 +2093,12 @@ struct
 	    (Printf.printf "(%d)..." rnum;
 	     flush stdout);
 
-	  (* Moving array_field_ranges_l computation from here to AS.ml *)	
+	  (* Moving array_field_ranges_l, i_byte_arr, i_n_arr computation 
+	     from here to AS.ml *)	
 
-	  let array_field_ranges_l = !(Adaptor_synthesis.array_field_ranges_l') in
-	  if !opt_trace_struct_adaptor = true then
-	    Printf.printf "SRFM#array_field_ranges_l.length = %d\n" (List.length array_field_ranges_l);
-	  if !opt_trace_struct_adaptor = true then
-	    List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
-	      Printf.printf "array_field_ranges_l[%d]= (%d, %x, %x, %s)\n"
-		ind field_num start_b end_b (V.exp_to_string cond);
-	    ) array_field_ranges_l;
-
-	  (* Maintaining an index on field ranges by byte position *)
-	  let i_byte_arr = ref (Array.make 0 (ref [])) in
-	  for i = 1 to max_size do
-	    i_byte_arr := Array.append !i_byte_arr (Array.make 1 (ref []));
-	  done;
-
-	  let rec populate_i_byte l = 
-	    match l with
-	    | (_, s, e, _, _, _)::tail -> 
-	      for i = s to e do
-		((!i_byte_arr).(i)) := (List.hd l) :: !((!i_byte_arr).(i));
-	      done;
-	      populate_i_byte tail
-	    | [] -> ()
-	  in
-	  populate_i_byte array_field_ranges_l;
-
-	  let i_n_arr = ref (Array.make 0 (ref [])) in
-	  for i = 0 to max_size do
-	    i_n_arr := Array.append !i_n_arr (Array.make 1 (ref []));
-	  done;
-	  let rec populate_i_n l =
-	    match l with
-	    | (_, _, _, n, sz, _)::tail ->
-	      ((!i_n_arr).(n)) := (List.hd l) :: !((!i_n_arr).(n));
-	      populate_i_n tail
-	    | [] -> ()
-	  in 
-	  populate_i_n array_field_ranges_l;
-
-	  if !opt_trace_struct_adaptor = true then (
-	    for i=0 to max_size-1 do
-	      Printf.printf "i_byte_arr: for byte %d: \n" i;
-	      let l = !((!i_byte_arr).(i)) in
-	      for j=0 to (List.length l)-1 do
-		let (_, s, e, _, _, _) = (List.nth l j) in
-		Printf.printf "(%d, %d), " s e;
-	      done;
-	      Printf.printf "\n";
-	    done;
-	  );
-
-	  if !opt_trace_struct_adaptor = true then (
-	    for i=0 to max_size do
-	      Printf.printf "i_n_arr: for entries %d: \n" i;
-	      let l = !((!i_n_arr).(i)) in
-	      for j=0 to (List.length l)-1 do
-		let (_, s, e, _, _, _) = (List.nth l j) in
-		Printf.printf "(%d, %d), " s e;
-	      done;
-	      Printf.printf "\n";
-	    done;
-	  );
-
+	  let i_byte_arr = Adaptor_synthesis.i_byte_arr' in
+	  let i_n_arr = Adaptor_synthesis.i_n_arr' in
+	  
 	  
 	  let f_type_val_list = Hashtbl.create 1000 in
 	  

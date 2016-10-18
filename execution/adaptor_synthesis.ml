@@ -1006,6 +1006,8 @@ let from_concrete v sz =
   - f3_start = f2_start + f2_tot_sz + f2_p
 *)
 let array_field_ranges_l' = ref []
+let i_byte_arr' = ref (Array.make 0 (ref [])) 
+let i_n_arr' = ref (Array.make 0 (ref [])) 
 let create_field_ranges_l fm =
   (* Since we number fields from 1, 
      start array_offsets_l_h with a null entry *)
@@ -1143,7 +1145,67 @@ let create_field_ranges_l fm =
     (Printf.printf "field ranges...";
      flush stdout);
 
-  array_field_ranges_l' := (List.sort cmp_arr !tmp_arr_off_l)
+  array_field_ranges_l' := (List.sort cmp_arr !tmp_arr_off_l);
+  if !opt_trace_struct_adaptor = true then
+    Printf.printf "SRFM#array_field_ranges_l'.length = %d\n" (List.length !array_field_ranges_l');
+  if !opt_trace_struct_adaptor = true then
+    List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
+      Printf.printf "array_field_ranges_l'[%d]= (%d, %x, %x, %s)\n"
+	ind field_num start_b end_b (V.exp_to_string cond);
+    ) !array_field_ranges_l';
+
+  (* Maintaining an index on field ranges by byte position *)
+  for i = 1 to max_size do
+    i_byte_arr' := Array.append !i_byte_arr' (Array.make 1 (ref []));
+  done;
+
+  let rec populate_i_byte l = 
+    match l with
+    | (_, s, e, _, _, _)::tail -> 
+      for i = s to e do
+	((!i_byte_arr').(i)) := (List.hd l) :: !((!i_byte_arr').(i));
+      done;
+      populate_i_byte tail
+    | [] -> ()
+  in
+  populate_i_byte !array_field_ranges_l';
+
+  for i = 0 to max_size do
+    i_n_arr' := Array.append !i_n_arr' (Array.make 1 (ref []));
+  done;
+  let rec populate_i_n l =
+    match l with
+    | (_, _, _, n, sz, _)::tail ->
+      ((!i_n_arr').(n)) := (List.hd l) :: !((!i_n_arr').(n));
+      populate_i_n tail
+    | [] -> ()
+  in 
+  populate_i_n !array_field_ranges_l';
+
+  if !opt_trace_struct_adaptor = true then (
+    for i=0 to max_size-1 do
+      Printf.printf "i_byte_arr': for byte %d: \n" i;
+      let l = !((!i_byte_arr').(i)) in
+      for j=0 to (List.length l)-1 do
+	let (_, s, e, _, _, _) = (List.nth l j) in
+	Printf.printf "(%d, %d), " s e;
+      done;
+      Printf.printf "\n";
+    done;
+  );
+
+  if !opt_trace_struct_adaptor = true then (
+    for i=0 to max_size do
+      Printf.printf "i_n_arr': for entries %d: \n" i;
+      let l = !((!i_n_arr').(i)) in
+      for j=0 to (List.length l)-1 do
+	let (_, s, e, _, _, _) = (List.nth l j) in
+	Printf.printf "(%d, %d), " s e;
+      done;
+      Printf.printf "\n";
+    done;
+  )
+
 
 let struct_adaptor fm = 
   let from_concrete v sz = 
@@ -1273,8 +1335,7 @@ let struct_adaptor fm =
 	let array_field_ranges_l = (List.rev !tmp_l) in *)
 (* Commenting out for field_ranges_l ends here *)
 
-	let array_field_ranges_l = !array_field_ranges_l' in
-	if !opt_trace_struct_adaptor = true then
+(*	if !opt_trace_struct_adaptor = true then
 	  Printf.printf "AS#array_field_ranges_l.length = %d\n" (List.length array_field_ranges_l);
 	if !opt_trace_struct_adaptor = true then
 	  List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
@@ -1334,7 +1395,7 @@ let struct_adaptor fm =
 	    Printf.printf "\n";
 	    done;
 	);
-
+*)
 	let f_type_val_list = Hashtbl.create 1000 in
 
 	let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
@@ -1434,7 +1495,7 @@ let struct_adaptor fm =
                    let new_q_exp =
 		     V.BinOp(V.EQ, field_size_temp,
 			     (get_arr_t_field_expr field 
-				(List.rev !((!i_n_arr).(ai_n))) (* array_field_ranges_l *)
+				(List.rev !((!i_n_arr').(ai_n))) (* array_field_ranges_l *)
 				(i_byte-start_byte) ai_f_sz ai_n )) in
 		     Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
 		     fm#add_to_path_cond new_q_exp;
@@ -1455,7 +1516,7 @@ let struct_adaptor fm =
 	   flush stdout);
 	let byte_expr_l = ref [] in 
 	for i=0 to (max_size-1) do 
-	  let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((!i_byte_arr).(i))) i) in
+	  let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((!i_byte_arr').(i))) i) in
 	  let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i addr_list_ind) in
 	  let byte_expr_sym = fm#get_fresh_symbolic byte_expr_sym_str 8 in
 	  let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in

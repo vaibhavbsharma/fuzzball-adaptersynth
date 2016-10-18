@@ -157,7 +157,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
      let (n_fields, _) = !opt_struct_adaptor_params in 
-     if n_fields <> 0 then Adaptor_synthesis.create_field_ranges_l fm;
+     if n_fields <> 0 then 
+       Adaptor_synthesis.create_field_ranges_l fm;
      for i=1 to n_fields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "f%d_size" i in
