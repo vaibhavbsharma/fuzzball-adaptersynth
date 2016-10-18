@@ -21,6 +21,6 @@ val create_field_ranges_l :
   Fragment_machine.fragment_machine -> unit 
 val array_field_ranges_l' : (int * int * int * int * int * Vine.exp) list ref
 val i_byte_arr' :  (int * int * int * int * int * Vine.exp) list ref array ref
-val i_n_arr' : (int * int * int * int * int * Vine.exp) list ref array ref
+val i_n_arr' : (int * int * int * int) list ref array ref
 val struct_adaptor: 
   Fragment_machine.fragment_machine -> unit

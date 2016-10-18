@@ -2100,8 +2100,6 @@ struct
 	  let i_n_arr = Adaptor_synthesis.i_n_arr' in
 	  
 	  
-	  let f_type_val_list = Hashtbl.create 1000 in
-	  
 	  let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 	      ai_byte ai_f_sz ai_n =
 	  (* Assume ai_n equals target_n for now *)
@@ -2125,26 +2123,22 @@ struct
 	    let addr = 0L in
 	    match this_array_field_ranges_l with
 	    | [] -> failwith "SRFM#get_arr_t_field_expr ran out of this_array_field_ranges_l"
-	    | [(_, start_byte, end_byte, n, f_sz, _)] -> 
+	    | [(start_byte, end_byte, n, f_sz)] -> 
 	      assert(n = ai_n);
 	      let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	      get_ai_byte_expr n f_sz start_addr 1
-	    | (_, start_byte, end_byte, n, f_sz, _)::tail ->
+	    | (start_byte, end_byte, n, f_sz)::tail ->
 	      assert(n = ai_n);
 	      let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	      let is_extend_req = (f_sz - 8) in
 	      if is_extend_req <> 0 then (
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
-		if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) && 
-		  ((Hashtbl.mem f_type_val_list zero_extend_val) = false) &&
-		  (n = ai_n) then (
+		if  (n = ai_n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
-		    Hashtbl.replace f_type_val_list sign_extend_val 1;
-		    Hashtbl.replace f_type_val_list zero_extend_val 1;
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
 			 (simplify
@@ -2157,12 +2151,10 @@ struct
 		   )
 	      ) else (
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
-		if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) &&
-		  (ai_n = n) then (
+		if (ai_n = n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = spfm#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
-		    Hashtbl.replace f_type_val_list sign_extend_val 1;
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		      (simplify (get_arr_t_field_expr field_num tail
 				  ai_byte ai_f_sz ai_n))
@@ -2190,7 +2182,6 @@ struct
 		  (try
 		     Hashtbl.find field_exprs field_size_temp_str
 		   with Not_found ->
-		     Hashtbl.clear f_type_val_list;
 		     let new_q_exp =
 		       V.BinOp(V.EQ, field_size_temp,
 			       (get_arr_t_field_expr field 

@@ -1079,26 +1079,30 @@ let create_field_ranges_l fm =
       let num_bytes_remaining = 
 	(max_size - new_s_b - (n_fields - field_num)) in
       let max_n = (num_bytes_remaining/f_sz_t) in
-      for n = 1 to max_n do
-	let end_byte = new_s_b + n*f_sz_t - 1 in
+      (* considering number of array entries to be powers of 2 *)
+      let n = ref 1 in 
+      (* for n = 1 to max_n do *)
+      while !n <= max_n do
+	let end_byte = new_s_b + (!n)*f_sz_t - 1 in
 	let cond =
 	  V.BinOp(V.BITAND, prev_cond,
 		  (*V.BinOp(V.EQ, field_start, 
 			  V.Constant(V.Int(V.REG_16, (Int64.of_int new_s_b)))),*)
 		  V.BinOp(V.BITAND, 
 			  V.BinOp(V.EQ, field_sz, (from_concrete f_sz_t 16)),
-			  V.BinOp(V.EQ, field_n,  (from_concrete n 16)))) in
+			  V.BinOp(V.EQ, field_n,  (from_concrete !n 16)))) in
 	
 	let cond' = simplify (
 	if Hashtbl.mem (List.nth !array_offsets_l_h field_num) 
-	  (field_num, new_s_b, end_byte, n, f_sz_t) = true then (
+	  (field_num, new_s_b, end_byte, !n, f_sz_t) = true then (
 	    let this_cond = Hashtbl.find (List.nth !array_offsets_l_h field_num) 
-	      (field_num, new_s_b, end_byte, n, f_sz_t) in
+	      (field_num, new_s_b, end_byte, !n, f_sz_t) in
 	    V.BinOp(V.BITOR, this_cond, cond)
 	   ) else cond ) 
 	  in
 	Hashtbl.replace (List.nth !array_offsets_l_h field_num) 
-	  (field_num, new_s_b, end_byte, n, f_sz_t) cond';
+	  (field_num, new_s_b, end_byte, !n, f_sz_t) cond';
+	n := !n lsl 1;
       done;
     in
     get_ent 1; get_ent 2; get_ent 4; get_ent 8;
@@ -1149,9 +1153,9 @@ let create_field_ranges_l fm =
   if !opt_trace_struct_adaptor = true then
     Printf.printf "SRFM#array_field_ranges_l'.length = %d\n" (List.length !array_field_ranges_l');
   if !opt_trace_struct_adaptor = true then
-    List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
-      Printf.printf "array_field_ranges_l'[%d]= (%d, %x, %x, %s)\n"
-	ind field_num start_b end_b (V.exp_to_string cond);
+    List.iteri ( fun ind (field_num, start_b, end_b, n, sz, cond) ->
+      Printf.printf "array_field_ranges_l'[%d]= (%d, %d, %d, %d, %d, %s)\n"
+	ind field_num start_b end_b n sz (V.exp_to_string cond);
     ) !array_field_ranges_l';
 
   (* Maintaining an index on field ranges by byte position *)
@@ -1170,13 +1174,18 @@ let create_field_ranges_l fm =
   in
   populate_i_byte !array_field_ranges_l';
 
+  let i_n_arr_h = ref (Array.make 0 (Hashtbl.create 0)) in
   for i = 0 to max_size do
-    i_n_arr' := Array.append !i_n_arr' (Array.make 1 (ref []));
+    (* i_n_arr' := Array.append !i_n_arr' (Array.make 1 (ref [])); *)
+    i_n_arr_h := Array.append !i_n_arr_h (Array.make 1 (Hashtbl.create (max_size/2)));
   done;
+ 
   let rec populate_i_n l =
     match l with
-    | (_, _, _, n, sz, _)::tail ->
-      ((!i_n_arr').(n)) := (List.hd l) :: !((!i_n_arr').(n));
+    | (_, s, e, n, sz, _)::tail ->
+      (* ((!i_n_arr').(n)) := (s,e,n,sz) :: !((!i_n_arr').(n)); *)
+      Hashtbl.replace ((!i_n_arr_h).(n)) (s,e,n,sz) ();
+      (* ((!i_n_arr').(n)) := (List.hd l) :: !((!i_n_arr').(n)); *)
       populate_i_n tail
     | [] -> ()
   in 
@@ -1193,14 +1202,31 @@ let create_field_ranges_l fm =
       Printf.printf "\n";
     done;
   );
+  
+  Printf.printf "i_byte_arr list lengths = \n";
+  for i=0 to max_size-1 do
+    Printf.printf "%d "(List.length !((!i_byte_arr').(i)));
+  done;
+  Printf.printf "\n\n";
 
+  Printf.printf "i_n_arr_h Hashtbl lengths = \n";
+  for i=0 to max_size do
+    Printf.printf "%d "(Hashtbl.length ((!i_n_arr_h).(i))); 
+  done;
+  Printf.printf "\n\n";
+ 
+  for i=0 to max_size do
+    let l = (Hashtbl.fold (fun k () ul -> k::ul) ((!i_n_arr_h).(i)) []) in 
+    i_n_arr' := Array.append !i_n_arr' (Array.make 1 (ref l));
+  done;
+ 
   if !opt_trace_struct_adaptor = true then (
     for i=0 to max_size do
       Printf.printf "i_n_arr': for entries %d: \n" i;
       let l = !((!i_n_arr').(i)) in
       for j=0 to (List.length l)-1 do
-	let (_, s, e, _, _, _) = (List.nth l j) in
-	Printf.printf "(%d, %d), " s e;
+	let (s, e, n, sz) = (List.nth l j) in
+	Printf.printf "(%d, %d, %d, %d), " s e n sz;
       done;
       Printf.printf "\n";
     done;
@@ -1396,8 +1422,6 @@ let struct_adaptor fm =
 	    done;
 	);
 *)
-	let f_type_val_list = Hashtbl.create 1000 in
-
 	let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 	    ai_byte ai_f_sz ai_n =
 	  (* Assume ai_n equals target_n for now *)
@@ -1418,27 +1442,24 @@ let struct_adaptor fm =
 	  in
 	  match this_array_field_ranges_l with
 	  | [] -> failwith "AS#get_arr_t_field_expr ran out of this_array_field_ranges_l"
-	  | [(_, start_byte, end_byte, n, f_sz, _)] -> 
+	  | [(start_byte, end_byte, n, f_sz)] -> 
 	    assert(n = ai_n);
 	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	    get_ai_byte_expr n f_sz start_addr 1
-	  | (_, start_byte, end_byte, n, f_sz, _)::tail ->
+	  | (start_byte, end_byte, n, f_sz)::tail ->
 	    assert(n = ai_n);
 	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	    let is_extend_req = (f_sz - 8) in
+	    Printf.printf "%d (_,%d, %d, %d, %d, _)\n" field_num start_byte end_byte n f_sz;
 	    if is_extend_req <> 0 then (
 	      let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 	      let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
-	      if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) && 
-		((Hashtbl.mem f_type_val_list zero_extend_val) = false) &&
-		(n = ai_n) then (
+	      if (n = ai_n) then (
 		  let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		  let f_type = fm#get_fresh_symbolic f_type_str 64 in
 		  let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		  let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
 		  
-		  Hashtbl.replace f_type_val_list sign_extend_val 1;
-		  Hashtbl.replace f_type_val_list zero_extend_val 1;
 		  let else_expr =
 		    simplify
 		      (get_arr_t_field_expr field_num tail
@@ -1453,13 +1474,11 @@ let struct_adaptor fm =
 		  )
 	    ) else (
 	      let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
-	      if ((Hashtbl.mem f_type_val_list sign_extend_val) = false) &&
-		(ai_n = n) then (
+	      if (ai_n = n) then (
 		let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		let f_type = fm#get_fresh_symbolic f_type_str 64 in
 		let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 
-		Hashtbl.replace f_type_val_list sign_extend_val 1;
 		let else_expr =
 		  simplify
 		    (get_arr_t_field_expr field_num tail
@@ -1491,7 +1510,6 @@ let struct_adaptor fm =
 		(try
                    Hashtbl.find field_exprs field_size_temp_str
                  with Not_found ->
-		   Hashtbl.clear f_type_val_list;
                    let new_q_exp =
 		     V.BinOp(V.EQ, field_size_temp,
 			     (get_arr_t_field_expr field 
