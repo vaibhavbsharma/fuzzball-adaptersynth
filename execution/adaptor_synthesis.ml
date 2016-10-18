@@ -1297,6 +1297,19 @@ let struct_adaptor fm =
 	  | [] -> ()
 	in
 	populate_i_byte array_field_ranges_l;
+
+	let i_n_arr = ref (Array.make 0 (ref [])) in
+	for i = 0 to max_size do
+	  i_n_arr := Array.append !i_n_arr (Array.make 1 (ref []));
+	done;
+	let rec populate_i_n l =
+	  match l with
+	  | (_, _, _, n, sz, _)::tail ->
+	    ((!i_n_arr).(n)) := (List.hd l) :: !((!i_n_arr).(n));
+	      populate_i_n tail
+	  | [] -> ()
+	in 
+	populate_i_n array_field_ranges_l;
 	
 	if !opt_trace_struct_adaptor = true then (
 	  for i=0 to max_size-1 do
@@ -1309,7 +1322,19 @@ let struct_adaptor fm =
 	    Printf.printf "\n";
 	  done;
 	);
-	
+
+	if !opt_trace_struct_adaptor = true then (
+	  for i=0 to max_size do
+	    Printf.printf "i_n_arr: for entries %d: \n" i;
+	    let l = !((!i_n_arr).(i)) in
+	    for j=0 to (List.length l)-1 do
+	      let (_, s, e, _, _, _) = (List.nth l j) in
+	      Printf.printf "(%d, %d), " s e;
+	    done;
+	    Printf.printf "\n";
+	    done;
+	);
+
 	let f_type_val_list = Hashtbl.create 1000 in
 
 	let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
@@ -1333,9 +1358,11 @@ let struct_adaptor fm =
 	  match this_array_field_ranges_l with
 	  | [] -> failwith "AS#get_arr_t_field_expr ran out of this_array_field_ranges_l"
 	  | [(_, start_byte, end_byte, n, f_sz, _)] -> 
+	    assert(n = ai_n);
 	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	    get_ai_byte_expr n f_sz start_addr 1
 	  | (_, start_byte, end_byte, n, f_sz, _)::tail ->
+	    assert(n = ai_n);
 	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	    let is_extend_req = (f_sz - 8) in
 	    if is_extend_req <> 0 then (
@@ -1406,7 +1433,8 @@ let struct_adaptor fm =
 		   Hashtbl.clear f_type_val_list;
                    let new_q_exp =
 		     V.BinOp(V.EQ, field_size_temp,
-			     (get_arr_t_field_expr field array_field_ranges_l
+			     (get_arr_t_field_expr field 
+				(List.rev !((!i_n_arr).(ai_n))) (* array_field_ranges_l *)
 				(i_byte-start_byte) ai_f_sz ai_n )) in
 		     Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
 		     fm#add_to_path_cond new_q_exp;
