@@ -976,13 +976,16 @@ let ret_simplelen_adaptor fm in_nargs =
 
 *)
 
-let upcast expr extend_op end_sz =
-  match end_sz with
-  | 8  -> V.Cast(extend_op, V.REG_8 , expr)
-  | 16 -> V.Cast(extend_op, V.REG_16, expr)
-  | 32 -> V.Cast(extend_op, V.REG_32, expr)
-  | 64 -> V.Cast(extend_op, V.REG_64, expr)
-  | _ -> failwith "unsupported upcast end size"
+let upcast expr _extend_op end_sz =
+  match _extend_op with 
+  | (Some extend_op) ->  
+    (match end_sz with
+    | 8  -> V.Cast(extend_op, V.REG_8 , expr)
+    | 16 -> V.Cast(extend_op, V.REG_16, expr)
+    | 32 -> V.Cast(extend_op, V.REG_32, expr)
+    | 64 -> V.Cast(extend_op, V.REG_64, expr)
+    | _ -> failwith "unsupported upcast end size")
+  | None -> expr
 
 let from_concrete v sz = 
   match sz with 
@@ -1427,10 +1430,11 @@ let struct_adaptor fm =
 	  (* Assume ai_n equals target_n for now *)
 	  let get_ai_byte_expr target_n target_sz start_addr ex_op =
 	    let cast_op =
-	      if target_sz <= ai_f_sz then 
-		if ex_op = 1 then V.CAST_SIGNED 
-		else V.CAST_UNSIGNED
-	      else V.CAST_LOW
+	      if target_sz < ai_f_sz then 
+		if ex_op = 1 then (Some V.CAST_SIGNED) 
+		else (Some V.CAST_UNSIGNED)
+	      else if target_sz > ai_f_sz then (Some V.CAST_LOW)
+	      else None
 	    in
 	    (* translate ai_byte to a t_byte by using ai_f_sz and t_sz *)
 	    let ai_q = ai_byte/ai_f_sz in
@@ -1450,7 +1454,6 @@ let struct_adaptor fm =
 	    assert(n = ai_n);
 	    let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 	    let is_extend_req = (f_sz - 8) in
-	    Printf.printf "%d (_,%d, %d, %d, %d, _)\n" field_num start_byte end_byte n f_sz;
 	    if is_extend_req <> 0 then (
 	      let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 	      let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
