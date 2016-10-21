@@ -647,6 +647,7 @@ struct
       if !opt_trace_mem_snapshots then
 	Printf.printf "SRFM#compare_sym_se called len(f1_h_l) = %d len(f2_h_l)=%d\n"
 	  (List.length f1_hash_list) (List.length f2_hash_list);
+      
       List.iteri (fun ind ele -> 
 	let f2_hash = Hashtbl.copy (ele#get_mem) in
 	f2_hash_list <- f2_hash_list @ [f2_hash];
@@ -702,9 +703,9 @@ struct
 	) f2_hash_list;
 	
 	if !inequiv = 1 then
-	  if !opt_trace_mem_snapshots = true then
-	    (Printf.printf "SRFM#compare_sym_se inequivalent side-effects in symbolic regions\n";
-	     raise DisqualifiedPath;);
+	  ( if !opt_trace_mem_snapshots = true then
+	      Printf.printf "SRFM#compare_sym_se inequivalent side-effects in symbolic regions\n";
+	    raise DisqualifiedPath;);
       );
       List.iter (fun m -> m#reset ();) regions;
       f1_hash_list <- [];
@@ -1303,7 +1304,8 @@ struct
 	  min
 	else
 	  let mid = (min + max) / 2 in
-	  let mask = Int64.shift_right_logical (-1L) (64-mid) in
+	  let mask = if mid = 0 then 0L 
+	    else (Int64.shift_right_logical (-1L) (64-mid)) in
 	  let cond_e = V.BinOp(V.LE, e, V.Constant(V.Int(ty, mask))) in
 	  let in_bounds = self#query_valid cond_e in
 	    if !opt_trace_tables then
@@ -1436,7 +1438,7 @@ struct
 	  let cond_e = V.BinOp(V.LE, e, V.Constant(V.Int(ty, mid))) in
 	  let in_bounds = self#query_valid cond_e in
 	    if !opt_trace_tables then
-	      Printf.printf "(%s) < %Ld: %s\n" (V.exp_to_string e) mid
+	      Printf.printf "(%s) <= %Ld: %s\n" (V.exp_to_string e) mid
 		(if in_bounds then "valid" else "invalid");
 	    if in_bounds then
 	      loop min mid
@@ -1861,7 +1863,7 @@ struct
       in
       let stride = stride form_man off_exp in
       let stride64 = Int64.of_int stride in
-      let num_ents64 = Int64.div (Int64.succ maxval) stride64 in
+      let num_ents64 = Int64.succ (Int64.div maxval stride64) in
       let num_ents = Int64.to_int num_ents64 in
       let target_conds = ref [] in
         for i = 0 to num_ents - 1 do
@@ -2034,14 +2036,17 @@ struct
       f2_hash_list <- [];
       Hashtbl.clear concrete_cache
 
-    method apply_struct_adaptor () = 
-      let upcast expr extend_op end_sz =
-	match end_sz with
-	| 8  -> V.Cast(extend_op, V.REG_8 , expr)
-	| 16 -> V.Cast(extend_op, V.REG_16, expr)
-	| 32 -> V.Cast(extend_op, V.REG_32, expr)
-	| 64 -> V.Cast(extend_op, V.REG_64, expr)
-	| _ -> failwith "unsupported upcast end size"
+    method apply_struct_adaptor () =
+      let upcast expr _extend_op end_sz =
+	match _extend_op with 
+	| (Some extend_op) ->  
+	  (match end_sz with
+	  | 8  -> V.Cast(extend_op, V.REG_8 , expr)
+	  | 16 -> V.Cast(extend_op, V.REG_16, expr)
+	  | 32 -> V.Cast(extend_op, V.REG_32, expr)
+	  | 64 -> V.Cast(extend_op, V.REG_64, expr)
+	  | _ -> failwith "unsupported upcast end size")
+	| None -> expr
       in
       let from_concrete v sz = 
 	match sz with 
@@ -2105,10 +2110,11 @@ struct
 	  (* Assume ai_n equals target_n for now *)
 	    let get_ai_byte_expr target_n target_sz start_addr ex_op =
 	      let cast_op =
-		if target_sz <= ai_f_sz then 
-		  if ex_op = 1 then V.CAST_SIGNED 
-		  else V.CAST_UNSIGNED
-		else V.CAST_LOW
+		if target_sz < ai_f_sz then 
+		  if ex_op = 1 then (Some V.CAST_SIGNED) 
+		  else (Some V.CAST_UNSIGNED)
+		else if target_sz > ai_f_sz then (Some V.CAST_LOW)
+		else None
 	      in
 	    (* translate ai_byte to a t_byte by using ai_f_sz and t_sz *)
 	      let ai_q = ai_byte/ai_f_sz in
@@ -2216,6 +2222,9 @@ struct
 		(V.exp_to_string q_exp);
 	    spfm#add_to_path_cond q_exp; 
 	    byte_expr_l := (D.from_symbolic byte_expr_sym) :: !byte_expr_l;
+	    if !opt_time_stats then
+	      (Printf.printf "om%d " i;
+	       flush stdout);
 	  done;
 
 	  byte_expr_l := (List.rev !byte_expr_l);
