@@ -237,7 +237,7 @@ let symbolic_state_cmdline_opts =
        "save N argument registers at addr1, " ^
        "replace the return value at instruction with address 'addr2' "^
        "with an adaptor symbolic formula ");
-    ("-synth-struct-adaptor", Arg.String
+    ("-synthesize-struct-adaptor", Arg.String
       (fun s -> opt_synth_struct_adaptor := !opt_synth_struct_adaptor @ [(Int64.of_string s)];),
      "addr Using structure adaptor grammar, "^
        "write formulae at upto size bytes at addr");
