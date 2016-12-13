@@ -11,10 +11,14 @@ open Fragment_machine
 open Exec_run_common
 
 let call_replacements fm last_eip eip =
-  let ret_reg = match !opt_arch with
-    | X86 -> R_EAX
-    | X64 -> R_RAX
-    | ARM -> R0
+  let (ret_reg, set_reg_conc, set_reg_sym, set_reg_fresh) =
+    match !opt_arch with
+    | X86 -> (R_EAX, fm#set_word_var, fm#set_word_reg_symbolic,
+	      fm#set_word_reg_fresh_symbolic)
+    | X64 -> (R_RAX, fm#set_long_var, fm#set_long_reg_symbolic,
+	      fm#set_long_reg_fresh_symbolic)
+    | ARM -> (R0, fm#set_word_var, fm#set_word_reg_symbolic,
+	      fm#set_word_reg_fresh_symbolic)
   in
   let canon_eip eip =
     match !opt_arch with
@@ -70,7 +74,7 @@ let call_replacements fm last_eip eip =
       | (None, Some sfas_sym, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> ignore(fm#set_word_reg_fresh_symbolic ret_reg sfas_sym); None)
       | (None, None, Some sfar_sym, None, None, None, None, None, None, None) ->
-	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg sfar_sym; None)
+	  Some (fun () -> fm#set_reg_fresh_region ret_reg sfar_sym; None)
       | (None, None, None, Some cfa_val, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_var ret_reg cfa_val; None)
       | (None, None, None, None, Some cfas_sym, None, None, None, None, None) ->
@@ -78,7 +82,7 @@ let call_replacements fm last_eip eip =
       | (None, None, None, None, None, Some cfaso_sym, None, None, None, None) ->
 	  Some (fun () -> fm#set_word_reg_symbolic ret_reg cfaso_sym; None)
       | (None, None, None, None, None, None, Some cfar_sym, None, None, None) ->
-	  Some (fun () -> fm#set_word_reg_fresh_region ret_reg cfar_sym; None)
+	  Some (fun () -> fm#set_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
           Some (adaptor_mode,out_nargs,in_addr,in_nargs), None, None) ->
           (*** simple adaptor ***)
