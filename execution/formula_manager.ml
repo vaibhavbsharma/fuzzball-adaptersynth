@@ -1327,9 +1327,9 @@ when special_ec_vars\n"; *)
 	     in
 	     let walked_qdecls3 =
 	       list_unique
-		 ((Vine_util.list_difference walked_qdecls2 mem_vars_as_in)
-		  @ mem_axioms_d
-		  @ mem_bytes_d)
+		 ( mem_bytes_d 
+		   @ mem_axioms_d
+		   @ (Vine_util.list_difference walked_qdecls2 mem_vars_as_in) )
 	     in
 	       (walked_qdecls3, cond_expr))
       in
