@@ -82,7 +82,8 @@ sig
       
     method reset : unit -> unit
 
-    method apply_struct_adaptor: unit -> unit
+    method conc_mem_struct_adaptor: bool -> unit
+    method sym_region_struct_adaptor: unit
     
     method after_exploration : unit
 

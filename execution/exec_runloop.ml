@@ -89,12 +89,14 @@ let call_replacements fm last_eip eip =
           if adaptor_mode = "simple" 
           then Some (fun () -> 
 	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
-	    Adaptor_synthesis.struct_adaptor fm;
+	    fm#conc_mem_struct_adaptor false;
+	    fm#sym_region_struct_adaptor;
             (Some in_addr))
 	  else if adaptor_mode = "typeconv"
 	  then Some (fun () -> 
 	    Adaptor_synthesis.typeconv_adaptor fm out_nargs in_nargs;
-	    Adaptor_synthesis.struct_adaptor fm;
+	    fm#conc_mem_struct_adaptor false;
+	    fm#sym_region_struct_adaptor;
 	    (*Adaptor_synthesis.float_typeconv_adaptor fm out_nargs in_nargs;*)
             (Some in_addr))
 	  (*** adaptor using trees of arithmetic (integer) expressions ***)

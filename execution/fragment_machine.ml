@@ -370,7 +370,8 @@ class virtual fragment_machine = object
 
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
-  method virtual apply_struct_adaptor: unit -> unit
+  method virtual conc_mem_struct_adaptor: bool -> unit
+  method virtual sym_region_struct_adaptor: unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -655,7 +656,7 @@ struct
     val mutable f1_se = new GM.granular_hash_memory 
     val mutable f1_hash : ( (int64, GM.gran64) Hashtbl.t) = Hashtbl.create 0
     val mutable f2_se = new GM.granular_hash_memory
-
+    
     method add_f1_store addr = 
       if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	( if !opt_trace_stores then
@@ -823,25 +824,25 @@ struct
       
     method make_f1_sym_snap = 
       (* this method is implemented in SRFM *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#make_f1_sym_snap called\n";
       ()
 
     method save_f1_sym_se = 
       (* this method is implemented in SRFM *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#save_f1_sym_se called\n";
       ()
     
     method make_f2_sym_snap = 
       (* this method is implemented in SRFM *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#make_f2_sym_snap called\n";
       ()
 	
     method compare_sym_se =
       (* this method is implemented in SRFM *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#compare_sym_se called\n";
       ()
    
@@ -852,43 +853,47 @@ struct
       ()
 
     method save_f1_conc_se = 
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#save_f1_conc_se called\n";
+      (* Adaptor_synthesis.struct_adaptor self; *)
+      self#conc_mem_struct_adaptor true;
       f1_se <- mem#get_level4;
       f1_hash <- Hashtbl.copy f1_se#get_mem;
       mem#reset4_3 ();
       ()
-      
+
     method make_f2_conc_snap = 
       (* reset back to level 3 already completed in save_f1_conc_se *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#make_f2_conc_snap called\n";
       mem#make_snap ();
       ()
 
     method compare_conc_se =
       (* compare side-effects on concrete memory between f1 and f2 *)
-      if !opt_trace_mem_snapshots then
+      if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#compare_conc_se called\n";
       f2_se <- mem#get_level4;
       let f2_hash = (f2_se#get_mem) in
       let f1_nonlocal_se = Hashtbl.create 0 in
       let f2_nonlocal_se = Hashtbl.create 0 in
       Hashtbl.iter (fun addr chunk ->
-	let (exp, _) = GM.gran64_get_long chunk (f1_se#get_missing) addr in
+	let (exp1, _) = GM.gran64_get_long chunk (f1_se#get_missing) addr in
+	let exp = D.to_symbolic_64 exp1 in
 	if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	  (if !opt_trace_mem_snapshots = true then
 	      Printf.printf "In f1, addr = %Lx, rsp = %Lx was non-local side-effect\n" 
 		addr saved_f1_rsp;
-	   Hashtbl.replace f1_nonlocal_se addr (D.to_symbolic_64 exp);)
+	   Hashtbl.replace f1_nonlocal_se addr exp;)
       ) f1_hash;
       Hashtbl.iter (fun addr chunk ->
-	let (exp, _) = GM.gran64_get_long chunk (f2_se#get_missing) addr in
+	let (exp1, _) = GM.gran64_get_long chunk (f2_se#get_missing) addr in
+	let exp = D.to_symbolic_64 exp1 in
 	if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
 	  (if !opt_trace_mem_snapshots = true then
 	      Printf.printf "In f2, addr = %Lx, rsp = %Lx was non-local side-effect\n" 
 		addr saved_f2_rsp;
-	   Hashtbl.replace f2_nonlocal_se addr (D.to_symbolic_64 exp);)
+	   Hashtbl.replace f2_nonlocal_se addr exp;)
       ) f2_hash;
       
       (* Check for non-local memory side-effects equivalence here *)
@@ -914,11 +919,13 @@ struct
 	  try 
 	    ignore(Hashtbl.find f1_nonlocal_se addr)
 	  with Not_found ->
+	    (* is this correct ? wont this mem#load_long give us the same expr
+	       that is f2's non-local side-effect *)
 	    let f1_exp = D.to_symbolic_64 (mem#load_long addr) in
 	    if !opt_trace_mem_snapshots = true then
 	      Printf.printf "addr = %Lx f1_exp = %s f2_exp = %s\n"
 		addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
-	    self#query_exp f1_exp f2_exp; 
+	    self#query_exp f1_exp f2_exp;
 	) f2_nonlocal_se;
       );
       mem#reset4_3 ();
@@ -1071,6 +1078,16 @@ struct
 	  )
 	  else if eip = end2 then (
 	    in_f2_range <- false;
+	    (* use this snippet to disable SE eq chk when using the memsub adaptor
+	    let (n_fields, _) = !opt_struct_adaptor_params in
+	    if n_fields = 0 then (
+	      self#compare_sym_se ;
+	      self#compare_conc_se ;
+	    ) else (
+	      mem#reset4_3 ();
+	      saved_f1_rsp <- 0L;
+	      saved_f2_rsp <- 0L;
+	    ); *)
 	    self#compare_sym_se ;
 	    self#compare_conc_se ;
 	    self#reset_f2_special_handlers_snap ;
@@ -2178,8 +2195,8 @@ struct
 	self#reset_syscalls ;
       List.iter (fun h -> h#reset) special_handler_list
 
-  method apply_struct_adaptor () = 
-    Printf.printf "FM#apply_struct_adaptor should not have been called\n";
+  method sym_region_struct_adaptor = 
+    Printf.printf "FM#sym_region_struct_adaptor should not have been called\n";
   
   method add_special_handler (h:special_handler) =
       special_handler_list <- h :: special_handler_list
@@ -3201,5 +3218,204 @@ struct
     method load_long_concretize  addr (b:bool) (s:string)
       = self#load_long_conc addr
     method make_sink_region (s:string) (i:int64) = ()
+
+    method conc_mem_struct_adaptor end_of_f1 = 
+      let get_ite_expr arg op const_type const then_val else_val = 
+	V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
+              then_val,
+              else_val)
+      in
+      let upcast expr _extend_op end_sz =
+	match _extend_op with 
+	| (Some extend_op) ->  
+	  (match end_sz with
+	  | 8  -> V.Cast(extend_op, V.REG_8 , expr)
+	  | 16 -> V.Cast(extend_op, V.REG_16, expr)
+	  | 32 -> V.Cast(extend_op, V.REG_32, expr)
+	  | 64 -> V.Cast(extend_op, V.REG_64, expr)
+	  | _ -> failwith "unsupported upcast end size")
+	| None -> expr
+      in
+      let from_concrete v sz = 
+	match sz with 
+	| 8 -> assert(v >= -128 && v <= 0xff);
+	  V.Constant(V.Int(V.REG_8,  (Int64.of_int (v land 0xff))))
+	| 16 -> assert(v >= -65536 && v <= 0xffff);
+	  V.Constant(V.Int(V.REG_16, (Int64.of_int (v land 0xffff))))
+	| 32 -> V.Constant(V.Int(V.REG_32, (Int64.logand (Int64.of_int v) 0xffffffffL)))
+	| 64 -> V.Constant(V.Int(V.REG_64, (Int64.of_int v)))
+	| _ -> failwith "unsupported size passed to AS#from_concrete"
+      in
+      let get_byte expr pos =
+	V.Cast(V.CAST_LOW, V.REG_8, 
+	       V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
+      in
+      (* This simplifies formulas and introduces t-variables for comple
+	 sub-expressions. Doing this generally speeds things up, but it
+	 may make debugging the formulas less convenient, so you can disable
+	 it by make "simplify" be the identity function. *)
+      let simplify e = 
+	if !opt_split_target_formulas = true then self#simplify_exp e else e in
+
+      let start_time = Sys.time () in
+      if (List.length !opt_synth_struct_adaptor) <> 0 then (
+	if !opt_trace_struct_adaptor = true then
+	  Printf.printf "Starting structure adaptor\n";
+	if !opt_time_stats then
+	  (Printf.printf "Generating structure adaptor formulas...";
+	   flush stdout);
+	List.iteri ( fun addr_list_ind addr -> 
+	  if !opt_time_stats then
+	    (Printf.printf "(0x%08Lx)..." addr;
+	     flush stdout);
+	  if (Int64.abs (fix_s32 addr)) > 4096L then (
+	    let (n_fields, max_size) = !opt_struct_adaptor_params in
+	    let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
+		ai_byte ai_f_sz ai_n =
+	      (* Assume ai_n equals target_n for now *)
+	      let get_ai_byte_expr target_n target_sz start_addr ex_op =
+		let cast_op =
+		  if target_sz < ai_f_sz then 
+		    if ex_op = 1 then (Some V.CAST_SIGNED) 
+		    else (Some V.CAST_UNSIGNED)
+		  else if target_sz > ai_f_sz then (Some V.CAST_LOW)
+		  else None
+		in
+		(* translate ai_byte to a t_byte by using ai_f_sz and t_sz *)
+		let ai_q = ai_byte/ai_f_sz in
+		let ai_r = ai_byte mod ai_f_sz in
+		let tmp_addr = Int64.add start_addr (Int64.of_int (ai_q*target_sz)) in
+		let ai_entry = 
+		  upcast (self#load_sym tmp_addr (target_sz*8)) cast_op (ai_f_sz*8) 
+		in 
+		get_byte ai_entry ai_r
+	      in
+	      match this_array_field_ranges_l with
+	      | [] -> failwith "AS#get_arr_t_field_expr ran out of this_array_field_ranges_l"
+	      | [(start_byte, end_byte, n, f_sz)] -> 
+		assert(n = ai_n);
+		let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
+		get_ai_byte_expr n f_sz start_addr 1
+	      | (start_byte, end_byte, n, f_sz)::tail ->
+		assert(n = ai_n);
+		let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
+		let is_extend_req = (f_sz - 8) in
+		if is_extend_req <> 0 then (
+		  let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
+		  let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
+		  if (n = ai_n) then (
+		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
+		    let f_type = self#get_fresh_symbolic f_type_str 64 in
+		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
+		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
+		    
+		    let else_expr =
+		      simplify
+			(get_arr_t_field_expr field_num tail
+			   ai_byte ai_f_sz ai_n ) in
+		    
+		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
+		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
+			 else_expr )
+		  ) else (
+		    simplify (get_arr_t_field_expr field_num tail
+				ai_byte ai_f_sz ai_n )
+		  )
+		) else (
+		  let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
+		  if (ai_n = n) then (
+		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
+		    let f_type = self#get_fresh_symbolic f_type_str 64 in
+		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
+
+		    let else_expr =
+		      simplify
+			(get_arr_t_field_expr field_num tail
+			   ai_byte ai_f_sz ai_n ) in
+		    
+		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
+		      else_expr
+		  ) else (
+		    simplify (get_arr_t_field_expr field_num tail
+				ai_byte ai_f_sz ai_n )
+		  )
+		)
+	    in
+	    let field_exprs = Hashtbl.create 1001 in
+	    let t_field_h = Hashtbl.create 1000 in
+	    let i_n_arr = !Adaptor_synthesis.i_n_arr' in
+	    let i_byte_arr = !Adaptor_synthesis.i_byte_arr' in
+	    let unique_str = if end_of_f1 = true then "_f1_" else "" in
+	    let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte = 
+	      (* i_byte = interesting_byte *)
+	      match this_array_field_ranges_l with
+	      | [] -> from_concrete 0 8
+	      | (field, start_byte, end_byte, ai_n, ai_f_sz, cond)::tail ->
+		if (i_byte >= start_byte) && (i_byte <= end_byte) then (
+		  let field_size_temp_str = "arr_as_t_field_"^
+		    (Printf.sprintf "%s%d_n%d_sz%d_b%d_%d" unique_str field ai_n ai_f_sz 
+		       (i_byte-start_byte) addr_list_ind)
+		  in
+		  let field_size_temp = self#get_fresh_symbolic field_size_temp_str 8 in
+
+		  let q_exp = 
+		    (try
+                       Hashtbl.find field_exprs field_size_temp_str
+                     with Not_found ->
+                       let new_q_exp =
+			 V.BinOp(V.EQ, field_size_temp,
+				 (get_arr_t_field_expr field 
+				    (List.rev !((i_n_arr).(ai_n))) (* array_field_ranges_l *)
+				    (i_byte-start_byte) ai_f_sz ai_n )) in
+		       Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
+		       self#add_to_path_cond new_q_exp;
+		       new_q_exp)
+		  in
+
+		  if !opt_trace_struct_adaptor = true then
+		    Hashtbl.replace t_field_h field_size_temp q_exp;
+		  
+		  V.Ite(cond, field_size_temp, 
+			(get_arr_ite_ai_byte_expr tail i_byte ))
+		) else (
+		  get_arr_ite_ai_byte_expr tail i_byte 
+		)
+	    in
+	    if !opt_time_stats then
+	      (Printf.printf "byte expressions...";
+	       flush stdout);
+	    let byte_expr_l = ref [] in 
+	    for i=0 to (max_size-1) do 
+	      let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) in
+	      let byte_expr_sym_str = 
+		"arr_ai_byte_"^(Printf.sprintf "%s%d_%d" unique_str i addr_list_ind) in
+	      let byte_expr_sym = self#get_fresh_symbolic byte_expr_sym_str 8 in
+	      let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
+	      if !opt_trace_struct_adaptor = true then
+		Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
+		  (V.exp_to_string q_exp);
+	      self#add_to_path_cond q_exp; 
+	      byte_expr_l := byte_expr_sym :: !byte_expr_l;
+	    done;
+	    byte_expr_l := (List.rev !byte_expr_l);
+
+	    if !opt_trace_struct_adaptor = true then
+	      Hashtbl.iter (fun key value ->
+		Printf.printf "AS#apply_struct_adaptor t_field_h[%s] = %s\n" 
+		  (V.exp_to_string key) (V.exp_to_string value);
+	      ) t_field_h; 
+	    
+	    for i=0 to (max_size-1) do
+	      self#store_sym (Int64.add addr (Int64.of_int i)) 8 (List.nth !byte_expr_l i);
+	    done;
+	    
+	  );
+	  
+	) !opt_synth_struct_adaptor;
+      );
+      if !opt_time_stats then
+	(Printf.printf "AS#ready to apply (%f sec).\n" (Sys.time () -. start_time);
+	 flush stdout);
+
   end
 end

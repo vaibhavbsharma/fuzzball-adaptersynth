@@ -1236,7 +1236,7 @@ let create_field_ranges_l fm =
   )
 
 
-let struct_adaptor fm = 
+let struct_adaptor (fm:fragment_machine) = 
   let from_concrete v sz = 
     match sz with 
     | 8 -> assert(v >= -128 && v <= 0xff);
@@ -1425,6 +1425,7 @@ let struct_adaptor fm =
 	    done;
 	);
 *)
+	
 	let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 	    ai_byte ai_f_sz ai_n =
 	  (* Assume ai_n equals target_n for now *)
@@ -1440,8 +1441,9 @@ let struct_adaptor fm =
 	    let ai_q = ai_byte/ai_f_sz in
 	    let ai_r = ai_byte mod ai_f_sz in
 	    let tmp_addr = Int64.add start_addr (Int64.of_int (ai_q*target_sz)) in
-	    let ai_entry = upcast 
-	      (fm#load_sym tmp_addr (target_sz*8)) cast_op (ai_f_sz*8) in 
+	    let ai_entry = 
+		upcast (fm#load_sym tmp_addr (target_sz*8)) cast_op (ai_f_sz*8) 
+	    in 
 	    get_byte ai_entry ai_r
 	  in
 	  match this_array_field_ranges_l with
@@ -1527,9 +1529,9 @@ let struct_adaptor fm =
 		Hashtbl.replace t_field_h field_size_temp q_exp;
 	      
 	      V.Ite(cond, field_size_temp, 
-		    (get_arr_ite_ai_byte_expr tail i_byte))
+		    (get_arr_ite_ai_byte_expr tail i_byte ))
 	    ) else (
-	      get_arr_ite_ai_byte_expr tail i_byte
+	      get_arr_ite_ai_byte_expr tail i_byte 
 	    )
 	in
 	if !opt_time_stats then
@@ -1547,9 +1549,8 @@ let struct_adaptor fm =
 	  fm#add_to_path_cond q_exp; 
 	  byte_expr_l := byte_expr_sym :: !byte_expr_l;
 	done;
-
 	byte_expr_l := (List.rev !byte_expr_l);
-	
+
 	if !opt_trace_struct_adaptor = true then
 	  Hashtbl.iter (fun key value ->
 	    Printf.printf "AS#apply_struct_adaptor t_field_h[%s] = %s\n" 
@@ -1563,9 +1564,8 @@ let struct_adaptor fm =
       );
       
     ) !opt_synth_struct_adaptor;
-    
   );
   if !opt_time_stats then
     (Printf.printf "AS#ready to apply (%f sec).\n" (Sys.time () -. start_time);
      flush stdout);
-  fm#apply_struct_adaptor ();
+  fm#sym_region_struct_adaptor;

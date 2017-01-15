@@ -139,7 +139,8 @@ class virtual fragment_machine : object
 
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
-  method virtual apply_struct_adaptor: unit -> unit
+  method virtual conc_mem_struct_adaptor: bool -> unit
+  method virtual sym_region_struct_adaptor: unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -185,6 +186,7 @@ class virtual fragment_machine : object
   method virtual make_f1_conc_snap : unit 
   method virtual save_f1_sym_se : unit
   method virtual save_f1_conc_se : unit
+
   method virtual make_f2_sym_snap : unit
   method virtual make_f2_conc_snap : unit
   method virtual compare_sym_se : unit
@@ -428,7 +430,8 @@ sig
 
     method make_snap : unit -> unit
     method reset : unit -> unit
-    method apply_struct_adaptor: unit -> unit
+    method conc_mem_struct_adaptor: bool -> unit
+    method sym_region_struct_adaptor: unit
 
     method add_special_handler : special_handler -> unit
 

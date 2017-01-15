@@ -520,6 +520,7 @@ struct
 
     val mutable regions : GM.granular_snapshot_memory list = []
     val mutable region_conc_addr_h = Hashtbl.create 101
+    val mutable conc_addr_region_h = Hashtbl.create 101
     val mutable sym_input_region_l = []
     val region_vals = Hashtbl.create 101
 
@@ -778,8 +779,14 @@ struct
 	  match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
 	  | V.Constant(V.Int(V.REG_64, _const)) -> 
-	    if (Int64.abs (fix_s32 _const)) > 4096L then
-	      const := !const @ [_const];
+	    if (Int64.abs (fix_s32 _const)) > 4096L then (
+	      (* if a concrete address has already been used for eager
+		 concretization of region R, then add to the tail of const
+		 so that it does not force this region to be equal to region R *)
+	      if Hashtbl.length conc_addr_region_h = 0 || 
+		Hashtbl.mem conc_addr_region_h _const then
+		  const := !const @ [_const] 
+		else const := _const :: !const );
 	    V.Constant(V.Int(V.REG_64, _const))
 	  | V.Ite(ce, te, fe) ->
 	    V.Ite((loop ce), (loop te), (loop fe))
@@ -837,6 +844,7 @@ struct
 	  | _ -> ());
 	Hashtbl.replace region_vals_per_path e new_region;
 	Hashtbl.replace region_conc_addr_h new_region !conc_addr;
+	Hashtbl.replace conc_addr_region_h !conc_addr new_region;
 	if !is_sym_input_region_l = true then
 	  sym_input_region_l <- sym_input_region_l @ [new_region];
 	if !opt_trace_regions then
@@ -1142,7 +1150,6 @@ struct
     (* Because we override handle_{load,store}, this should only be
        called for jumps. *)
     method eval_addr_exp exp =
-      (* let (r, addr, _, _, _) = self#eval_addr_exp_region exp 0xa000 in *)
       match (self#eval_addr_exp_region exp 0xa000 (fun _ _ -> None)) with
       | SingleLocation(r, addr) ->
 	(match r with
@@ -1973,21 +1980,21 @@ struct
       if (!opt_no_table_store) ||
 	not (self#maybe_table_or_concrete_store addr_e ty value)
       then
-      let location = 
-	self#eval_addr_exp_region addr_e 0x9000 (self#decide_maxval "Store") in
-      let r = ref None in
-      let addr = ref 0L in
-      let table_store_status =
-	match location with
-	| TableLocation(r, off_exp, cloc) ->
-	  (match self#decide_maxval "Store" off_exp 0L with
-	  | None -> false
-	  | Some maxval -> 
-	    self#table_store cloc r off_exp 
-	      (D.to_symbolic_32 (self#eval_int_exp_simplify addr_e)) 
-	      maxval ty value)
-	| SingleLocation(r', addr') -> r := r'; addr := addr'; false
-      in
+	let location = 
+	  self#eval_addr_exp_region addr_e 0x9000 (self#decide_maxval "Store") in
+	let r = ref None in
+	let addr = ref 0L in
+	let table_store_status =
+	  match location with
+	  | TableLocation(r, off_exp, cloc) ->
+	    (match self#decide_maxval "Store" off_exp 0L with
+	    | None -> false
+	    | Some maxval -> 
+	      self#table_store cloc r off_exp 
+		(D.to_symbolic_32 (self#eval_int_exp_simplify addr_e)) 
+		maxval ty value)
+	  | SingleLocation(r', addr') -> r := r'; addr := addr'; false
+	in
 	if !r = Some 0 && (Int64.abs (fix_s32 !addr)) < 4096L then
 	  raise NullDereference;
 	if !opt_trace_stores then
@@ -2082,12 +2089,13 @@ struct
       Hashtbl.clear region_val_queried;
       Hashtbl.clear region_vals_per_path;
       Hashtbl.clear region_conc_addr_h;
+      Hashtbl.clear conc_addr_region_h;
       sym_input_region_l <- [];
       f1_hash_list <- [];
       f2_hash_list <- [];
       Hashtbl.clear concrete_cache
 
-    method apply_struct_adaptor () =
+    method sym_region_struct_adaptor =
       let upcast expr _extend_op end_sz =
 	match _extend_op with 
 	| (Some extend_op) ->  
