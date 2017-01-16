@@ -119,6 +119,7 @@ let opt_synth_ret_adaptor = ref []
 let opt_synth_struct_adaptor = ref []
 let opt_struct_adaptor_params = ref (0,0)
 let opt_adaptor_search_mode  = ref false
+let opt_adaptor_ivc = ref false
 let opt_split_target_formulas = ref false
 let opt_synth_simplelen_adaptor = ref []
 let synth_extra_conditions = ref []

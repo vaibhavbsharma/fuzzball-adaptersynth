@@ -516,6 +516,7 @@ class virtual fragment_machine = object
     -> (bool * Query_engine.sat_assign)
 
   method virtual query_condition : Vine.exp -> bool option -> int -> (bool * bool option) 
+  method virtual query_unique_value : Vine.exp -> Vine.typ -> int64 option
   method virtual add_to_path_cond : Vine.exp -> unit
 
   method virtual match_input_var : string -> int option
@@ -855,7 +856,6 @@ struct
     method save_f1_conc_se = 
       if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#save_f1_conc_se called\n";
-      (* Adaptor_synthesis.struct_adaptor self; *)
       self#conc_mem_struct_adaptor true;
       f1_se <- mem#get_level4;
       f1_hash <- Hashtbl.copy f1_se#get_mem;
@@ -3193,6 +3193,7 @@ struct
     method query_condition (e:Vine.exp) (b:bool option) 
 	(i:int) : (bool * bool option) =
       (false,None)
+    method query_unique_value (e:Vine.exp) (t:Vine.typ) = None
     method add_to_path_cond (e:Vine.exp) = ()
     method match_input_var (s:string) : int option = None
     method get_path_cond : Vine.exp list = []
@@ -3394,8 +3395,24 @@ struct
 	      if !opt_trace_struct_adaptor = true then
 		Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		  (V.exp_to_string q_exp);
-	      self#add_to_path_cond q_exp; 
-	      byte_expr_l := byte_expr_sym :: !byte_expr_l;
+	      self#add_to_path_cond q_exp;
+
+	      (* if this is CE search, check if byte_expr has unique value *)
+	      let final_byte_val = 
+		if not !opt_adaptor_ivc || !opt_adaptor_search_mode then
+		  byte_expr_sym 
+		else (
+		  match self#query_unique_value byte_expr_sym V.REG_8 with
+		  | Some v ->
+		    Printf.printf "%s has unique value %Lx\n" 
+		      (V.exp_to_string byte_expr_sym) v;
+		    (V.Constant(V.Int(V.REG_8, v)))
+		  | None -> 
+		    Printf.printf "%s does not have unique value\n" 
+		      (V.exp_to_string byte_expr_sym);
+		    byte_expr_sym )
+	      in
+	      byte_expr_l := final_byte_val :: !byte_expr_l;
 	    done;
 	    byte_expr_l := (List.rev !byte_expr_l);
 

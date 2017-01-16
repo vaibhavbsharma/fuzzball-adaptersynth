@@ -491,6 +491,8 @@ let cmdline_opts =
     ("-adaptor-search-mode", Arg.Set(opt_adaptor_search_mode),
      " Run in adaptor search mode, FuzzBALL will run in counter example mode"^
        " if left unspecified");
+    ("-adaptor-ivc", Arg.Set(opt_adaptor_ivc),
+     " Run implied value concretization on adaptor formulas");
     ("-trace-detailed",
      (Arg.Unit
 	(fun () ->

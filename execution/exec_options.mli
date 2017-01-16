@@ -97,6 +97,7 @@ val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
 val opt_synth_struct_adaptor : int64 list ref
 val opt_struct_adaptor_params : (int * int) ref
 val opt_adaptor_search_mode : bool ref
+val opt_adaptor_ivc : bool ref
 val opt_split_target_formulas : bool ref
 val opt_synth_simplelen_adaptor : (int64 * int64 * int64 * int64 * int64) list ref
 val synth_extra_conditions : Vine.exp list ref

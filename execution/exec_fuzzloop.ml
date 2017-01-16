@@ -163,7 +163,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "f%d_size" i in
        let field_n_str = Printf.sprintf "f%d_n" i in
-       ignore(fm#get_fresh_symbolic field_n_str 16);
+       let field_n = fm#get_fresh_symbolic field_n_str 16 in
        let field_sz_sym = fm#get_fresh_symbolic field_size_str 16 in
        let tmp_cond = (* f1_size == (0 || 1 || 2 || 4 || 8) *)
 	 V.BinOp(
@@ -207,8 +207,21 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	     (V.exp_to_string tmp_cond2);
 	   opt_extra_conditions := tmp_cond2 :: !opt_extra_conditions; 
 	 );
-       done;
-     done;
+       done; (* end for j *)
+       
+       (* i_end_b - i_start_b + 1 should be divisible by field_n *)
+       let i_bytes = V.BinOp(V.MINUS, 
+			     V.BinOp(
+			       V.PLUS, i_end_b, V.Constant(V.Int(V.REG_64, 1L))),
+			     i_start_b) in
+       let tmp_cond3 = V.BinOp(V.EQ, 
+			       V.BinOp(V.MOD, i_bytes, 
+				       V.Cast(V.CAST_UNSIGNED, V.REG_64, field_n)), 
+			       V.Constant(V.Int(V.REG_64, 0L))) in
+       Printf.printf "exec_fuzzloop adding tmp_cond3 = %s\n"
+	 (V.exp_to_string tmp_cond3);
+       opt_extra_conditions := tmp_cond3 :: !opt_extra_conditions; 
+     done; (* end for i *)
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
        let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in

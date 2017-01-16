@@ -597,8 +597,24 @@ let simple_adaptor fm out_nargs in_nargs =
   in
   if in_nargs > 0L then  (
     main_loop ((Int64.to_int in_nargs)-1);
-    List.iteri (fun index expr ->
-	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
+    List.iteri (fun index _expr ->
+      let expr =  
+	if (not !opt_adaptor_ivc) || !opt_adaptor_search_mode then 
+	  _expr
+	else (
+	  match fm#query_unique_value _expr V.REG_64 with
+	  | Some v ->
+	    Printf.printf "%s has unique value %Lx\n" 
+	      (V.exp_to_string _expr) v;
+	    (V.Constant(V.Int(V.REG_64, v)))
+	  | None -> 
+	    Printf.printf "%s does not have unique value\n" 
+	      (V.exp_to_string _expr);
+	    _expr
+	)
+      in
+      fm#set_reg_symbolic (List.nth arg_regs index) expr;
+    ) !symbolic_args;
   )
 
 (* Simple adaptor code ends here *)
