@@ -1027,6 +1027,7 @@ let from_concrete v sz =
 let array_field_ranges_l' = ref []
 let i_byte_arr' = ref (Array.make 0 (ref [])) 
 let i_n_arr' = ref (Array.make 0 (ref [])) 
+let ranges_by_field_num = ref (Array.make 0 (ref []))
 let create_field_ranges_l fm =
   (* Since we number fields from 1, 
      start array_offsets_l_h with a null entry *)
@@ -1238,7 +1239,21 @@ let create_field_ranges_l fm =
     let l = (Hashtbl.fold (fun k () ul -> k::ul) ((!i_n_arr_h).(i)) []) in 
     i_n_arr' := Array.append !i_n_arr' (Array.make 1 (ref l));
   done;
- 
+
+  (* Creating an array of lists populated with ranges for each field 
+     to setup side-conditions in exec_fuzzloop *)
+  for i = 0 to n_fields do
+    ranges_by_field_num := Array.append !ranges_by_field_num (Array.make 1 (ref []));
+  done;
+  List.iter (
+    fun (f_num, s, e, _, sz, _) ->
+      (!ranges_by_field_num).(f_num) := (Int64.of_int ((s lsl 32)+(e lsl 16)+1)) 
+      :: !((!ranges_by_field_num).(f_num));
+      if sz != 8 then
+	(!ranges_by_field_num).(f_num) := (Int64.of_int ((s lsl 32)+(e lsl 16)+0)) 
+	:: !((!ranges_by_field_num).(f_num));
+  ) !array_field_ranges_l';
+
   if !opt_trace_struct_adaptor = true then (
     for i=0 to max_size do
       Printf.printf "i_n_arr': for entries %d: \n" i;

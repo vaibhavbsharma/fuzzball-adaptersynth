@@ -553,6 +553,7 @@ class virtual fragment_machine = object
   method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
+  method virtual reset_struct_counts: unit 
 
   method virtual restrict_symbolic_expr : 
     register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
@@ -657,7 +658,10 @@ struct
     val mutable f1_se = new GM.granular_hash_memory 
     val mutable f1_hash : ( (int64, GM.gran64) Hashtbl.t) = Hashtbl.create 0
     val mutable f2_se = new GM.granular_hash_memory
-    
+
+    val mutable e_o_f1_count = ref 0
+    val mutable f2_init_count = ref 0
+
     method add_f1_store addr = 
       if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	( if !opt_trace_stores then
@@ -1078,8 +1082,8 @@ struct
 	  )
 	  else if eip = end2 then (
 	    in_f2_range <- false;
-	    (* use this snippet to disable SE eq chk when using the memsub adaptor
-	    let (n_fields, _) = !opt_struct_adaptor_params in
+	    (* use this snippet to disable SE eq chk when using the memsub adaptor *)
+	    (* let (n_fields, _) = !opt_struct_adaptor_params in
 	    if n_fields = 0 then (
 	      self#compare_sym_se ;
 	      self#compare_conc_se ;
@@ -1087,7 +1091,7 @@ struct
 	      mem#reset4_3 ();
 	      saved_f1_rsp <- 0L;
 	      saved_f2_rsp <- 0L;
-	    ); *)
+	    );*) 
 	    self#compare_sym_se ;
 	    self#compare_conc_se ;
 	    self#reset_f2_special_handlers_snap ;
@@ -1095,6 +1099,10 @@ struct
       ) !opt_match_syscalls_addr_range;
       self#watchpoint
 
+    method reset_struct_counts = 
+      e_o_f1_count := 0;
+      f2_init_count := 0;
+	
     method get_eip =
       match !opt_arch with
 	| X86 -> self#get_word_var R_EIP
@@ -3265,7 +3273,8 @@ struct
 	if !opt_time_stats then
 	  (Printf.printf "Generating structure adaptor formulas...";
 	   flush stdout);
-	List.iteri ( fun addr_list_ind addr -> 
+	let addr_list_ind = if end_of_f1 then !e_o_f1_count else !f2_init_count in
+	let addr = List.nth !opt_synth_struct_adaptor addr_list_ind in
 	  if !opt_time_stats then
 	    (Printf.printf "(0x%08Lx)..." addr;
 	     flush stdout);
@@ -3273,7 +3282,7 @@ struct
 	    let (n_fields, max_size) = !opt_struct_adaptor_params in
 	    let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 		ai_byte ai_f_sz ai_n =
-	      (* Assume ai_n equals target_n for now *)
+		(* Assume ai_n equals target_n for now *)
 	      let get_ai_byte_expr target_n target_sz start_addr ex_op =
 		let cast_op =
 		  if target_sz < ai_f_sz then 
@@ -3282,7 +3291,7 @@ struct
 		  else if target_sz > ai_f_sz then (Some V.CAST_LOW)
 		  else None
 		in
-		(* translate ai_byte to a t_byte by using ai_f_sz and t_sz *)
+		  (* translate ai_byte to a t_byte by using ai_f_sz and t_sz *)
 		let ai_q = ai_byte/ai_f_sz in
 		let ai_r = ai_byte mod ai_f_sz in
 		let tmp_addr = Int64.add start_addr (Int64.of_int (ai_q*target_sz)) in
@@ -3346,9 +3355,9 @@ struct
 	    let t_field_h = Hashtbl.create 1000 in
 	    let i_n_arr = !Adaptor_synthesis.i_n_arr' in
 	    let i_byte_arr = !Adaptor_synthesis.i_byte_arr' in
-	    let unique_str = if end_of_f1 = true then "_f1_" else "" in
+	    let unique_str = if end_of_f1 then "_f1_" else "" in
 	    let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte = 
-	      (* i_byte = interesting_byte *)
+		(* i_byte = interesting_byte *)
 	      match this_array_field_ranges_l with
 	      | [] -> from_concrete 0 8
 	      | (field, start_byte, end_byte, ai_n, ai_f_sz, cond)::tail ->
@@ -3361,9 +3370,9 @@ struct
 
 		  let q_exp = 
 		    (try
-                       Hashtbl.find field_exprs field_size_temp_str
+		       Hashtbl.find field_exprs field_size_temp_str
                      with Not_found ->
-                       let new_q_exp =
+		       let new_q_exp =
 			 V.BinOp(V.EQ, field_size_temp,
 				 (get_arr_t_field_expr field 
 				    (List.rev !((i_n_arr).(ai_n))) (* array_field_ranges_l *)
@@ -3397,7 +3406,7 @@ struct
 		  (V.exp_to_string q_exp);
 	      self#add_to_path_cond q_exp;
 
-	      (* if this is CE search, check if byte_expr has unique value *)
+		(* if this is CE search, check if byte_expr has unique value *)
 	      let final_byte_val = 
 		if not !opt_adaptor_ivc || !opt_adaptor_search_mode then
 		  byte_expr_sym 
@@ -3427,8 +3436,8 @@ struct
 	    done;
 	    
 	  );
-	  
-	) !opt_synth_struct_adaptor;
+	  if end_of_f1 then e_o_f1_count := !e_o_f1_count + 1
+	  else f2_init_count := !f2_init_count + 1;
       );
       if !opt_time_stats then
 	(Printf.printf "AS#ready to apply (%f sec).\n" (Sys.time () -. start_time);

@@ -159,6 +159,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      let (n_fields, _) = !opt_struct_adaptor_params in 
      if n_fields <> 0 then 
        Adaptor_synthesis.create_field_ranges_l fm;
+     let field_ranges = Adaptor_synthesis.ranges_by_field_num in
      for i=1 to n_fields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "f%d_size" i in
@@ -208,7 +209,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	   opt_extra_conditions := tmp_cond2 :: !opt_extra_conditions; 
 	 );
        done; (* end for j *)
-       
+      
+       (* end_byte must be >= start_byte *)
+       opt_extra_conditions := V.BinOp(V.LE, i_start_b, i_end_b) :: !opt_extra_conditions;
+      
        (* i_end_b - i_start_b + 1 should be divisible by field_n *)
        let i_bytes = V.BinOp(V.MINUS, 
 			     V.BinOp(
@@ -221,6 +225,42 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        Printf.printf "exec_fuzzloop adding tmp_cond3 = %s\n"
 	 (V.exp_to_string tmp_cond3);
        opt_extra_conditions := tmp_cond3 :: !opt_extra_conditions; 
+       
+       (* (end_byte-start_byte+1)/n == 1, 2, 4, or 8 *)
+       let size_cond1 = V.BinOp(V.EQ, V.Constant(V.Int(V.REG_64, 1L)), 
+				       V.BinOp(V.DIVIDE, i_bytes, 
+					       V.Cast(
+						 V.CAST_UNSIGNED, V.REG_64, field_n))) in
+       let size_cond2 = V.BinOp(V.EQ, V.Constant(V.Int(V.REG_64, 2L)), 
+				       V.BinOp(V.DIVIDE, i_bytes, 
+					       V.Cast(
+						 V.CAST_UNSIGNED, V.REG_64, field_n))) in
+       let size_cond3 = V.BinOp(V.EQ, V.Constant(V.Int(V.REG_64, 4L)), 
+				       V.BinOp(V.DIVIDE, i_bytes, 
+					       V.Cast(
+						 V.CAST_UNSIGNED, V.REG_64, field_n))) in 
+       let size_cond4 = V.BinOp(V.EQ, V.Constant(V.Int(V.REG_64, 8L)), 
+				       V.BinOp(V.DIVIDE, i_bytes, 
+					       V.Cast(
+						 V.CAST_UNSIGNED, V.REG_64, field_n))) in
+       opt_extra_conditions := V.BinOp(V.BITOR, size_cond1, 
+				       V.BinOp(V.BITOR, size_cond2, 
+					       V.BinOp(V.BITOR, size_cond3, size_cond4)))
+       :: !opt_extra_conditions;
+      
+       (* f_type should equal only one of the valid values *)
+       let constify a = V.Constant(V.Int(V.REG_64, a)) in
+       let or_list l = 
+	 match l with 
+	 | [] -> constify 0L
+	 | [a] -> constify a
+	 | e :: r -> List.fold_left (
+	   fun a b -> V.BinOp(V.BITOR, a, 
+			      (V.BinOp(V.EQ, f_type_sym, (constify b))))
+	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
+       in
+       let ranges = !((!field_ranges).(i)) in
+       opt_extra_conditions := (or_list ranges) :: !opt_extra_conditions;
      done; (* end for i *)
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
@@ -294,6 +334,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
+	       if (List.length !opt_synth_struct_adaptor) <> 0 then
+		 fm#reset_struct_counts;
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
 	       if (List.length !opt_synth_ret_adaptor) <> 0 then

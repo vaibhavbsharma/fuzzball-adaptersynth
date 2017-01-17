@@ -302,6 +302,7 @@ sig
     method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
+    method reset_struct_counts: unit 
     
     method restrict_symbolic_expr : Fragment_machine.register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
     method check_adaptor_condition : Vine.exp -> unit

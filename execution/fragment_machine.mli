@@ -326,6 +326,7 @@ class virtual fragment_machine : object
   method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
   method virtual match_syscalls: unit -> bool
   method virtual reset_syscalls: unit
+  method virtual reset_struct_counts: unit 
   
   method virtual restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
   method virtual check_adaptor_condition : Vine.exp -> unit
@@ -400,6 +401,7 @@ sig
     method check_f2_syscall_args: Vine.exp list -> int -> bool
     method match_syscalls: unit -> bool
     method reset_syscalls: unit
+    method reset_struct_counts: unit 
     val mutable f1_write_addr_l:int64 list
     val mutable f2_write_addr_l:int64 list
     
