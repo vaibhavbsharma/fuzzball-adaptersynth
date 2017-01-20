@@ -3275,6 +3275,7 @@ struct
 	   flush stdout);
 	let addr_list_ind = if end_of_f1 then !e_o_f1_count else !f2_init_count in
 	let addr = List.nth !opt_synth_struct_adaptor addr_list_ind in
+	let adaptor_vals = Hashtbl.copy Adaptor_synthesis.adaptor_vals in
 	  if !opt_time_stats then
 	    (Printf.printf "(0x%08Lx)..." addr;
 	     flush stdout);
@@ -3315,7 +3316,10 @@ struct
 		  let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
 		  if (n = ai_n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		    let f_type = self#get_fresh_symbolic f_type_str 64 in
+		    let f_type = 
+		      if not !opt_adaptor_search_mode then 
+			Hashtbl.find adaptor_vals f_type_str
+		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
 		    
@@ -3335,7 +3339,10 @@ struct
 		  let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 		  if (ai_n = n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
-		    let f_type = self#get_fresh_symbolic f_type_str 64 in
+		    let f_type = 
+		      if not !opt_adaptor_search_mode then 
+			Hashtbl.find adaptor_vals f_type_str
+		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 
 		    let else_expr =
@@ -3395,7 +3402,7 @@ struct
 	      (Printf.printf "byte expressions...";
 	       flush stdout);
 
-	    let upcast expr _extend_op end_sz =
+	    (* let upcast expr _extend_op end_sz =
 	      match _extend_op with 
 	      | (Some extend_op) ->  
 		(match end_sz with
@@ -3420,7 +3427,6 @@ struct
 	      V.Cast(V.CAST_LOW, V.REG_8, 
 		     V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
 	    in
-	    let adaptor_vals = Hashtbl.copy Adaptor_synthesis.adaptor_vals in
 	    let byte_ce_expr_l = ref [] in
 	    let get_byte_from_adaptor f_num =
 	      let str_gen i s = Printf.sprintf "f%d%s" i s in
@@ -3435,10 +3441,11 @@ struct
 		| _ -> 0 in
 	      let t_s_b = f_type lsr 32 in (* target_start_byte *)
 	      let t_e_b = (f_type lsr 16) land 65535 in (* target_end_byte *)
-	      let cast_op = if (f_type mod 2) = 1 then (Some V.CAST_SIGNED) 
+	      let t_size = (t_e_b-t_s_b+1)/f_n in
+	      let cast_op = if t_size > f_size then (Some V.CAST_LOW)
+		else if (f_type mod 2) = 1 then (Some V.CAST_SIGNED) 
 		else if (f_type mod 2) = 0 then (Some V.CAST_UNSIGNED)
 		else None in
-	      let t_size = (t_e_b-t_s_b+1)/f_n in
 	      if !opt_trace_struct_adaptor then
 		Printf.printf "parsing adaptor in FM: type=%x n=%d sz=%d t_s=%d t_e=%d\n"
 		  f_type f_n f_size t_s_b t_e_b;
@@ -3465,12 +3472,12 @@ struct
 		let byte_val = self#load_sym load_addr 8 in
 		byte_ce_expr_l := byte_val :: !byte_ce_expr_l;
 	      done;
-	      byte_ce_expr_l := (List.rev !byte_ce_expr_l));
+	      byte_ce_expr_l := (List.rev !byte_ce_expr_l)); *)
 	    let byte_expr_l = ref [] in 
 	    for i=0 to (max_size-1) do 
-	      let byte_expr = if !opt_adaptor_search_mode then
+	      let byte_expr = (* if !opt_adaptor_search_mode then *)
 		(get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) 
-		else (List.nth !byte_ce_expr_l i)
+		(* else (List.nth !byte_ce_expr_l i) *)
 	      in
 	      let byte_expr_sym_str = 
 		"arr_ai_byte_"^(Printf.sprintf "%s%d_%d" unique_str i addr_list_ind) in

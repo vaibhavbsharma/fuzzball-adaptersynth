@@ -157,26 +157,22 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
      let (n_fields, _) = !opt_struct_adaptor_params in 
-     if n_fields <> 0 then 
-       Adaptor_synthesis.create_field_ranges_l fm;
-     let field_ranges = Adaptor_synthesis.ranges_by_field_num in
      for i=1 to n_fields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "f%d_size" i in
        let field_n_str = Printf.sprintf "f%d_n" i in
        let field_n = fm#get_fresh_symbolic field_n_str 16 in
        let field_sz_sym = fm#get_fresh_symbolic field_size_str 16 in
-       let tmp_cond = (* f1_size == (0 || 1 || 2 || 4 || 8) *)
-	 V.BinOp(
-	   V.BITOR, V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,0L))),
-	   V.BinOp(V.BITOR, 
-		   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,1L))),
-		   V.BinOp(V.BITOR,
-			   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,2L))),
-			   V.BinOp(V.BITOR,
-				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,4L))),
-				   V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,8L)
-				   )))))) in
+       let tmp_cond = (* f1_size == (1 || 2 || 4 || 8) *)
+	 V.BinOp(V.BITOR, 
+		 V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,1L))),
+		 V.BinOp(V.BITOR,
+			 V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,2L))),
+			 V.BinOp(V.BITOR,
+				 V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,4L))),
+				 V.BinOp(V.EQ,field_sz_sym,V.Constant(V.Int(V.REG_16,8L)
+				 )))))
+       in
        opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
       
        (* this target field cannot overlap with another target field *)
@@ -248,19 +244,6 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 					       V.BinOp(V.BITOR, size_cond3, size_cond4)))
        :: !opt_extra_conditions;
       
-       (* f_type should equal only one of the valid values *)
-       let constify a = V.Constant(V.Int(V.REG_64, a)) in
-       let or_list l = 
-	 match l with 
-	 | [] -> constify 0L
-	 | [a] -> constify a
-	 | e :: r -> List.fold_left (
-	   fun a b -> V.BinOp(V.BITOR, a, 
-			      (V.BinOp(V.EQ, f_type_sym, (constify b))))
-	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
-       in
-       let ranges = !((!field_ranges).(i)) in
-       opt_extra_conditions := (or_list ranges) :: !opt_extra_conditions;
      done; (* end for i *)
      
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
@@ -307,6 +290,26 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
+     if n_fields <> 0 then 
+       Adaptor_synthesis.create_field_ranges_l fm;
+     let field_ranges = Adaptor_synthesis.ranges_by_field_num in
+     for i = 1 to n_fields do
+       let f_type_str = Printf.sprintf "f%d_type" i in
+       let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
+       (* f_type should equal only one of the valid values *)
+       let constify a = V.Constant(V.Int(V.REG_64, a)) in
+       let or_list l = 
+	 match l with 
+	 | [] -> constify 0L
+	 | [a] -> constify a
+	 | e :: r -> List.fold_left (
+	   fun a b -> V.BinOp(V.BITOR, a, 
+			      (V.BinOp(V.EQ, f_type_sym, (constify b))))
+	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
+       in
+       let ranges = !((!field_ranges).(i)) in
+       opt_extra_conditions := (or_list ranges) :: !opt_extra_conditions;
+     done;
 
      (try
 	loop_w_stats !opt_num_paths

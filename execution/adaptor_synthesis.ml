@@ -1110,8 +1110,14 @@ let create_field_ranges_l fm =
       let f_sz_str = ("f"^(Printf.sprintf "%d" field_num)^"_size") in
       let f_n_str  = ("f"^(Printf.sprintf "%d" field_num)^"_n") in 
       (* let f_start_str  = ("f"^(Printf.sprintf "%d" field_num)^"_start") in *)
-      let field_sz = fm#get_fresh_symbolic f_sz_str 16 in
-      let field_n  = fm#get_fresh_symbolic f_n_str 16 in
+      let field_sz = 
+	if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals f_sz_str
+	else fm#get_fresh_symbolic f_sz_str 16 in
+      let field_n = 
+	if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals f_n_str
+	else fm#get_fresh_symbolic f_n_str 16 in
       (* let field_start  = fm#get_fresh_symbolic f_start_str 16 in *)
       let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
       let num_bytes_remaining = 
