@@ -278,7 +278,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	   (List.length !opt_extra_conditions) in_nargs (V.exp_to_string tmp_cond);*)
 	 );
      );
-     
+
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);
      symbolic_init ();
@@ -286,6 +286,28 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      fm#make_snap ();
      if !opt_trace_setup then
        (Printf.printf "Took snapshot\n"; flush stdout);
+
+     (* Populate hashtable of adaptor vars *)
+     let _ =
+       if !opt_trace_struct_adaptor then
+	 Printf.printf "adaptor_vals: Iterating through %d extra conditions\n" 
+	   (List.length !opt_extra_conditions);
+       List.iter ( fun cond ->
+	 (match cond with
+	 | V.BinOp(V.EQ,V.Lval(V.Temp((_, s, _))),
+		   V.Constant(V.Int(ty,value))) 
+	 | V.BinOp(V.EQ,V.Constant(V.Int(ty,value)),
+		   V.Lval(V.Temp((_, s, _)))) ->
+	   if !opt_trace_struct_adaptor then (
+	     if Hashtbl.mem Adaptor_synthesis.adaptor_vals s then 
+	       Printf.printf "adaptor_vals already had value for %s, panic!\n" s
+	     else Printf.printf "adding %s to adaptor_vals\n" s;);
+	   Hashtbl.replace Adaptor_synthesis.adaptor_vals s
+	     (V.Constant(V.Int(ty,value)))
+	 | _ -> ());
+       ) !opt_extra_conditions; 
+     in
+
      (try
 	loop_w_stats !opt_num_paths
 	  (fun iter ->

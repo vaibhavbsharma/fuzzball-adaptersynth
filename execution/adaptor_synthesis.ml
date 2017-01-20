@@ -8,6 +8,9 @@ open Exec_options;;
 open Exec_exceptions;;
 open Exec_utils;;
 
+
+let adaptor_vals = Hashtbl.create 10
+ 
 (*** general helper code used in multiple adaptors ***)
 
 let get_ite_expr arg op const_type const then_val else_val = 
@@ -578,19 +581,34 @@ let simple_adaptor fm out_nargs in_nargs =
 	(* These extra conditions should be getting added in exec_fuzzloop 
 	   to make them get added at the beginning of each iteration *)
 	(*opt_extra_conditions :=  
-             V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L)))
-	 :: !opt_extra_conditions;*)
+          V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L)))
+	  :: !opt_extra_conditions;*)
 	var_val
        ) 
        else ( 
+	 (* Assuming adaptor_vals maps strings to Vine expressions
+	    where each string is the name of an adaptor variable *)
+	 if not !opt_adaptor_search_mode then (
+	   let var_is_const_val = Hashtbl.find adaptor_vals (var_name^"_is_const") in
+	   let var_val_val = Hashtbl.find adaptor_vals (var_name^"_val") in
+	   if var_is_const_val = V.Constant(V.Int(V.REG_1, 0L)) then (
+	     match var_val_val with
+	     | V.Constant(V.Int(V.REG_64, n)) ->
+	       let r = if n >= out_nargs then (Int64.pred out_nargs) else n in
+	       (fm#get_reg_symbolic (List.nth arg_regs (Int64.to_int r) ))
+	     | _ -> failwith (Printf.sprintf "failed to get value of %s_val" var_name)
+	   ) else var_val_val
+	 ) else 
+	   get_ite_expr var_is_const V.NEQ V.REG_1 0L  
+	     var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) 
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
-             V.BITOR,
-             V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
-             V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-	 :: !opt_extra_conditions;*)
-	 get_ite_expr var_is_const V.NEQ V.REG_1 0L  
-	   var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs))) in
+           V.BITOR,
+           V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
+           V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	   :: !opt_extra_conditions;*)
+	     
+       )) in
     (* Printf.printf "setting arg=%s\n" (V.exp_to_string arg); *)
     symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 

@@ -25,3 +25,4 @@ val i_n_arr' : (int * int * int * int) list ref array ref
 val ranges_by_field_num : int64 list ref array ref
 val struct_adaptor: 
   Fragment_machine.fragment_machine -> unit
+val adaptor_vals : ( string, Vine.exp ) Hashtbl.t

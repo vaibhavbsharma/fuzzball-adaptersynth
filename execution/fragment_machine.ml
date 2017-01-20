@@ -3394,9 +3394,84 @@ struct
 	    if !opt_time_stats then
 	      (Printf.printf "byte expressions...";
 	       flush stdout);
+
+	    let upcast expr _extend_op end_sz =
+	      match _extend_op with 
+	      | (Some extend_op) ->  
+		(match end_sz with
+		| 8  -> V.Cast(extend_op, V.REG_8 , expr)
+		| 16 -> V.Cast(extend_op, V.REG_16, expr)
+		| 32 -> V.Cast(extend_op, V.REG_32, expr)
+		| 64 -> V.Cast(extend_op, V.REG_64, expr)
+		| _ -> failwith "unsupported upcast end size")
+	      | None -> expr
+	    in  
+	    let from_concrete v sz = 
+	      match sz with 
+	      | 8 -> assert(v >= -128 && v <= 0xff);
+		V.Constant(V.Int(V.REG_8,  (Int64.of_int (v land 0xff))))
+	      | 16 -> assert(v >= -65536 && v <= 0xffff);
+		V.Constant(V.Int(V.REG_16, (Int64.of_int (v land 0xffff))))
+	      | 32 -> V.Constant(V.Int(V.REG_32, (Int64.logand (Int64.of_int v) 0xffffffffL)))
+	      | 64 -> V.Constant(V.Int(V.REG_64, (Int64.of_int v)))
+	      | _ -> failwith "unsupported size passed to AS#from_concrete"
+	    in
+	    let get_byte expr pos =
+	      V.Cast(V.CAST_LOW, V.REG_8, 
+		     V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
+	    in
+	    let adaptor_vals = Hashtbl.copy Adaptor_synthesis.adaptor_vals in
+	    let byte_ce_expr_l = ref [] in
+	    let get_byte_from_adaptor f_num =
+	      let str_gen i s = Printf.sprintf "f%d%s" i s in
+	      let f_type = match Hashtbl.find adaptor_vals (str_gen f_num "_type") with 
+		| V.Constant(V.Int(V.REG_64, n)) -> (Int64.to_int n)
+		| _ -> 0 in
+	      let f_n = match Hashtbl.find adaptor_vals (str_gen f_num "_n") with
+		| V.Constant(V.Int(V.REG_16, n)) -> (Int64.to_int n)
+		| _ -> 0 in
+	      let f_size = match Hashtbl.find adaptor_vals (str_gen f_num "_size") with 
+		| V.Constant(V.Int(V.REG_16, n)) -> (Int64.to_int n)
+		| _ -> 0 in
+	      let t_s_b = f_type lsr 32 in (* target_start_byte *)
+	      let t_e_b = (f_type lsr 16) land 65535 in (* target_end_byte *)
+	      let cast_op = if (f_type mod 2) = 1 then (Some V.CAST_SIGNED) 
+		else if (f_type mod 2) = 0 then (Some V.CAST_UNSIGNED)
+		else None in
+	      let t_size = (t_e_b-t_s_b+1)/f_n in
+	      if !opt_trace_struct_adaptor then
+		Printf.printf "parsing adaptor in FM: type=%x n=%d sz=%d t_s=%d t_e=%d\n"
+		  f_type f_n f_size t_s_b t_e_b;
+	      for byte = 0 to (f_n*f_size)-1 do
+		let i_this_entry = byte/f_size in
+		let i_this_byte_within_entry = byte mod f_size in
+		let t_this_entry = t_size*i_this_entry in
+		let t_load_addr = Int64.add addr (Int64.of_int (t_s_b+t_this_entry)) in
+		let i_this_entry_val = 
+		  upcast (self#load_sym t_load_addr (t_size*8)) cast_op (f_size*8) in
+		let byte_val = get_byte i_this_entry_val i_this_byte_within_entry in
+		if !opt_trace_struct_adaptor then
+		  Printf.printf "byte_val = %s\n" (V.exp_to_string byte_val);
+		byte_ce_expr_l := byte_val :: !byte_ce_expr_l;
+	      done;
+	    in
+	    if not !opt_adaptor_search_mode then (
+	      for i = 1 to n_fields do
+		get_byte_from_adaptor i;
+	      done;
+	      let sz = List.length !byte_ce_expr_l in
+	      for i = sz to (max_size-1) do
+		let load_addr = Int64.add addr (Int64.of_int i) in
+		let byte_val = self#load_sym load_addr 8 in
+		byte_ce_expr_l := byte_val :: !byte_ce_expr_l;
+	      done;
+	      byte_ce_expr_l := (List.rev !byte_ce_expr_l));
 	    let byte_expr_l = ref [] in 
 	    for i=0 to (max_size-1) do 
-	      let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) in
+	      let byte_expr = if !opt_adaptor_search_mode then
+		(get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) 
+		else (List.nth !byte_ce_expr_l i)
+	      in
 	      let byte_expr_sym_str = 
 		"arr_ai_byte_"^(Printf.sprintf "%s%d_%d" unique_str i addr_list_ind) in
 	      let byte_expr_sym = self#get_fresh_symbolic byte_expr_sym_str 8 in
