@@ -3267,9 +3267,10 @@ struct
 	if !opt_split_target_formulas = true then self#simplify_exp e else e in
 
       let start_time = Sys.time () in
+      let step_str = if end_of_f1 then "eof1" else "sof2" in
       if (List.length !opt_synth_struct_adaptor) <> 0 then (
 	if !opt_trace_struct_adaptor = true then
-	  Printf.printf "Starting structure adaptor\n";
+	  Printf.printf "Starting structure adaptor %s\n" step_str;
 	if !opt_time_stats then
 	  (Printf.printf "Generating structure adaptor formulas...";
 	   flush stdout);
@@ -3327,14 +3328,14 @@ struct
 		    let else_expr' = (get_arr_t_field_expr field_num tail
 			   ai_byte ai_f_sz ai_n ) in
 		    if !opt_time_stats then
-		      (Printf.printf "AS#gatfe gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
-			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		      (Printf.printf "AS#gatfe %s gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
+			 step_str ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
 		       prev_time := Sys.time();
 		       flush stdout);
 		    let else_expr = simplify else_expr' in
 		    if !opt_time_stats then
-		      (Printf.printf "AS#gatfe simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
-			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		      (Printf.printf "AS#gatfe %s simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
+			 step_str ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
 		       prev_time := Sys.time();
 		       flush stdout);
 		    
@@ -3359,15 +3360,15 @@ struct
 		    let else_expr' = (get_arr_t_field_expr field_num tail
 			   ai_byte ai_f_sz ai_n ) in
 		    if !opt_time_stats then
-		      (Printf.printf "AS#gatfe gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
-			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		      (Printf.printf "AS#gatfe %s gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
+			 step_str ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
 		       prev_time := Sys.time();
 		       flush stdout);
 
 		    let else_expr = simplify else_expr' in
 		    if !opt_time_stats then
-		      (Printf.printf "AS#gatfe simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
-			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		      (Printf.printf "AS#gatfe %s simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
+			 step_str ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
 		       prev_time := Sys.time();
 		       flush stdout);
 		    
@@ -3408,20 +3409,20 @@ struct
 				    (i_byte-start_byte) ai_f_sz ai_n )) in
 		       
 		       if !opt_time_stats then
-			 (Printf.printf "AS#gaiabe gatfe for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
-			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			 (Printf.printf "AS#gaiabe %s gatfe for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    step_str i_byte field_size_temp_str (Sys.time () -. !prev_time);
 			  prev_time := Sys.time();
 			  flush stdout);
 		       Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
 		       if !opt_time_stats then
-			 (Printf.printf "AS#gaiabe field_exprs.replace for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
-			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			 (Printf.printf "AS#gaiabe %s field_exprs.replace for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    step_str i_byte field_size_temp_str (Sys.time () -. !prev_time);
 			  prev_time := Sys.time();
 			  flush stdout);
 		       self#add_to_path_cond new_q_exp;
 		       if !opt_time_stats then
-			 (Printf.printf "AS#gaiabe atpc for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
-			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			 (Printf.printf "AS#gaiabe %s atpc for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    step_str i_byte field_size_temp_str (Sys.time () -. !prev_time);
 			  prev_time := Sys.time();
 			  flush stdout);
 		       new_q_exp)
@@ -3437,7 +3438,7 @@ struct
 		)
 	    in
 	    if !opt_time_stats then
-	      (Printf.printf "byte expressions...";
+	      (Printf.printf "%s byte expressions..." step_str;
 	       flush stdout);
 
 	    (* let upcast expr _extend_op end_sz =
@@ -3526,13 +3527,15 @@ struct
 		Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		  (V.exp_to_string q_exp);
 	      if !opt_time_stats then
-		(Printf.printf "AS# for loop, gaiabe for byte %d time = (%f sec).\n" i (Sys.time () -. !prev_time);
+		(Printf.printf "AS# for loop %s, gaiabe for byte %d time = (%f sec).\n" 
+		   step_str i (Sys.time () -. !prev_time);
 		 prev_time := Sys.time();
 		 flush stdout);
 
 	      self#add_to_path_cond q_exp;
 	      if !opt_time_stats then
-		(Printf.printf "AS#for loop, atpc for byte %d time = (%f sec).\n" i (Sys.time () -. !prev_time);
+		(Printf.printf "AS#for loop %s, atpc for byte %d time = (%f sec).\n" 
+		   step_str i (Sys.time () -. !prev_time);
 		 prev_time := Sys.time();
 		 flush stdout);
 
@@ -3570,7 +3573,7 @@ struct
 	  else f2_init_count := !f2_init_count + 1;
       );
       if !opt_time_stats then
-	(Printf.printf "AS#ready to apply (%f sec).\n" (Sys.time () -. start_time);
+	(Printf.printf "AS#ready to apply (%f sec). %s\n" (Sys.time () -. start_time) step_str;
 	 flush stdout);
 
   end
