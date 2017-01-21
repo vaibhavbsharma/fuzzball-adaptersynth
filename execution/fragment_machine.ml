@@ -3322,11 +3322,21 @@ struct
 		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
-		    
-		    let else_expr =
-		      simplify
-			(get_arr_t_field_expr field_num tail
+		   
+		    let prev_time = ref (Sys.time ()) in
+		    let else_expr' = (get_arr_t_field_expr field_num tail
 			   ai_byte ai_f_sz ai_n ) in
+		    if !opt_time_stats then
+		      (Printf.printf "AS#gatfe gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
+			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		       prev_time := Sys.time();
+		       flush stdout);
+		    let else_expr = simplify else_expr' in
+		    if !opt_time_stats then
+		      (Printf.printf "AS#gatfe simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
+			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		       prev_time := Sys.time();
+		       flush stdout);
 		    
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		      (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val zero_extend_expr
@@ -3345,10 +3355,21 @@ struct
 		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 
-		    let else_expr =
-		      simplify
-			(get_arr_t_field_expr field_num tail
+		    let prev_time = ref (Sys.time ()) in
+		    let else_expr' = (get_arr_t_field_expr field_num tail
 			   ai_byte ai_f_sz ai_n ) in
+		    if !opt_time_stats then
+		      (Printf.printf "AS#gatfe gatfe for else expr, byte %d, sz %d, n %d time = (%f sec).\n" 
+			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		       prev_time := Sys.time();
+		       flush stdout);
+
+		    let else_expr = simplify else_expr' in
+		    if !opt_time_stats then
+		      (Printf.printf "AS#gatfe simplify for byte %d, sz %d, n %d time = (%f sec).\n" 
+			 ai_byte ai_f_sz ai_n (Sys.time () -. !prev_time);
+		       prev_time := Sys.time();
+		       flush stdout);
 		    
 		    get_ite_expr f_type V.EQ V.REG_64 sign_extend_val sign_extend_expr 
 		      else_expr
@@ -3379,13 +3400,30 @@ struct
 		    (try
 		       Hashtbl.find field_exprs field_size_temp_str
                      with Not_found ->
+		       let prev_time = ref (Sys.time ()) in
 		       let new_q_exp =
 			 V.BinOp(V.EQ, field_size_temp,
 				 (get_arr_t_field_expr field 
 				    (List.rev !((i_n_arr).(ai_n))) (* array_field_ranges_l *)
 				    (i_byte-start_byte) ai_f_sz ai_n )) in
+		       
+		       if !opt_time_stats then
+			 (Printf.printf "AS#gaiabe gatfe for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			  prev_time := Sys.time();
+			  flush stdout);
 		       Hashtbl.replace field_exprs field_size_temp_str new_q_exp;
+		       if !opt_time_stats then
+			 (Printf.printf "AS#gaiabe field_exprs.replace for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			  prev_time := Sys.time();
+			  flush stdout);
 		       self#add_to_path_cond new_q_exp;
+		       if !opt_time_stats then
+			 (Printf.printf "AS#gaiabe atpc for byte %d, field_size_temp_str = %s time = (%f sec).\n" 
+			    i_byte field_size_temp_str (Sys.time () -. !prev_time);
+			  prev_time := Sys.time();
+			  flush stdout);
 		       new_q_exp)
 		  in
 
@@ -3474,6 +3512,7 @@ struct
 	      done;
 	      byte_ce_expr_l := (List.rev !byte_ce_expr_l)); *)
 	    let byte_expr_l = ref [] in 
+	    let prev_time = ref (Sys.time ()) in
 	    for i=0 to (max_size-1) do 
 	      let byte_expr = (* if !opt_adaptor_search_mode then *)
 		(get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) 
@@ -3486,7 +3525,16 @@ struct
 	      if !opt_trace_struct_adaptor = true then
 		Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		  (V.exp_to_string q_exp);
+	      if !opt_time_stats then
+		(Printf.printf "AS# for loop, gaiabe for byte %d time = (%f sec).\n" i (Sys.time () -. !prev_time);
+		 prev_time := Sys.time();
+		 flush stdout);
+
 	      self#add_to_path_cond q_exp;
+	      if !opt_time_stats then
+		(Printf.printf "AS#for loop, atpc for byte %d time = (%f sec).\n" i (Sys.time () -. !prev_time);
+		 prev_time := Sys.time();
+		 flush stdout);
 
 		(* if this is CE search, check if byte_expr has unique value *)
 	      let final_byte_val = 
