@@ -608,9 +608,18 @@ let simple_adaptor fm out_nargs in_nargs =
            V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
 	   :: !opt_extra_conditions;*)
 	     
-       )) in
-    (* Printf.printf "setting arg=%s\n" (V.exp_to_string arg); *)
-    symbolic_args := arg :: !symbolic_args;
+       )) 
+    in
+    let arg' =
+      (match arg with 
+      | V.Lval(V.Temp((_, s, _))) -> 
+	if Hashtbl.mem adaptor_vals s then
+	  Hashtbl.find adaptor_vals s
+	else arg
+      | _ -> arg)
+    in
+    Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
+    symbolic_args := arg' :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
   if in_nargs > 0L then  (

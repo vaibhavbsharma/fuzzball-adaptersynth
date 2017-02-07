@@ -756,30 +756,33 @@ object(self)
       )
     done
 
-  method private reset_unix_fd_positions_to_base =
+  method reset_unix_fd_positions_to_base =
     for vt_fd = 0 to (Array.length unix_fds)-1 do 
       if vt_fd > 2 then (
 	match unix_fds.(vt_fd) with
 	| Some _fd ->
-	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s\n"
-	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname;*)
+	  (* Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s vt_fd = %d\n"
+	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname vt_fd; *)
 	  let _ = while Stack.length fd_info.(vt_fd).snap_pos > 1 do
 	      ignore(Stack.pop fd_info.(vt_fd).snap_pos);
-	    done in
+	    done 
+	  in
 	  (*let snap_pos = *)
 	  let _ =
-	    match Stack.top fd_info.(vt_fd).snap_pos with
-	    | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
-	    | None -> 0
+	    if (Stack.length fd_info.(vt_fd).snap_pos) > 0 then (
+	      match Stack.top fd_info.(vt_fd).snap_pos with
+	      | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
+	      | None -> 0) 
+	    else 0
 	  in
 	  if Stack.length fd_info.(vt_fd).snap_pos > 1 then
 	    ignore(Stack.pop fd_info.(vt_fd).snap_pos);
-	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
-	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
+	(*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
+	  (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
 	| _ -> ()
       );
     done
-
+      
   method private reset_sym_fd_positions =
     Hashtbl.iter
       (fun fd _ ->
@@ -2944,7 +2947,7 @@ object(self)
        done;*)
        if (fm#check_f2_syscall_args arg_list syscall_num) = true then (
 	 Printf.printf "linux_syscalls:syscalls argument divergence raising DisqualifiedPath\n";
-	 raise DisqualifiedPath;);
+	 raise DisqualifiedPath; );
      );
        ignore(0, read_7_regs);
        match (!opt_arch, syscall_num) with 
