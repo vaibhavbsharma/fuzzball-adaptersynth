@@ -156,8 +156,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
-     let (n_fields, _) = !opt_struct_adaptor_params in 
-     for i=1 to n_fields do 
+     let (t_n_fields, _, _) = !opt_struct_adaptor_params in 
+     for i=1 to t_n_fields do 
        let f_type_str = Printf.sprintf "f%d_type" i in
        let field_size_str = Printf.sprintf "f%d_size" i in
        let field_n_str = Printf.sprintf "f%d_n" i in
@@ -184,7 +184,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 V.Constant(V.Int(V.REG_64, 65535L)), 
 	 V.BinOp(V.RSHIFT, f_type_sym, 
 		 V.Constant(V.Int(V.REG_8, 16L)))) in
-       for j=1 to n_fields do
+       for j=1 to t_n_fields do
 	 if i <> j then (
 	   let f2_type_sym = fm#get_fresh_symbolic (Printf.sprintf "f%d_type" j) 64 in
 	   let j_start_b = V.BinOp(V.RSHIFT, f2_type_sym, 
@@ -290,10 +290,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
-     if n_fields <> 0 then 
+     if t_n_fields <> 0 then 
        Adaptor_synthesis.create_field_ranges_l fm;
      let field_ranges = Adaptor_synthesis.ranges_by_field_num in
-     for i = 1 to n_fields do
+     for i = 1 to t_n_fields do
        let f_type_str = Printf.sprintf "f%d_type" i in
        let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
        (* f_type should equal only one of the valid values *)
@@ -354,7 +354,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	       );
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 if ((fm#match_syscalls ()) <> true)  ||
-		   ((fm#match_writes ()) <> true)
+		   ( ((fm#match_writes ()) <> true) && 
+		       (!opt_dont_compare_mem_se = false))
 		 then
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in

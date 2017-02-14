@@ -2095,7 +2095,7 @@ struct
       f2_hash_list <- [];
       Hashtbl.clear concrete_cache
 
-    method sym_region_struct_adaptor =
+    method sym_region_struct_adaptor = 
       let upcast expr _extend_op end_sz =
 	match _extend_op with 
 	| (Some extend_op) ->  
@@ -2151,7 +2151,7 @@ struct
 	in
 	let start_time = Sys.time () in
 	List.iteri ( fun sym_input_region_l_ind rnum ->
-	  let (n_fields, max_size) = !opt_struct_adaptor_params in
+	  let (_, _, max_size) = !opt_struct_adaptor_params in
 
 	  if !opt_time_stats then
 	    (Printf.printf "(%d)..." rnum;

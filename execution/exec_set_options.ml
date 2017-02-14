@@ -242,9 +242,9 @@ let symbolic_state_cmdline_opts =
      "addr Using structure adaptor grammar, "^
        "write formulae at upto size bytes at addr");
     ("-struct-adaptor-params", Arg.String
-      (add_delimited_int_int_pair opt_struct_adaptor_params ':'),
-     "N:size  Structure adaptor will try to map upto N fields in target and "^
-       "inner structures at upto size bytes");
+      (add_delimited_int_triple opt_struct_adaptor_params ':'),
+     "N1:N2:size  Structure adaptor will try to map upto N1 fields in target and "^
+       "N2 fields in inner structures at upto size bytes");
   ]
 
 let slurp_file fname =
@@ -538,6 +538,10 @@ let cmdline_opts =
      " Print formulae created by the structure adaptor");
     ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
      " Print memory snapshot/reset operations");
+    ("-dont-compare-memory-sideeffects", Arg.Set(opt_dont_compare_mem_se),
+     " Dont compare side-effects on concrete memory and symbolic regions");
+    ("-dont-compare-linux-syscalls", Arg.Set(opt_dont_compare_syscalls),
+     " Dont compare system call sequences of f1, f2 for equality");
     ("-trace-registers", Arg.Set(opt_trace_registers),
      " Print register contents");
     ("-trace-setup", Arg.Set(opt_trace_setup),

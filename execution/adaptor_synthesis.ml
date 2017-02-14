@@ -1051,7 +1051,8 @@ let from_concrete v sz =
   - f2_start = f1_start + f1_tot_sz + f1_p
   - f3_start = f2_start + f2_tot_sz + f2_p
 *)
-let array_field_ranges_l' = ref []
+let t_array_field_ranges_l' = ref []
+let i_array_field_ranges_l' = ref []
 let i_byte_arr' = ref (Array.make 0 (ref [])) 
 let i_n_arr' = ref (Array.make 0 (ref [])) 
 let ranges_by_field_num = ref (Array.make 0 (ref []))
@@ -1060,11 +1061,8 @@ let create_field_ranges_l fm =
      start array_offsets_l_h with a null entry *)
   let simplify e = 
     if !opt_split_target_formulas = true then fm#simplify_exp e else e in
-  let (n_fields, max_size) = !opt_struct_adaptor_params in
+  let (t_n_fields, i_n_fields, max_size) = !opt_struct_adaptor_params in
   let array_offsets_l_h = ref [(Hashtbl.create 0)] in 
-  for i = 1 to n_fields do
-    array_offsets_l_h := (Hashtbl.create 1000) :: !array_offsets_l_h;
-  done;
   
   (* for i = 1 to n_fields do
     let f_sz_str = ("f"^(Printf.sprintf "%d" i)^"_size") in
@@ -1114,62 +1112,73 @@ let create_field_ranges_l fm =
 
   done; (* end for i = 1 to n_fields *) *)
   
-  let get_array_field_ranges_l field_num start_byte prev_cond =
+  let get_array_field_ranges_l field_num start_byte prev_cond n_fields =
     let get_ent f_sz_t =
-      let f_sz_str = ("f"^(Printf.sprintf "%d" field_num)^"_size") in
-      let f_n_str  = ("f"^(Printf.sprintf "%d" field_num)^"_n") in 
-      (* let f_start_str  = ("f"^(Printf.sprintf "%d" field_num)^"_start") in *)
-      let field_sz = 
-	if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals f_sz_str
-	else fm#get_fresh_symbolic f_sz_str 16 in
-      let field_n = 
-	if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals f_n_str
-	else fm#get_fresh_symbolic f_n_str 16 in
-      (* let field_start  = fm#get_fresh_symbolic f_start_str 16 in *)
-      let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
-      let num_bytes_remaining = 
-	(max_size - new_s_b - (n_fields - field_num)) in
-      let max_n = (num_bytes_remaining/f_sz_t) in
-      (* considering number of array entries to be powers of 2 *)
-      let n = ref 1 in 
-      (* for n = 1 to max_n do *)
-      while !n <= max_n do
-	let end_byte = new_s_b + (!n)*f_sz_t - 1 in
-	let cond =
-	  V.BinOp(V.BITAND, prev_cond,
-		  (*V.BinOp(V.EQ, field_start, 
-			  V.Constant(V.Int(V.REG_16, (Int64.of_int new_s_b)))),*)
-		  V.BinOp(V.BITAND, 
-			  V.BinOp(V.EQ, field_sz, (from_concrete f_sz_t 16)),
-			  V.BinOp(V.EQ, field_n,  (from_concrete !n 16)))) in
-	
-	let cond' = simplify (
-	if Hashtbl.mem (List.nth !array_offsets_l_h field_num) 
-	  (field_num, new_s_b, end_byte, !n, f_sz_t) = true then (
-	    let this_cond = Hashtbl.find (List.nth !array_offsets_l_h field_num) 
-	      (field_num, new_s_b, end_byte, !n, f_sz_t) in
-	    V.BinOp(V.BITOR, this_cond, cond)
-	   ) else cond ) 
+      if n_fields = i_n_fields then (
+	let f_sz_str = ("f"^(Printf.sprintf "%d" field_num)^"_size") in
+	let f_n_str  = ("f"^(Printf.sprintf "%d" field_num)^"_n") in 
+	let field_sz = 
+	  if not !opt_adaptor_search_mode then 
+	    Hashtbl.find adaptor_vals f_sz_str
+	  else fm#get_fresh_symbolic f_sz_str 16 in
+	let field_n = 
+	  if not !opt_adaptor_search_mode then 
+	    Hashtbl.find adaptor_vals f_n_str
+	  else fm#get_fresh_symbolic f_n_str 16 in
+	let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
+	let num_bytes_remaining = 
+	  (max_size - new_s_b - (n_fields - field_num)) in
+	let max_n = (num_bytes_remaining/f_sz_t) in
+	(* considering number of array entries to be powers of 2 *)
+	let n = ref 1 in 
+	while !n <= max_n do
+	  let end_byte = new_s_b + (!n)*f_sz_t - 1 in
+	  let cond =
+	    V.BinOp(V.BITAND, prev_cond,
+		    V.BinOp(V.BITAND, 
+			    V.BinOp(V.EQ, field_sz, (from_concrete f_sz_t 16)),
+			    V.BinOp(V.EQ, field_n,  (from_concrete !n 16)))) in
+	  let cond' = simplify (
+	    if Hashtbl.mem (List.nth !array_offsets_l_h field_num) 
+	      (field_num, new_s_b, end_byte, !n, f_sz_t) = true then (
+		let this_cond = Hashtbl.find (List.nth !array_offsets_l_h field_num) 
+		  (field_num, new_s_b, end_byte, !n, f_sz_t) in
+		V.BinOp(V.BITOR, this_cond, cond)
+	       ) else cond ) 
 	  in
-	Hashtbl.replace (List.nth !array_offsets_l_h field_num) 
-	  (field_num, new_s_b, end_byte, !n, f_sz_t) cond';
-	n := !n lsl 1;
-      done;
+	  Hashtbl.replace (List.nth !array_offsets_l_h field_num) 
+	    (field_num, new_s_b, end_byte, !n, f_sz_t) cond';
+	  n := !n lsl 1;
+	done;) 
+      else if n_fields = t_n_fields then (
+	let cond' = V.Constant(V.Int(V.REG_16, 1L)) in
+	let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
+	let num_bytes_remaining = 
+	  (max_size - new_s_b - (n_fields - field_num)) in
+	let max_n = (num_bytes_remaining/f_sz_t) in
+	(* considering number of array entries to be powers of 2 *)
+	let n = ref 1 in 
+	while !n <= max_n do
+	  let end_byte = new_s_b + (!n)*f_sz_t - 1 in
+	  Hashtbl.replace (List.nth !array_offsets_l_h field_num) 
+	    (field_num, new_s_b, end_byte, !n, f_sz_t) cond';
+	  n := !n lsl 1;
+	done;
+      ) else failwith "n_fields is not i_n_fields or t_n_fields"
     in
     get_ent 1; get_ent 2; get_ent 4; get_ent 8;
   in
   
-  let rec get_array_offsets_l field = 
+  let rec get_array_offsets_l field n_fields = 
     match field with
-    | 1 -> get_array_field_ranges_l 1 0 (V.Constant(V.Int(V.REG_1, 1L)))
+    | 1 -> 
+      get_array_field_ranges_l 1 0 (V.Constant(V.Int(V.REG_1, 1L))) n_fields;
     | k -> 
-      get_array_offsets_l (k-1);
+      get_array_offsets_l (k-1) n_fields;
       let h = (List.nth !array_offsets_l_h (k-1)) in
       Hashtbl.iter ( fun (field_num, _, end_byte, _, _) prev_cond  ->
 	assert(field_num = (k-1));
-	get_array_field_ranges_l k (end_byte+1) prev_cond; 
+	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields; 
 	Printf.printf "SRFM#field=%d Hashtbl.len = %d\n" k
 	  (Hashtbl.length (List.nth !array_offsets_l_h k));
       ) h;
@@ -1186,30 +1195,39 @@ let create_field_ranges_l fm =
       )
     )
   in
-
-  get_array_offsets_l n_fields;
-  if !opt_time_stats then
-    (Printf.printf "get_array_offsets_l done...";
-     flush stdout);
-  let tmp_arr_off_l = ref [] in
-  for i = 1 to n_fields do
-    let h = (List.nth !array_offsets_l_h i) in
-    Hashtbl.iter (fun (f,s,e,n,sz) c -> 
-      tmp_arr_off_l := (f,s,e,n,sz,c) :: !tmp_arr_off_l;) h; 
-  done;
   
-  if !opt_time_stats then
-    (Printf.printf "field ranges...";
-     flush stdout);
-
-  array_field_ranges_l' := (List.sort cmp_arr !tmp_arr_off_l);
-  if !opt_trace_struct_adaptor = true then
-    Printf.printf "SRFM#array_field_ranges_l'.length = %d\n" (List.length !array_field_ranges_l');
-  if !opt_trace_struct_adaptor = true then
+  let create_array_field_ranges_l n_fields = 
+    array_offsets_l_h := [];
+    for i = 1 to n_fields+1 do
+      array_offsets_l_h := (Hashtbl.create 1000) :: !array_offsets_l_h;
+    done;
+    get_array_offsets_l n_fields n_fields;
+    if !opt_time_stats then
+      (Printf.printf "get_array_offsets_l done...";
+       flush stdout);
+    let tmp_arr_off_l = ref [] in
+    for i = 1 to n_fields do
+      let h = (List.nth !array_offsets_l_h i) in
+      Hashtbl.iter (fun (f,s,e,n,sz) c -> 
+	tmp_arr_off_l := (f,s,e,n,sz,c) :: !tmp_arr_off_l;) h; 
+    done;
+    
+    if !opt_time_stats then
+      (Printf.printf "field ranges...";
+       flush stdout);
+    (List.sort cmp_arr !tmp_arr_off_l)
+  in
+  t_array_field_ranges_l' := create_array_field_ranges_l t_n_fields;
+  i_array_field_ranges_l' := create_array_field_ranges_l i_n_fields;
+  if !opt_trace_struct_adaptor = true then (
+    Printf.printf "SRFM#i_array_field_ranges_l'.length = %d\n" (List.length !i_array_field_ranges_l');
+  );
+  if !opt_trace_struct_adaptor = true then (
     List.iteri ( fun ind (field_num, start_b, end_b, n, sz, cond) ->
-      Printf.printf "array_field_ranges_l'[%d]= (%d, %d, %d, %d, %d, %s)\n"
+      Printf.printf "i_array_field_ranges_l'[%d]= (%d, %d, %d, %d, %d, %s)\n"
 	ind field_num start_b end_b n sz (V.exp_to_string cond);
-    ) !array_field_ranges_l';
+    ) !i_array_field_ranges_l';
+  );
 
   (* Maintaining an index on field ranges by byte position *)
   for i = 1 to max_size do
@@ -1225,7 +1243,7 @@ let create_field_ranges_l fm =
       populate_i_byte tail
     | [] -> ()
   in
-  populate_i_byte !array_field_ranges_l';
+  populate_i_byte !i_array_field_ranges_l';
 
   let i_n_arr_h = ref (Array.make 0 (Hashtbl.create 0)) in
   for i = 0 to max_size do
@@ -1242,7 +1260,7 @@ let create_field_ranges_l fm =
       populate_i_n tail
     | [] -> ()
   in 
-  populate_i_n !array_field_ranges_l';
+  populate_i_n !t_array_field_ranges_l';
 
   if !opt_trace_struct_adaptor = true then (
     for i=0 to max_size-1 do
@@ -1275,7 +1293,7 @@ let create_field_ranges_l fm =
 
   (* Creating an array of lists populated with ranges for each field 
      to setup side-conditions in exec_fuzzloop *)
-  for i = 0 to n_fields do
+  for i = 0 to t_n_fields do
     ranges_by_field_num := Array.append !ranges_by_field_num (Array.make 1 (ref []));
   done;
   List.iter (
@@ -1285,7 +1303,7 @@ let create_field_ranges_l fm =
       if sz != 8 then
 	(!ranges_by_field_num).(f_num) := (Int64.of_int ((s lsl 32)+(e lsl 16)+0)) 
 	:: !((!ranges_by_field_num).(f_num));
-  ) !array_field_ranges_l';
+  ) !i_array_field_ranges_l';
 
   if !opt_trace_struct_adaptor = true then (
     for i=0 to max_size do
@@ -1334,7 +1352,7 @@ let struct_adaptor (fm:fragment_machine) =
 	(Printf.printf "(0x%08Lx)..." addr;
 	 flush stdout);
       if (Int64.abs (fix_s32 addr)) > 4096L then (
-	let (n_fields, max_size) = !opt_struct_adaptor_params in
+	let (t_n_fields, i_n_fields, max_size) = !opt_struct_adaptor_params in
 
 (* Commenting out for field_ranges_l starts here *)
 (*	let get_array_field_ranges_l field_num start_byte =

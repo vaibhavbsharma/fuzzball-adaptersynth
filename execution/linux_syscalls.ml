@@ -756,7 +756,7 @@ object(self)
       )
     done
 
-  method reset_unix_fd_positions_to_base =
+  method private reset_unix_fd_positions_to_base =
     for vt_fd = 0 to (Array.length unix_fds)-1 do 
       if vt_fd > 2 then (
 	match unix_fds.(vt_fd) with
@@ -2881,7 +2881,7 @@ object(self)
 	   ebp = fm#get_reg_symbolic arg_regs.(5) in
 	 (ebx, ecx, edx, esi, edi, ebp) 
      in
-     if (fm#get_in_f1_range ()) = true then (
+     if (fm#get_in_f1_range ()) && (not !opt_dont_compare_syscalls) then (
        Printf.printf "f1:syscall(%d)\n" syscall_num;
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
        Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
@@ -2912,11 +2912,11 @@ object(self)
        done;*)
        fm#add_f1_syscall_with_args syscall_num arg_list;
      );
-     if (fm#get_in_f2_range ()) = true then (
+     if (fm#get_in_f2_range ()) && (not !opt_dont_compare_syscalls) then (
        Printf.printf "f2:syscall(%d)\n" syscall_num;
        if fm#check_f2_syscall syscall_num = false then (
 	 Printf.printf "linux_syscalls:syscall divergence: raising DisqualifiedPath\n";
-	 raise DisqualifiedPath;);
+	  raise DisqualifiedPath;);
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
        Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
 	 syscall_num name num_args;

@@ -84,6 +84,8 @@ val opt_solve_path_conditions : bool ref
 val opt_trace_regions : bool ref
 val opt_trace_struct_adaptor : bool ref
 val opt_trace_mem_snapshots : bool ref
+val opt_dont_compare_mem_se : bool ref
+val opt_dont_compare_syscalls : bool ref
 val opt_check_store_sequence : bool ref
 val opt_check_for_null : bool ref
 val opt_offset_strategy : offset_strategy ref
@@ -95,7 +97,7 @@ val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
 val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
 val opt_synth_struct_adaptor : int64 list ref
-val opt_struct_adaptor_params : (int * int) ref
+val opt_struct_adaptor_params : (int * int * int) ref
 val opt_adaptor_search_mode : bool ref
 val opt_adaptor_ivc : bool ref
 val opt_split_target_formulas : bool ref
@@ -213,6 +215,8 @@ val add_delimited_int64_int_pair :
   (int64 * int) list ref -> char -> string -> unit
 val add_delimited_int_int_pair :
   (int * int) ref -> char -> string -> unit
+val add_delimited_int_triple:
+  (int * int * int) ref -> char -> string -> unit
 
 val opt_program_name : string option ref
 val opt_start_addr : int64 option ref
