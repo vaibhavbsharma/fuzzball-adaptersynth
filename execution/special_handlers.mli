@@ -18,6 +18,10 @@ object
   method handle_special : string -> Vine.stmt list option
   method make_snap : unit
   method reset : unit
+  method make_f1_snap : unit
+  method reset_f1_snap : unit
+  method make_f2_snap : unit
+  method reset_f2_snap : unit
 end
 
 class trap_special_nonhandler : Fragment_machine.fragment_machine -> object
