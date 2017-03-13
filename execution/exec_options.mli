@@ -81,6 +81,7 @@ val opt_concrete_path : bool ref
 val opt_concrete_path_simulate : bool ref
 val opt_concolic_prob : float option ref
 val opt_solve_path_conditions : bool ref
+val opt_no_sym_regions : bool ref
 val opt_trace_regions : bool ref
 val opt_trace_struct_adaptor : bool ref
 val opt_trace_mem_snapshots : bool ref
@@ -187,6 +188,7 @@ val opt_arch : execution_arch ref
 val opt_trace_stmts : bool ref
 val opt_trace_eval : bool ref
 val opt_track_sym_usage : bool ref
+val opt_trace_client_reqs : bool ref
 
 val asmir_arch : unit -> Asmir.arch
 

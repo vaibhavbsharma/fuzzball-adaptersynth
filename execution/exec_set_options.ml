@@ -204,6 +204,8 @@ let symbolic_state_cmdline_opts =
     ("-sink-region", Arg.String
        (add_delimited_str_num_pair opt_sink_regions '+'),
      "var+size Range-check but ignore writes to a region");
+    ("-no-sym-regions", Arg.Set(opt_no_sym_regions),
+     " Do not attempt to make symbolic regions");
     ("-skip-call-ret-symbol", Arg.String
        (add_delimited_num_str_pair opt_skip_call_addr_symbol '='),
      "addr=symname Like -s-c-r, but return a fresh symbol");
@@ -481,6 +483,8 @@ let cmdline_opts =
      " Enable several common trace and stats options");
     ("-trace-binary-paths", Arg.Set(opt_trace_binary_paths),
      " Print decision paths as bit strings");
+    ("-trace-client-reqs", Arg.Set(opt_trace_client_reqs),
+     " Print Valgrind-style client requests");
     ("-trace-conditions", Arg.Set(opt_trace_conditions),
      " Print branch conditions");
     ("-trace-decisions", Arg.Set(opt_trace_decisions),
@@ -674,6 +678,9 @@ let apply_cmdline_opts_early (fm : Fragment_machine.fragment_machine) dl =
     fm#make_regs_symbolic
   else
     fm#make_regs_zero;
+  fm#add_special_handler
+    ((new Special_handlers.vg_client_req_special_handler fm)
+     :> Fragment_machine.special_handler);
   fm#add_special_handler
     ((new Special_handlers.trap_special_nonhandler fm)
      :> Fragment_machine.special_handler);

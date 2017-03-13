@@ -470,20 +470,52 @@ struct
       | _ -> if (!opt_fail_offset_heuristic) then (
 	  failwith ("Strange term "^(V.exp_to_string e)^" in address")
 	) else ExprOffset(e)
-	  
+
+  (* When we're not going to try for symbolic regions, just separate
+     the concrete terms from everything else; they should be the base *)
+  let classify_terms_simple e form_man =
+    let constants = ref 0L in
+    let rec loop e =
+      match e with
+	| V.BinOp(V.PLUS, e1, e2) -> (loop e1) @ (loop e2)
+	| V.Lval(V.Temp(var)) ->
+	    FormMan.if_expr_temp form_man var
+	      (fun e' -> loop e') [e] (fun v -> ())
+	| V.Constant(V.Int(V.REG_32, n)) ->
+	    constants := Int64.add !constants n;
+	    []
+	| e -> [e]
+    in
+    let terms = loop e in
+      (!constants, terms)
+
   let classify_terms e form_man =
-    let l = List.map (classify_term form_man) (split_terms e form_man) in
-    let (cbases, coffs, eoffs, ambig, syms) =
-      (ref [], ref [], ref [], ref [], ref []) in
-      List.iter
-	(function
-	   | ConstantBase(o) ->  cbases := o :: !cbases
-	   | ConstantOffset(o) -> coffs := o :: !coffs
-	   | ExprOffset(e) ->     eoffs := e :: !eoffs
-	   | AmbiguousExpr(e) ->  ambig := e :: !ambig
-	   | Symbol(v) ->          syms := v :: !syms)
-	l;
-      (!cbases, !coffs, !eoffs, !ambig, !syms)
+    match (e, !opt_no_sym_regions) with
+      | (V.Constant(V.Int(_, k)), _) ->
+	  (* Most common case: all concrete is a concrete base *)
+	  ([k], [], [], [], [])
+      | (e, true) ->
+	  let (cbase, terms) = classify_terms_simple e form_man in
+	  let cbases = if cbase = 0L then [] else [cbase] in
+	    if !opt_trace_sym_addr_details then
+	      Printf.printf "Extracted base address 0x%0Lx from %s\n"
+		cbase (V.exp_to_string e);
+	    (cbases, [], terms, [], [])
+      | (_, _) ->
+	  if !opt_trace_sym_addr_details then
+	    Printf.printf "Analyzing addr expr %s\n" (V.exp_to_string e);
+	  let l = List.map (classify_term form_man) (split_terms e form_man) in
+	  let (cbases, coffs, eoffs, ambig, syms) =
+	    (ref [], ref [], ref [], ref [], ref []) in
+	    List.iter
+	      (function
+		 | ConstantBase(o) ->  cbases := o :: !cbases
+		 | ConstantOffset(o) -> coffs := o :: !coffs
+		 | ExprOffset(e) ->     eoffs := e :: !eoffs
+		 | AmbiguousExpr(e) ->  ambig := e :: !ambig
+		 | Symbol(v) ->          syms := v :: !syms)
+	      l;
+	    (!cbases, !coffs, !eoffs, !ambig, !syms)
 
   let select_one l rand_func =
     let split_list l =
@@ -1012,7 +1044,7 @@ struct
 	     for symbolic regions *)
 	  | (0L, [], [e]) -> (Some(self#region_for e), [])
 	  | (0L, [v], _) -> (Some(self#region_for v), ambig)
-	  | (0L, [], el) -> (Some 0, el) (* TODO: Pick one element from el *)
+	  | (0L, [], el) -> (Some 0, el)
 	  | (0L, vl, _) ->
 	      let (bvar, rest_vars) =
 		(* We used to have logic here that checked whether one
@@ -1379,7 +1411,10 @@ struct
 		| wd' -> wd'
 	      in
 		Hashtbl.replace bitwidth_cache key wd;
-	        wd
+		if wd = Some 0L then
+		  None
+		else
+		  wd
 
     method private decide_offset_wd off_exp = 
       let fast_wd = narrow_bitwidth form_man off_exp in
@@ -1702,6 +1737,7 @@ struct
 	   let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
 	   form_man#check_sym_usage_d v ty "loaded value"
 	     is_stack self#query_relevance);
+
 	if !r' = Some 0 && (Int64.abs (fix_s32 !addr')) < 4096L then
 	  raise NullDereference;
 	(v, ty)
