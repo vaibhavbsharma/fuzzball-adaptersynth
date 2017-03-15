@@ -156,9 +156,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then chartrans_loop 255
        else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
      
-     let (t_n_fields, _, _) = !opt_struct_adaptor_params in 
-     for i=1 to t_n_fields do 
-       let f_type_str = Printf.sprintf "f%d_type" i in
+     let (_, i_n_fields, _) = !opt_struct_adaptor_params in 
+     for i = 1 to i_n_fields do
        let field_size_str = Printf.sprintf "f%d_size" i in
        let field_n_str = Printf.sprintf "f%d_n" i in
        let field_n = fm#get_fresh_symbolic field_n_str 16 in
@@ -174,8 +173,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 				 )))))
        in
        opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
-      
-       (* this target field cannot overlap with another target field *)
+       let f_type_str = Printf.sprintf "f%d_type" i in
+       (* this target field cannot overlap with another target field
+	  this means that two inner fields cannot be mapped to the same target
+	  field (sorry twins!) *)
        let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
        let i_start_b = V.BinOp(V.RSHIFT, f_type_sym, 
 			       V.Constant(V.Int(V.REG_8, 32L))) in
@@ -184,7 +185,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 V.Constant(V.Int(V.REG_64, 65535L)), 
 	 V.BinOp(V.RSHIFT, f_type_sym, 
 		 V.Constant(V.Int(V.REG_8, 16L)))) in
-       for j=1 to t_n_fields do
+       for j=1 to i_n_fields do
 	 if i <> j then (
 	   let f2_type_sym = fm#get_fresh_symbolic (Printf.sprintf "f%d_type" j) 64 in
 	   let j_start_b = V.BinOp(V.RSHIFT, f2_type_sym, 
@@ -209,7 +210,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        (* end_byte must be >= start_byte *)
        opt_extra_conditions := V.BinOp(V.LE, i_start_b, i_end_b) :: !opt_extra_conditions;
       
-       (* i_end_b - i_start_b + 1 should be divisible by field_n *)
+	(*  i_end_b - i_start_b + 1 should be divisible by field_n *) 
        let i_bytes = V.BinOp(V.MINUS, 
 			     V.BinOp(
 			       V.PLUS, i_end_b, V.Constant(V.Int(V.REG_64, 1L))),
@@ -240,8 +241,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 					       V.Cast(
 						 V.CAST_UNSIGNED, V.REG_64, field_n))) in
        opt_extra_conditions := V.BinOp(V.BITOR, size_cond1, 
-				       V.BinOp(V.BITOR, size_cond2, 
-					       V.BinOp(V.BITOR, size_cond3, size_cond4)))
+					       V.BinOp(V.BITOR, size_cond2, 
+						       V.BinOp(V.BITOR, size_cond3, size_cond4)))
        :: !opt_extra_conditions;
       
      done; (* end for i *)
@@ -290,10 +291,14 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
-     if t_n_fields <> 0 then 
-       Adaptor_synthesis.create_field_ranges_l fm;
+     if i_n_fields <> 0 then 
+       Adaptor_synthesis.create_field_ranges_l fm ;
      let field_ranges = Adaptor_synthesis.ranges_by_field_num in
-     for i = 1 to t_n_fields do
+     let ranges = ref [] in
+     for i = 1 to i_n_fields do
+       ranges := !ranges @ !((!field_ranges).(i));
+     done;
+     for i = 1 to i_n_fields do
        let f_type_str = Printf.sprintf "f%d_type" i in
        let f_type_sym = fm#get_fresh_symbolic f_type_str 64 in
        (* f_type should equal only one of the valid values *)
@@ -307,8 +312,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 			      (V.BinOp(V.EQ, f_type_sym, (constify b))))
 	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
        in
-       let ranges = !((!field_ranges).(i)) in
-       opt_extra_conditions := (or_list ranges) :: !opt_extra_conditions;
+       opt_extra_conditions := (or_list !ranges) :: !opt_extra_conditions;
      done;
 
      (try

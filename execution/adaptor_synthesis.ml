@@ -1112,7 +1112,7 @@ let create_field_ranges_l fm =
 
   done; (* end for i = 1 to n_fields *) *)
   
-  let get_array_field_ranges_l field_num start_byte prev_cond n_fields =
+  let get_array_field_ranges_l field_num start_byte prev_cond n_fields  =
     let get_ent f_sz_t =
       if n_fields = i_n_fields then (
 	let f_sz_str = ("f"^(Printf.sprintf "%d" field_num)^"_size") in
@@ -1149,7 +1149,7 @@ let create_field_ranges_l fm =
 	  Hashtbl.replace (List.nth !array_offsets_l_h field_num) 
 	    (field_num, new_s_b, end_byte, !n, f_sz_t) cond';
 	  n := !n lsl 1;
-	done;) 
+	done; ) 
       else if n_fields = t_n_fields then (
 	let cond' = V.Constant(V.Int(V.REG_16, 1L)) in
 	let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
@@ -1169,16 +1169,16 @@ let create_field_ranges_l fm =
     get_ent 1; get_ent 2; get_ent 4; get_ent 8;
   in
   
-  let rec get_array_offsets_l field n_fields = 
+  let rec get_array_offsets_l field n_fields  = 
     match field with
     | 1 -> 
-      get_array_field_ranges_l 1 0 (V.Constant(V.Int(V.REG_1, 1L))) n_fields;
+      get_array_field_ranges_l 1 0 (V.Constant(V.Int(V.REG_1, 1L))) n_fields ;
     | k -> 
-      get_array_offsets_l (k-1) n_fields;
+      get_array_offsets_l (k-1) n_fields ;
       let h = (List.nth !array_offsets_l_h (k-1)) in
       Hashtbl.iter ( fun (field_num, _, end_byte, _, _) prev_cond  ->
 	assert(field_num = (k-1));
-	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields; 
+	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields ; 
 	Printf.printf "SRFM#field=%d Hashtbl.len = %d\n" k
 	  (Hashtbl.length (List.nth !array_offsets_l_h k));
       ) h;
@@ -1201,7 +1201,7 @@ let create_field_ranges_l fm =
     for i = 1 to n_fields+1 do
       array_offsets_l_h := (Hashtbl.create 1000) :: !array_offsets_l_h;
     done;
-    get_array_offsets_l n_fields n_fields;
+    get_array_offsets_l n_fields n_fields ;
     if !opt_time_stats then
       (Printf.printf "get_array_offsets_l done...";
        flush stdout);
@@ -1293,7 +1293,7 @@ let create_field_ranges_l fm =
 
   (* Creating an array of lists populated with ranges for each field 
      to setup side-conditions in exec_fuzzloop *)
-  for i = 0 to t_n_fields do
+  for i = 0 to i_n_fields do
     ranges_by_field_num := Array.append !ranges_by_field_num (Array.make 1 (ref []));
   done;
   List.iter (
