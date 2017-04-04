@@ -162,6 +162,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      
      let (_, i_n_fields, _) = !opt_struct_adaptor_params in 
      for i = 1 to i_n_fields do
+       ignore(fm#get_fresh_symbolic (Printf.sprintf "m%d_arith" i) 64);
+       ignore(fm#get_fresh_symbolic (Printf.sprintf "c%d_arith" i) 64);
        let field_size_str = Printf.sprintf "f%d_size" i in
        let field_n_str = Printf.sprintf "f%d_n" i in
        let field_n = fm#get_fresh_symbolic field_n_str 16 in
@@ -316,7 +318,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 			      (V.BinOp(V.EQ, f_type_sym, (constify b))))
 	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
        in
-       opt_extra_conditions := (or_list !ranges) :: !opt_extra_conditions;
+       let this_cond = (or_list !ranges) in
+       Printf.printf "list of valid values = %s\n" (V.exp_to_string this_cond);
+       opt_extra_conditions := this_cond :: !opt_extra_conditions;
      done;
 
      (try

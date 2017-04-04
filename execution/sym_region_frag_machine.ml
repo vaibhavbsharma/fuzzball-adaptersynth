@@ -1098,11 +1098,16 @@ struct
 	  let off_expr = (sum_list (eoffs @ off_syms)) in
 	  match decide_fn off_expr 0L with
 	  | Some wd ->
-	    if !opt_trace_tables then
+	    if !opt_trace_tables then (
+	      let off_expr_str = 
+		  if (List.length ambig)<>0 && (List.length syms)=0 then 
+		    V.exp_to_string (List.hd ambig)
+		  else if (List.length syms)<>0 then 
+		    V.exp_to_string (List.hd syms)
+		  else "invalid_table_treatment_offset_expr" in
 	      Printf.printf 
 		"Table treatment for sym region with base = %s and offset expr = %s\n"
-		(V.exp_to_string (List.hd ambig))
-		(V.exp_to_string off_expr);
+		off_expr_str (V.exp_to_string off_expr););
 	    TableLocation(base, off_expr, cloc)
 	  | None -> 
 	    let coff = List.fold_left Int64.add 0L coffs in
