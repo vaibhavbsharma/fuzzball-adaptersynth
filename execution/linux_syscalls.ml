@@ -4770,6 +4770,14 @@ object(self)
 	     Printf.printf "Unknown Linux/ARM system call %d\n" syscall_num;
 	     uh "Unhandled Linux system call"
 	 | (X64, _) ->
+	   if !opt_trace_syscalls then
+	     Printf.printf "Applying unhandled system call treatment for %d\n" syscall_num;
+	   let () =
+	     (* Write message to file *)
+	     let oc = open_out_gen [Open_append; Open_creat] 0o664 "noop_syscalls.lst" in 
+	     Printf.fprintf oc "%d\n" syscall_num;
+	     close_out oc;
+	   in
 	   if !opt_ret_zero_missing_x64_syscalls = true then 
 	     put_return 0L
 	   else self#put_errno Unix.ENOSYS);
