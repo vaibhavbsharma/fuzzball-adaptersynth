@@ -91,6 +91,7 @@ val opt_check_store_sequence : bool ref
 val opt_check_for_null : bool ref
 val opt_offset_strategy : offset_strategy ref
 val opt_concretize_divisors : bool ref
+val opt_nonzero_divisors : bool ref
 val opt_trace_stopping : bool ref
 val opt_trace_setup : bool ref
 val opt_extra_env : (string, string) Hashtbl.t

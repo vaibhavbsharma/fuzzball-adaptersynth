@@ -330,6 +330,8 @@ let explore_cmdline_opts =
      "N Stop after N different paths");
     ("-concretize-divisors", Arg.Set(opt_concretize_divisors),
      " Choose concrete values for divisors in /, %");
+    ("-nonzero-divisors", Arg.Set(opt_nonzero_divisors),
+     " Dont allow zero values for divisors in /, %");
     ("-trace-binary-paths-delimited",
      Arg.Set(opt_trace_binary_paths_delimited),
      " As above, but with '-'s separating queries");

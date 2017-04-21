@@ -113,6 +113,7 @@ let opt_dont_compare_syscalls = ref false
 let opt_check_for_null = ref false
 let opt_offset_strategy = ref UniformStrat
 let opt_concretize_divisors = ref false
+let opt_nonzero_divisors = ref false
 let opt_trace_stopping = ref false
 let opt_trace_setup = ref false
 let opt_extra_env = Hashtbl.create 10

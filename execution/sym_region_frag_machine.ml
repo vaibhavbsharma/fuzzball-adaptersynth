@@ -1327,6 +1327,26 @@ struct
 	  | V.DIVIDE | V.SDIVIDE | V.MOD | V.SMOD 
 		when !opt_concretize_divisors
 	      -> (v1, (conc ty2 v2))
+	  | V.DIVIDE | V.SDIVIDE | V.MOD | V.SMOD 
+	      when !opt_nonzero_divisors
+		->
+	    let r = 
+	      try
+		match ty2 with
+		| V.REG_1 -> ignore(D.to_concrete_1 v2); v2
+		| V.REG_8 -> ignore(D.to_concrete_8 v2); v2
+		| V.REG_16 -> ignore(D.to_concrete_16 v2); v2
+		| V.REG_32 -> ignore(D.to_concrete_32 v2); v2
+		| V.REG_64 -> ignore(D.to_concrete_64 v2); v2
+		| _ -> failwith "Bad type in maybe_concretize_binop"
+	      with 
+		NotConcrete _ ->
+		  let (b,_) = self#query_condition 
+		    (V.BinOp(V.NEQ, (D.to_symbolic_64 v2), V.Constant(V.Int(V.REG_64, 0L))))
+		    (Some true) 0x6d42 in
+		  if b = false then raise DisqualifiedPath;
+		  v2
+	    in (v1, r)
 	  | _ -> (v1, v2)
 
     method private store_byte_region  r addr b =
