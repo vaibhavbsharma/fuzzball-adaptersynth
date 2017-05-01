@@ -1037,7 +1037,11 @@ struct
 		(List.map V.exp_to_string syms)));
 	let cbase = List.fold_left Int64.add 0L cbases in
 	let (base, off_syms) = match (cbase, syms, ambig) with
-	  | (0L, [], []) -> raise NullDereference
+	  | (0L, [], []) -> 
+	    Printf.printf "about to raise null dereference\n";
+	    flush(stdout);
+	    (Some 0, [])
+	    (* raise NullDereference *)
 	  (* adaptor expressions are classified as AmbiguousExpr, but they can
 	     still be region expressions *)
 	  (* The following two cases are applicable when applying table treatment 

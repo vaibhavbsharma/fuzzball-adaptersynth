@@ -19,6 +19,7 @@ val ret_simplelen_adaptor :
   Fragment_machine.fragment_machine -> int64 -> unit
 val create_field_ranges_l : 
   Fragment_machine.fragment_machine -> unit 
+val arithmetic_int_init_sym_vars : Fragment_machine.fragment_machine -> int -> unit 
 val i_array_field_ranges_l' : (int * int * int * int * int * Vine.exp) list ref
 val i_byte_arr' :  (int * int * int * int * int * Vine.exp) list ref array ref
 val i_n_arr' : (int * int * int * int) list ref array ref

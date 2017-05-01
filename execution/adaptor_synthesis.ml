@@ -68,8 +68,12 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
   let rec build_tree d base =
     if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
     else 
-      let node_type = fm#get_fresh_symbolic (var ^ "_type_" ^ base) 8 in
-      let node_val = fm#get_fresh_symbolic (var ^ "_val_" ^ base) 
+      let node_type = if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals (var ^ "_type_" ^ base)
+	else fm#get_fresh_symbolic (var ^ "_type_" ^ base) 8 in
+      let node_val = if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals (var ^ "_val_" ^ base)
+	else fm#get_fresh_symbolic (var ^ "_val_" ^ base) 
                        (if val_type = V.REG_32 then 32 else 64) in
       if d = 1 
       then if out_nargs = 0L
@@ -119,8 +123,12 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
       restrict_const_node binops unops depth =
   (* zeros-out nodes in an arithmetic expression subtree *)
   let rec zero_lower d base =
-    let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-    let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
+    let node_type = if not !opt_adaptor_search_mode then 
+	Hashtbl.find adaptor_vals (var_name ^ "_type_" ^ base)
+      else fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
+    let node_val = if not !opt_adaptor_search_mode then 
+	Hashtbl.find adaptor_vals (var_name ^ "_val_" ^ base)
+      else fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
                      (if val_type = V.REG_32 then 32 else 64) in
     if d = 1 
     then 
@@ -141,8 +149,12 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
   let rec traverse_tree d base = 
     if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
     else 
-      let node_type = fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-      let node_val = fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
+      let node_type = if not !opt_adaptor_search_mode then 
+	Hashtbl.find adaptor_vals (var_name ^ "_type_" ^ base)
+	else fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
+      let node_val = if not !opt_adaptor_search_mode then 
+	Hashtbl.find adaptor_vals (var_name ^ "_val_" ^ base)
+	else fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
                        (if val_type = V.REG_32 then 32 else 64) in
         if d = 1
         then 
@@ -224,9 +236,9 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 3
+let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = V.REG_32
+let int_val_type = V.REG_64
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
@@ -242,14 +254,14 @@ let int_unops = [V.NEG; V.NOT]
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
    zero if used) *)
-let int_restrict_constant_range = None
+let int_restrict_constant_range = None (* Some (0L, 16L) used for killpg <- kill *) (* Some (-187L, 187L) used for isupper <-> islower *)
 let int_restrict_constant_list = None
 (* restrict the input and output of the adaptor (input restrictions reflect
    f1 preconditions and output restrictions reflect f2 preconditions)
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
    int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
    this list must contain zero if used) *)
-let int_restrict_input_range = None
+let int_restrict_input_range = Some (0L, 2147483647L) (* Used for killpg <- kill *)
 let int_restrict_input_list = None
 let int_restrict_output_range = None
 let int_restrict_output_list = None
@@ -385,13 +397,33 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
                int_restrict_output_list))
        !symbolic_exprs)
   else ()
-    
+   
+let arithmetic_int_init_sym_vars fm in_nargs = 
+  let rec create_arith_int_sym_vars prev_type_str prev_val_str d =
+    ignore(fm#get_fresh_symbolic (prev_type_str^"0") 8);
+    ignore(fm#get_fresh_symbolic (prev_val_str^"0") 64);
+    ignore(fm#get_fresh_symbolic (prev_type_str^"1") 8);
+    ignore(fm#get_fresh_symbolic (prev_val_str^"1") 64);
+    if d <> 1 then (
+      create_arith_int_sym_vars (prev_type_str^"0") (prev_val_str^"0") (d-1);
+      create_arith_int_sym_vars (prev_type_str^"1") (prev_val_str^"1") (d-1);
+    );
+  in
+  for i = 0 to in_nargs do
+    let type_str = Printf.sprintf "%c_type_R" (Char.chr ((Char.code 'a') + i)) in
+    let val_str = Printf.sprintf "%c_val_R" (Char.chr ((Char.code 'a') + i)) in
+    ignore(fm#get_fresh_symbolic type_str 8);
+    ignore(fm#get_fresh_symbolic val_str 64);
+    create_arith_int_sym_vars type_str val_str int_arith_depth;
+  done;
+ ()
+ 
 (* adds extra conditions on the input variables and associated 
    adaptor variables; this function is called in exec_fuzzloop *)
 let rec arithmetic_int_extra_conditions fm out_nargs n = 
   let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
   let var = fm#get_fresh_symbolic var_name 
-              (if int_val_type = V.REG_32 then 32 else 64) in
+      (if int_val_type = V.REG_32 then 32 else 64) in
   (* restrict the value of a constant node to be in a specified range or 
      one of a specified value *)
   let restrict_const_node node_type node_val =

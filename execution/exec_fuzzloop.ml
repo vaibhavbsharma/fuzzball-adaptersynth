@@ -150,9 +150,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
        else if (mode = "arithmetic_int")   
        then (
-	 if (in_nargs <> 0L) then
+	 (* if (in_nargs <> 0L) then
 	   Adaptor_synthesis.arithmetic_int_extra_conditions
-	     fm out_nargs ((Int64.to_int in_nargs)-1);)
+	     fm out_nargs ((Int64.to_int in_nargs)-1);) *)
+	 Adaptor_synthesis.arithmetic_int_init_sym_vars fm (Int64.to_int in_nargs);
+	 )
        else if mode = "arithmetic_float"
        then Adaptor_synthesis.arithmetic_float_extra_conditions
          fm out_nargs ((Int64.to_int in_nargs)-1)
@@ -297,6 +299,16 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
+
+     let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
+     if (mode = "arithmetic_int")   
+     then (
+       if (in_nargs <> 0L) then (
+	 Adaptor_synthesis.arithmetic_int_extra_conditions
+	   fm out_nargs ((Int64.to_int in_nargs)-1);
+	 opt_extra_conditions := !opt_extra_conditions @ !synth_extra_conditions;
+       ); 
+     );
      if i_n_fields <> 0 then 
        Adaptor_synthesis.create_field_ranges_l fm ;
      let field_ranges = Adaptor_synthesis.ranges_by_field_num in
