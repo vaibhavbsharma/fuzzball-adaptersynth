@@ -3307,14 +3307,14 @@ struct
 		let value = (self#load_sym tmp_addr (target_sz*8)) in
 		let ai_entry = 
 		  upcast value cast_op (ai_f_sz*8) in 
-		let m_sym = upcast (self#get_fresh_symbolic 
+		(* let m_sym = upcast (self#get_fresh_symbolic 
 		  (Printf.sprintf "m%d_arith" field_num) 64) (Some V.CAST_LOW) (ai_f_sz*8) in
 		let c_sym = upcast (self#get_fresh_symbolic 
 		  (Printf.sprintf "c%d_arith" field_num) 64) (Some V.CAST_LOW) (ai_f_sz*8) in
 		let arith_expr = V.BinOp(V.PLUS, 
 					 V.BinOp(V.TIMES, m_sym, ai_entry), c_sym) in
-		(* get_byte ai_entry ai_r *)
-		get_byte arith_expr ai_r
+		get_byte arith_expr ai_r *)
+		get_byte ai_entry ai_r
 	      in
 	      match this_array_field_ranges_l with
 	      | [] -> failwith "AS#get_arr_t_field_expr ran out of this_array_field_ranges_l"
@@ -3322,6 +3322,7 @@ struct
 		assert(n = ai_n);
 		let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 		let base_expr = get_ai_byte_expr n f_sz start_addr 1 in
+		let base_expr_unsigned  = get_ai_byte_expr n f_sz start_addr 0 in
 		if !opt_trace_struct_adaptor then (
 		  Printf.printf "base case for get_arr_t_field_expr (%d, %d, %d, %d) ai_byte = %d\n"
 		    start_byte end_byte n f_sz ai_byte;
@@ -3332,8 +3333,10 @@ struct
 		    Hashtbl.find adaptor_vals f_type_str
 		  else self#get_fresh_symbolic f_type_str 64 in
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
+		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
 		get_ite_expr f_type V.EQ V.REG_64 sign_extend_val base_expr 
-		  (V.Constant(V.Int(V.REG_8, 0L))) 
+		  (get_ite_expr f_type V.EQ V.REG_64 zero_extend_val base_expr_unsigned
+		     (V.Constant(V.Int(V.REG_8, 0L)))) 
 		(* base_expr *)
 	      | (start_byte, end_byte, n, f_sz)::tail ->
 		assert(n = ai_n);
