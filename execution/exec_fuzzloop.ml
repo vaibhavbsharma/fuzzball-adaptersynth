@@ -299,8 +299,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
-
-     let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
+     
+     let (mode, _, out_nargs, _, in_nargs) = 
+       if ((List.length !opt_synth_adaptor) <> 0) then
+	 List.hd !opt_synth_adaptor else ("", 0L, 0L, 0L, 0L) 
+     in 
      if (mode = "arithmetic_int")   
      then (
        if (in_nargs <> 0L) then (
