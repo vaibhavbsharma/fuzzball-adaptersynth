@@ -70,17 +70,17 @@ let call_replacements fm last_eip eip =
     with
       | (None, None, None, None, None, None, None, None, None, None) -> None
       | (Some sfa_val, None, None, None, None, None, None, None, None, None) ->
-	  Some (fun () -> fm#set_word_var ret_reg sfa_val; None)
+	  Some (fun () -> set_reg_conc ret_reg sfa_val; None)
       | (None, Some sfas_sym, None, None, None, None, None, None, None, None) ->
-	  Some (fun () -> ignore(fm#set_word_reg_fresh_symbolic ret_reg sfas_sym); None)
+	  Some (fun () -> ignore(set_reg_fresh ret_reg sfas_sym); None)
       | (None, None, Some sfar_sym, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_reg_fresh_region ret_reg sfar_sym; None)
       | (None, None, None, Some cfa_val, None, None, None, None, None, None) ->
-	  Some (fun () -> fm#set_word_var ret_reg cfa_val; None)
+	  Some (fun () -> set_reg_conc ret_reg cfa_val; None)
       | (None, None, None, None, Some cfas_sym, None, None, None, None, None) ->
-	  Some (fun () -> ignore(fm#set_word_reg_fresh_symbolic ret_reg cfas_sym); None)
+	  Some (fun () -> ignore(set_reg_fresh ret_reg cfas_sym); None)
       | (None, None, None, None, None, Some cfaso_sym, None, None, None, None) ->
-	  Some (fun () -> fm#set_word_reg_symbolic ret_reg cfaso_sym; None)
+	  Some (fun () -> set_reg_sym ret_reg cfaso_sym; None)
       | (None, None, None, None, None, None, Some cfar_sym, None, None, None) ->
 	  Some (fun () -> fm#set_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
