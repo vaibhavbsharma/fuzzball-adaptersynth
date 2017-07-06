@@ -24,3 +24,7 @@ missing
 /compile
 .z3-trace
 fuzzball-tmp-*
+*.bkp
+TAGS
+tags
+*~
