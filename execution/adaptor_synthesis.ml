@@ -709,7 +709,12 @@ let get_typeconv_expr src_operand src_type extend_op =
 
 let typeconv_adaptor fm out_nargs in_nargs =
   Printf.printf "Starting typeconv adaptor\n";
-  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let arg_regs = 
+    match !opt_arch with
+    | X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+    | ARM -> [R0; R1; R2; R3]
+    | _ -> failwith "argregs unsupported for architecture"
+  in
   (* argument registers -- assumes SSE floating point *)
   (*let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in*)
   let symbolic_args = ref [] in
@@ -886,7 +891,11 @@ let ret_typeconv_adaptor fm in_nargs =
   let ret_val = (fm#get_fresh_symbolic ("ret_val") 64) in
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   (* TODO: try using other return argument registers like XMM0 *)
-  let return_arg = fm#get_reg_symbolic R_RAX in
+  let return_arg = fm#get_reg_symbolic 
+    (match !opt_arch with
+    | X64 -> R_RAX
+    | ARM -> R0
+    | _ -> failwith "unsupported return register for architecture") in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
   let type_53_expr = (get_ite_expr return_arg V.EQ V.REG_64 0L 
