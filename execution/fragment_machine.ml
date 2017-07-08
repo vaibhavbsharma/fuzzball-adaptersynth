@@ -1062,7 +1062,11 @@ struct
       List.iter (
 	fun (start1,end1,start2,end2) ->
 	  if eip = start1 then (
-	    saved_f1_rsp <- self#get_long_var R_RSP; 
+	    saved_f1_rsp <- self#get_long_var 
+	      (match !opt_arch with
+	      | X64 -> R_RSP
+	      | ARM -> R13
+	      | _ -> failwith "unsupported architecture for adaptor synthesis");
 	    in_f1_range <- true;
 	    self#make_f1_sym_snap ; 
 	    self#make_f1_conc_snap ;  
@@ -1075,7 +1079,11 @@ struct
 	    self#reset_f1_special_handlers_snap ;
 	  );
 	  if eip = start2 then (
-	    saved_f2_rsp <- self#get_long_var R_RSP;
+	    saved_f2_rsp <- self#get_long_var 
+	      (match !opt_arch with
+	      | X64 -> R_RSP
+	      | ARM -> R13
+	      | _ -> failwith "unsupported architecture for adaptor synthesis");
 	    in_f2_range <- true;
 	    self#make_f2_sym_snap ;
 	    self#make_f2_conc_snap ;
@@ -1455,6 +1463,40 @@ struct
 	reg R13  (D.from_concrete_32 0x00000000L);
 	reg R14  (D.from_concrete_32 0x00000000L);
 	reg R15T (D.from_concrete_32 0x00000000L);
+
+	reg R_D0 (D.from_concrete_64 0x0L);
+	reg R_D1 (D.from_concrete_64 0x0L);
+	reg R_D2 (D.from_concrete_64 0x0L);
+	reg R_D3 (D.from_concrete_64 0x0L);
+	reg R_D4 (D.from_concrete_64 0x0L);
+	reg R_D5 (D.from_concrete_64 0x0L);
+	reg R_D6 (D.from_concrete_64 0x0L);
+	reg R_D7 (D.from_concrete_64 0x0L);
+	reg R_D8 (D.from_concrete_64 0x0L);
+	reg R_D9 (D.from_concrete_64 0x0L);
+	reg R_D10 (D.from_concrete_64 0x0L);
+	reg R_D11 (D.from_concrete_64 0x0L);
+	reg R_D12 (D.from_concrete_64 0x0L);
+	reg R_D13 (D.from_concrete_64 0x0L);
+	reg R_D14 (D.from_concrete_64 0x0L);
+	reg R_D15 (D.from_concrete_64 0x0L);
+	reg R_D16 (D.from_concrete_64 0x0L);
+	reg R_D17 (D.from_concrete_64 0x0L);
+	reg R_D18 (D.from_concrete_64 0x0L);
+	reg R_D19 (D.from_concrete_64 0x0L);
+	reg R_D20 (D.from_concrete_64 0x0L);
+	reg R_D21 (D.from_concrete_64 0x0L);
+	reg R_D22 (D.from_concrete_64 0x0L);
+	reg R_D23 (D.from_concrete_64 0x0L);
+	reg R_D24 (D.from_concrete_64 0x0L);
+	reg R_D25 (D.from_concrete_64 0x0L);
+	reg R_D26 (D.from_concrete_64 0x0L);
+	reg R_D27 (D.from_concrete_64 0x0L);
+	reg R_D28 (D.from_concrete_64 0x0L);
+	reg R_D29 (D.from_concrete_64 0x0L);
+	reg R_D30 (D.from_concrete_64 0x0L);
+	reg R_D31 (D.from_concrete_64 0x0L);
+
 	reg R_NF (D.from_concrete_1 0);
 	reg R_ZF (D.from_concrete_1 0);
 	reg R_CF (D.from_concrete_1 0);
@@ -2706,12 +2748,19 @@ struct
 	    let (v1, ty1) = self#eval_int_exp_ty e in
 	      self#eval_fcast kind rm ty v1 ty1
 	| V.Ite(cond, true_e, false_e) ->
-	    let (v_c, ty_c) = self#eval_int_exp_ty cond and
-		(v_t, ty_t) = self#eval_int_exp_ty true_e and
-		(v_f, ty_f) = self#eval_int_exp_ty false_e in
+	    let (v_c, ty_c) = self#eval_int_exp_ty cond in
+	    (try 
+	      let v_c_c = D.to_concrete_1 v_c in
+	      if v_c_c = 1 then 
+		self#eval_int_exp_ty true_e
+	      else 
+		self#eval_int_exp_ty false_e
+	    with NotConcrete _ ->
+	      let (v_t, ty_t) = self#eval_int_exp_ty true_e and
+		  (v_f, ty_f) = self#eval_int_exp_ty false_e in
 	      assert(ty_c = V.REG_1);
 	      assert(ty_t = ty_f);
-	      self#eval_ite v_c v_t v_f ty_t
+	      self#eval_ite v_c v_t v_f ty_t)
 	(* XXX move this to something like a special handler: *)
 	| V.Unknown("rdtsc") -> ((D.from_concrete_64 1L), V.REG_64) 
 	| V.Unknown(_) ->
@@ -2820,14 +2869,46 @@ struct
 		       else
 			 jump (self#eval_label_exp l2)
 		 | V.Move(V.Temp((n,s,t) as v), e) ->
-		     let rhs = self#eval_int_exp_simplify e in
-		       if !opt_trace_eval then
-			 Printf.printf "    %s <- %s\n" s (D.to_string_32 rhs);
-		       self#set_int_var v rhs;
-		       loop rest
+		   let tmp_func e1 = 
+		     let rhs = self#eval_int_exp_simplify e1 in
+		     if !opt_trace_eval then
+		       Printf.printf "    %s <- %s\n" s (D.to_string_32 rhs);
+		     self#set_int_var v rhs;
+		   in
+		   (match e with
+		   | V.Ite(cond, true_e, false_e) ->
+		     let (v_c, ty_c) = self#eval_int_exp_ty cond in
+		     (try 
+			let v_c_c = D.to_concrete_1 v_c in
+			let other_e = 
+			  if v_c_c = 1 then true_e else false_e in
+			(match other_e with
+			| V.Lval(V.Temp(n1, s1, t1)) ->
+			  if not (n = n1 && t = t1 && s = s1) then tmp_func e
+			| _ ->  tmp_func e);
+		      with NotConcrete _ -> tmp_func e);
+		   | _ -> 
+		     tmp_func e);
+		   loop rest
 		 | V.Move(V.Mem(memv, idx_e, ty), rhs_e) ->
-		     self#handle_store idx_e ty rhs_e;
-		     loop rest
+		   (match rhs_e with
+		   | V.Ite(cond, true_e, false_e) ->
+		     let (v_c, ty_c) = self#eval_int_exp_ty cond in
+		     (try 
+			let v_c_c = D.to_concrete_1 v_c in
+			let other_e = 
+			  if v_c_c = 1 then true_e else false_e in
+			(match other_e with
+			| V.Lval(V.Mem(memv_1, idx_e_1, ty_1)) ->
+			  if not (idx_e_1 = idx_e && ty = ty_1) then 
+			    self#handle_store idx_e ty rhs_e;
+			| _ ->  
+			  self#handle_store idx_e ty rhs_e;)
+		      with NotConcrete _ ->
+			self#handle_store idx_e ty rhs_e;)
+		   | _ -> 
+		     self#handle_store idx_e ty rhs_e;);
+		   loop rest
 		 | V.Special("VEX decode error") ->
 		     raise IllegalInstruction
 		 | V.Special(str) ->
