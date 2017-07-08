@@ -35,7 +35,7 @@ let call_replacements fm last_eip eip =
   let lookup_info targ l =
     List.fold_left
       (fun ret (str, addr1, val1, addr2, val2) -> 
-	 if ((canon_eip addr1) = (canon_eip targ)) then 
+	 if ((canon_eip addr2) = (canon_eip targ)) then 
            Some (str,val1,addr2,val2) 
          else ret)
       None l
@@ -64,7 +64,7 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_symbol),
 	   (lookup last_eip !opt_skip_call_addr_symbol_once),
 	   (lookup last_eip !opt_skip_call_addr_region),
-	   (lookup_info last_eip !opt_synth_adaptor),
+	   (lookup_info eip !opt_synth_adaptor),
 	   (lookup_ret_info eip !opt_synth_ret_adaptor),
 	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor))
     with
@@ -151,10 +151,11 @@ let call_replacements fm last_eip eip =
             (Some in_addr))
       | (None, None, None, None, None, None, None, None, 
           Some (adaptor_mode, addr1, addr2, in_nargs), None) ->
-	if (adaptor_mode = "return-typeconv") && addr2 = eip then
-        Some (fun () -> 
-	  Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
-          (Some addr2))
+	if (adaptor_mode = "return-typeconv") && addr2 = eip then (
+          Some (fun () -> 
+	    Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
+            (Some addr2))
+	)
 	else if (adaptor_mode = "return-typeconv") && addr1 = eip then
         Some (fun () -> 
 	  Printf.printf "exec_runloop#thunk() should save arg regs here\n";
@@ -283,7 +284,9 @@ let call_replacements fm last_eip eip =
 	   decision_loop ((Int64.to_int in_nargs)-1);
 	   Adaptor_synthesis.struct_adaptor fm;
            (Some in_addr))
-      | _ -> failwith "Contradictory replacement options"
+      | _ -> 
+	Printf.printf "eip = 0x%Lx\n" eip;
+	failwith "Contradictory replacement options"
 
 let loop_detect = Hashtbl.create 1000
 
@@ -378,17 +381,21 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 					(char_of_int (Int64.to_int offset_byte_1));
 					(char_of_int (Int64.to_int offset_byte_2));
 					(char_of_int (Int64.to_int offset_byte_3))|] in
-	      (*Printf.printf "eip %Lx:jumping to adapter %Lx using offset %Lx\n" 
-		eip in_addr offset;*)
-              (*Array.iter 
-                ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
+		(*Printf.printf "eip %Lx:jumping to adapter %Lx using offset %Lx\n" 
+		  eip in_addr offset;*)
+		(*Array.iter 
+                  ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
 		Array.append [|'\xe9'|] offset_char_arr)
 	      else (* noop because this was a return value adaptor *)
 		(
 		  (* Printf.printf "nooping because no call replacement required\n"; *)
 		  [||]
 		)
-	    | (ARM, 0L,_) -> [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] (* bx lr *)
+	    | (ARM, 0L,_) -> 
+	      Printf.printf "no adaptor synth. call replacement to be done\n";
+	      flush(stdout);
+	      [||] (* nop *)
+	      (* [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] *) (* bx lr *)
 	    | (ARM, 1L,_) -> [|'\x70'; '\x47'|] (* bx lr (Thumb) *)
 	    | (ARM, _,_) -> failwith "Can't happen (logand with 1)"
 	  in

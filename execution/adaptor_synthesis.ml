@@ -602,11 +602,22 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 
 let simple_adaptor fm out_nargs in_nargs =
   Printf.printf "Starting simple adaptor\n";
-  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let arg_regs = 
+    match !opt_arch with
+    | X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+    | ARM -> [R0; R1; R2; R3]
+    | _ -> failwith "argregs unsupported for architecture"
+  in
   let symbolic_args = ref [] in
+  let (size, vine_size) = 
+    match !opt_arch with 
+    | X64 -> (64, V.REG_64)
+    | ARM -> (32, V.REG_32)
+    | _ -> failwith "argregs unsupported for architecture"
+  in
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
     let var_is_const = fm#get_fresh_symbolic (var_name^"_is_const") 1 in
     let arg =  
       (if out_nargs = 0L then (
@@ -625,14 +636,14 @@ let simple_adaptor fm out_nargs in_nargs =
 	   let var_val_val = Hashtbl.find adaptor_vals (var_name^"_val") in
 	   if var_is_const_val = V.Constant(V.Int(V.REG_1, 0L)) then (
 	     match var_val_val with
-	     | V.Constant(V.Int(V.REG_64, n)) ->
+	     | V.Constant(V.Int(vine_size, n)) ->
 	       let r = if n >= out_nargs then (Int64.pred out_nargs) else n in
 	       (fm#get_reg_symbolic (List.nth arg_regs (Int64.to_int r) ))
 	     | _ -> failwith (Printf.sprintf "failed to get value of %s_val" var_name)
 	   ) else var_val_val
 	 ) else 
 	   get_ite_expr var_is_const V.NEQ V.REG_1 0L  
-	     var_val (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) 
+	     var_val (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) 
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
            V.BITOR,
@@ -643,12 +654,12 @@ let simple_adaptor fm out_nargs in_nargs =
        )) 
     in
     let arg' =
-      (match arg with 
+      (V.Cast(V.CAST_LOW, vine_size, (match arg with 
       | V.Lval(V.Temp((_, s, _))) -> 
 	if Hashtbl.mem adaptor_vals s then
 	  Hashtbl.find adaptor_vals s
 	else arg
-      | _ -> arg)
+      | _ -> arg)))
     in
     Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
     symbolic_args := arg' :: !symbolic_args;
@@ -661,11 +672,11 @@ let simple_adaptor fm out_nargs in_nargs =
 	if (not !opt_adaptor_ivc) || !opt_adaptor_search_mode then 
 	  _expr
 	else (
-	  match fm#query_unique_value _expr V.REG_64 with
+	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
 	    Printf.printf "%s has unique value %Lx\n" 
 	      (V.exp_to_string _expr) v;
-	    (V.Constant(V.Int(V.REG_64, v)))
+	    (V.Constant(V.Int(vine_size, v)))
 	  | None -> 
 	    Printf.printf "%s does not have unique value\n" 
 	      (V.exp_to_string _expr);
@@ -689,9 +700,12 @@ let get_ite_typeconv_expr fm arg_idx idx_type regs n =
   ) 
 
 let get_typeconv_expr src_operand src_type extend_op =
-  V.Cast(extend_op, V.REG_64, 
-	 (V.Cast(V.CAST_LOW, src_type, src_operand))
-  )
+  V.Cast( extend_op, 
+	 (match !opt_arch with
+	 | X64 -> V.REG_64
+	 | ARM -> V.REG_32
+	 | _ -> failwith "unsupported return register for architecture"), 
+	 (V.Cast(V.CAST_LOW, src_type, src_operand)) )
 
 (* 
    type = 0 -> use the outer function argument in var_val
@@ -886,21 +900,27 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
 
 let ret_typeconv_adaptor fm in_nargs =
   Printf.printf "Starting return-typeconv adaptor\n";
-  let saved_args_list = fm#get_saved_arg_regs () in
-  assert((List.length saved_args_list) = (Int64.to_int in_nargs));
-  let ret_val = (fm#get_fresh_symbolic ("ret_val") 64) in
-  let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
-  (* TODO: try using other return argument registers like XMM0 *)
   let return_arg = fm#get_reg_symbolic 
     (match !opt_arch with
     | X64 -> R_RAX
     | ARM -> R0
     | _ -> failwith "unsupported return register for architecture") in
+  let (size, vine_size) = 
+    match !opt_arch with 
+    | X64 -> (64, V.REG_64)
+    | ARM -> (32, V.REG_32)
+    | _ -> failwith "argregs unsupported for architecture"
+  in
+  let saved_args_list = fm#get_saved_arg_regs () in
+  assert((List.length saved_args_list) = (Int64.to_int in_nargs));
+  let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
+  let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
+  (* TODO: try using other return argument registers like XMM0 *)
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
-  let type_53_expr = (get_ite_expr return_arg V.EQ V.REG_64 0L 
-			       (V.Constant(V.Int(V.REG_64,0L))) 
-			       (V.Constant(V.Int(V.REG_64,1L)))) in
+  let type_53_expr = (get_ite_expr return_arg V.EQ vine_size 0L 
+			       (V.Constant(V.Int(vine_size,0L))) 
+			       (V.Constant(V.Int(vine_size,1L)))) in
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
   let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
   let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
@@ -915,7 +935,7 @@ let ret_typeconv_adaptor fm in_nargs =
 		V.BinOp(V.LE,ret_type,V.Constant(V.Int(V.REG_8,1L))),
 		V.BinOp(V.GE,ret_type,V.Constant(V.Int(V.REG_8,51L))))
 			    :: !opt_extra_conditions;*)
-      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
+      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
        (get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
         (get_ite_expr ret_type V.EQ V.REG_8 51L type_51_expr
          (get_ite_expr ret_type V.EQ V.REG_8 52L type_52_expr
@@ -930,7 +950,7 @@ let ret_typeconv_adaptor fm in_nargs =
     ) 
     else ( 
       let ite_saved_arg_expr = 
-	(get_ite_saved_arg_expr fm ret_val V.REG_64 saved_args_list in_nargs) in
+	(get_ite_saved_arg_expr fm ret_val vine_size saved_args_list in_nargs) in
       let type_11_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_SIGNED) in
       let type_12_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_32 V.CAST_UNSIGNED) in
       let type_21_expr = (get_typeconv_expr ite_saved_arg_expr V.REG_16 V.CAST_SIGNED) in
@@ -946,7 +966,7 @@ let ret_typeconv_adaptor fm in_nargs =
           V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
           V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
 			    :: !opt_extra_conditions; *)
-      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg 
+      get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
 	(get_ite_expr ret_type V.EQ V.REG_8 1L ret_val
 	 (get_ite_expr ret_type V.EQ V.REG_8 11L type_11_expr
 	  (get_ite_expr ret_type V.EQ V.REG_8 12L type_12_expr
@@ -971,7 +991,11 @@ let ret_typeconv_adaptor fm in_nargs =
   in
   (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
   fm#reset_saved_arg_regs;
-  fm#set_reg_symbolic R_RAX arg
+  fm#set_reg_symbolic ( match !opt_arch with
+  | X64 -> R_RAX
+  | ARM -> R0
+  | _ -> failwith "unsupported architecture for ret_typeconv adaptor") 
+    (V.Cast(V.CAST_LOW, V.REG_32, arg))
   
 (* Return value type conversion adaptor code ends here *)
 

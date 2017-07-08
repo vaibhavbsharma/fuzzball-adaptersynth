@@ -695,7 +695,11 @@ struct
 
     method save_arg_regs nargs = 
       (* Only works for X64 *)
-      let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+      let arg_regs = match !opt_arch with
+	| X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+	| ARM -> [R0; R1; R2; R3]
+	| _ -> failwith "unsupported architecture for save_arg_regs";
+      in
       if (List.length saved_arg_regs) = 0 then (
 	for i = 0 to (Int64.to_int nargs)-1 do
 	  saved_arg_regs <- saved_arg_regs@
@@ -1062,11 +1066,7 @@ struct
       List.iter (
 	fun (start1,end1,start2,end2) ->
 	  if eip = start1 then (
-	    saved_f1_rsp <- self#get_long_var 
-	      (match !opt_arch with
-	      | X64 -> R_RSP
-	      | ARM -> R13
-	      | _ -> failwith "unsupported architecture for adaptor synthesis");
+	    saved_f1_rsp <- 0L; (* self#get_long_var R_RSP *)
 	    in_f1_range <- true;
 	    self#make_f1_sym_snap ; 
 	    self#make_f1_conc_snap ;  
@@ -1079,11 +1079,7 @@ struct
 	    self#reset_f1_special_handlers_snap ;
 	  );
 	  if eip = start2 then (
-	    saved_f2_rsp <- self#get_long_var 
-	      (match !opt_arch with
-	      | X64 -> R_RSP
-	      | ARM -> R13
-	      | _ -> failwith "unsupported architecture for adaptor synthesis");
+	    saved_f2_rsp <- 0L; (* self#get_long_var R_RSP *)
 	    in_f2_range <- true;
 	    self#make_f2_sym_snap ;
 	    self#make_f2_conc_snap ;

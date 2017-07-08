@@ -106,12 +106,18 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        failwith ("The path condition is non-empty before fm#start_symbolic,"^
 	 "you may want to re-run fuzzball with the -zero-memory option");
      fm#start_symbolic;
+    
+     let (size, vine_size) = match !opt_arch with
+       | X64 -> (64, V.REG_64)
+       | ARM -> (32, V.REG_32)
+       | _ -> failwith "unsupported architecture for simple adaptor"
+     in
      
      let rec simple_loop n out_nargs type_name type_size =
        let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-       ignore(fm#get_fresh_symbolic (var_name^"_f_val") 64);
+       ignore(fm#get_fresh_symbolic (var_name^"_f_val") size);
        ignore(fm#get_fresh_symbolic (var_name^"_f"^type_name) type_size);
-       let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+       let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
        let var_type = fm#get_fresh_symbolic (var_name^type_name) type_size in
        (*ignore(fm#get_fresh_symbolic (var_name^"_val") 64);*)
        (*ignore(fm#get_fresh_symbolic (var_name^type_name) type_size);*)
@@ -125,7 +131,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	   V.BinOp(
 	     V.BITOR,
 	     V.BinOp(V.EQ,var_type,V.Constant(V.Int(var_type_type,1L))),
-	     V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	     V.BinOp(V.LT,var_val,V.Constant(V.Int(vine_size,out_nargs))))
 	 else (
            V.BinOp(V.EQ,var_type,V.Constant(V.Int(var_type_type,1L)))
 	 )) in
@@ -258,13 +264,13 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      if (List.length !opt_synth_ret_adaptor) <> 0 then (
        let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
        let var_type = (fm#get_fresh_symbolic ("ret_type") 8) in
-       let var_val = (fm#get_fresh_symbolic ("ret_val") 64) in
+       let var_val = (fm#get_fresh_symbolic ("ret_val") size) in
        if in_nargs > 0L then
 	 ( let tmp_cond = 
 	     V.BinOp(
 	       V.BITOR,
 	       V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
-	       V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,in_nargs)))) in
+	       V.BinOp(V.LT,var_val,V.Constant(V.Int(vine_size,in_nargs)))) in
 	   opt_extra_conditions := tmp_cond :: !opt_extra_conditions;
 	 (*Printf.printf "opt_extra_condition.length = %d in_nargs=%Lx tmp_cond = %s\n" 
 	   (List.length !opt_extra_conditions) in_nargs (V.exp_to_string tmp_cond);*)
