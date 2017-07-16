@@ -394,7 +394,6 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
-	       adaptor_score := 0;
 	       if (List.length !opt_synth_struct_adaptor) <> 0 then
 		 fm#reset_struct_counts;
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
@@ -420,7 +419,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	       if !opt_concrete_path_simulate then
 		 opt_concrete_path_simulate := false; (* First iter. only *)
 	       reset_cb ();
-	       fm#reset ()
+	       fm#reset ();
+	       adaptor_score := 0;
 	  );
       with
 	| LastIteration -> ()

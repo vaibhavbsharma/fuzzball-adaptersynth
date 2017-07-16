@@ -997,7 +997,7 @@ let ret_typeconv_adaptor fm in_nargs =
   | X64 -> R_RAX
   | ARM -> R0
   | _ -> failwith "unsupported architecture for ret_typeconv adaptor") 
-    (V.Cast(V.CAST_LOW, V.REG_32, arg))
+    (V.Cast(V.CAST_LOW, vine_size, arg))
   
 (* Return value type conversion adaptor code ends here *)
 

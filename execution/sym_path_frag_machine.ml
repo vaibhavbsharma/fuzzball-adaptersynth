@@ -913,6 +913,7 @@ struct
       dt#set_heur 1;
       dt#mark_all_seen;
       infl_man#finish_path;
+      Printf.printf "adaptor_score = %d\n" !adaptor_score;
       if !opt_trace_binary_paths then
 	Printf.printf "Path: %s\n" dt#get_hist_str;
       if !opt_trace_binary_paths_delimited then
@@ -927,7 +928,7 @@ struct
 	assert(let (b,_) =
 		 self#query_with_path_cond_wcache V.exp_true true false
 	       in b);
-      Printf.printf "adaptor_score = %d\n" !adaptor_score;
+      flush(stdout);
       dt#try_again_p
 
     method print_tree chan = dt#print_tree chan

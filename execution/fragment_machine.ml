@@ -779,6 +779,7 @@ struct
 	) 
       in
       f2_syscalls_arg_num <- f2_syscalls_arg_num + (List.length arg_list);
+      if ret = false then adaptor_score := !adaptor_score + 1;
       ret
 
     method match_syscalls () =
@@ -1070,7 +1071,10 @@ struct
       List.iter (
 	fun (start1,end1,start2,end2) ->
 	  if eip = start1 then (
-	    saved_f1_rsp <- 0L; (* self#get_long_var R_RSP *)
+	    saved_f1_rsp <- (match !opt_arch with
+	    | ARM -> 0L
+	    | X64 -> self#get_long_var R_RSP
+	    | _ -> failwith "unsupported architecture for adaptor synthesis");
 	    in_f1_range <- true;
 	    self#make_f1_sym_snap ; 
 	    self#make_f1_conc_snap ;  
@@ -1083,7 +1087,10 @@ struct
 	    self#reset_f1_special_handlers_snap ;
 	  );
 	  if eip = start2 then (
-	    saved_f2_rsp <- 0L; (* self#get_long_var R_RSP *)
+	    saved_f2_rsp <- (match !opt_arch with
+	    | ARM -> 0L
+	    | X64 -> self#get_long_var R_RSP
+	    | _ -> failwith "unsupported architecture for adaptor synthesis");
 	    in_f2_range <- true;
 	    self#make_f2_sym_snap ;
 	    self#make_f2_conc_snap ;
