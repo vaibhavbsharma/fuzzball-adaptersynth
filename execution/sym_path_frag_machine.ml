@@ -17,6 +17,7 @@ open Exec_no_influence;;
 open Granular_memory;;
 open Fragment_machine;;
 open Decision_tree;;
+open Adaptor_synthesis;;
 
 let solver_sats = ref 0L
 let solver_unsats = ref 0L
@@ -926,6 +927,7 @@ struct
 	assert(let (b,_) =
 		 self#query_with_path_cond_wcache V.exp_true true false
 	       in b);
+      Printf.printf "adaptor_score = %d\n" !adaptor_score;
       dt#try_again_p
 
     method print_tree chan = dt#print_tree chan

@@ -10,6 +10,8 @@ open Exec_utils;;
 
 
 let adaptor_vals = Hashtbl.create 10
+
+let adaptor_score = ref 0
  
 (*** general helper code used in multiple adaptors ***)
 

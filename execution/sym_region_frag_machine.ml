@@ -17,6 +17,7 @@ open Fragment_machine;;
 open Decision_tree;;
 open Sym_path_frag_machine;;
 open Vine_util;;
+open Adaptor_synthesis;;
 
 module SymRegionFragMachineFunctor =
   functor (D : DOMAIN) ->
@@ -743,7 +744,9 @@ struct
 	(if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equal side-effects %s = %s\n"
 	      (V.exp_to_string exp1) 
-	      (V.exp_to_string exp2);)
+	      (V.exp_to_string exp2);
+	 adaptor_score := !adaptor_score + 1;
+	)
       else (
 	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
 	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
@@ -757,6 +760,7 @@ struct
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equivalent side-effects %s=\n%s"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	  adaptor_score := !adaptor_score + 1;
 	)
       )
 

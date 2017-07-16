@@ -15,6 +15,7 @@ open Stpvc_engine;;
 open Stp_external_engine;;
 open Concrete_memory;;
 open Granular_memory;;
+open Adaptor_synthesis;;
 
 let bool64 f = fun a b -> if (f a b) then 1L else 0L
 
@@ -949,7 +950,9 @@ struct
 	(if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equal side-effects %s = %s\n"
 	      (V.exp_to_string exp1) 
-	      (V.exp_to_string exp2);)
+	      (V.exp_to_string exp2);
+	 adaptor_score := !adaptor_score + 1;
+	)
       else (
 	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
 	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
@@ -963,6 +966,7 @@ struct
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equivalent side-effects %s=\n%s"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	  adaptor_score := !adaptor_score + 1;
 	)
       )
 

@@ -15,6 +15,7 @@ open Sym_region_frag_machine;;
 open Exec_run_common;;
 open Exec_runloop;;
 open Exec_stats;;
+open Adaptor_synthesis;;
 
 let loop_w_stats count fn =
   let iter = ref 0L and
@@ -393,6 +394,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
+	       adaptor_score := 0;
 	       if (List.length !opt_synth_struct_adaptor) <> 0 then
 		 fm#reset_struct_counts;
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then

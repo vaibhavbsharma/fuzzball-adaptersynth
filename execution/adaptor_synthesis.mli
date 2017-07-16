@@ -27,3 +27,4 @@ val ranges_by_field_num : int64 list ref array ref
 val struct_adaptor: 
   Fragment_machine.fragment_machine -> unit
 val adaptor_vals : ( string, Vine.exp ) Hashtbl.t
+val adaptor_score : int ref

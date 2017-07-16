@@ -35,7 +35,13 @@ let call_replacements fm last_eip eip =
   let lookup_info targ l =
     List.fold_left
       (fun ret (str, addr1, val1, addr2, val2) -> 
-	 if ((canon_eip addr2) = (canon_eip targ)) then 
+	let addr = match !opt_arch with 
+	  (* not a function of the architecture, just how we're doing things *)
+	  | X64 -> addr1 
+	  | ARM -> addr2
+	  | _ -> failwith "unsupported architecture for adaptor synthesis"
+	in
+	 if ((canon_eip addr) = (canon_eip targ)) then 
            Some (str,val1,addr2,val2) 
          else ret)
       None l
@@ -57,6 +63,12 @@ let call_replacements fm last_eip eip =
 	else ret)
       None l
   in
+  let my_eip = match !opt_arch with
+    (* not a function of the architecture, just how we're doing things *)
+    | X64 -> last_eip
+    | ARM -> eip
+    | _ -> failwith "unsupported architecture for adaptor synthesis"
+  in
     match ((lookup eip      !opt_skip_func_addr),
 	   (lookup eip      !opt_skip_func_addr_symbol),
 	   (lookup eip      !opt_skip_func_addr_region),
@@ -64,7 +76,7 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_symbol),
 	   (lookup last_eip !opt_skip_call_addr_symbol_once),
 	   (lookup last_eip !opt_skip_call_addr_region),
-	   (lookup_info eip !opt_synth_adaptor),
+	   (lookup_info my_eip !opt_synth_adaptor),
 	   (lookup_ret_info eip !opt_synth_ret_adaptor),
 	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor))
     with
