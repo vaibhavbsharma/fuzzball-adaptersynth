@@ -697,7 +697,7 @@ struct
       (* Only works for X64 *)
       let arg_regs = match !opt_arch with
 	| X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-	| ARM -> [R0; R1; R2; R3]
+	| ARM -> [R0; R1; R2; R3; R4]
 	| _ -> failwith "unsupported architecture for save_arg_regs";
       in
       if (List.length saved_arg_regs) = 0 then (
