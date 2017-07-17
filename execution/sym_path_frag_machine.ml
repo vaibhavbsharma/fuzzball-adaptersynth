@@ -913,7 +913,10 @@ struct
       dt#set_heur 1;
       dt#mark_all_seen;
       infl_man#finish_path;
-      Printf.printf "adaptor_score = %d\n" !adaptor_score;
+      let d = dt#get_depth_bracketed in
+      
+      Printf.printf "adaptor_score = %d(%d)\n" 
+	(d*(!adaptor_score) + d) !adaptor_score;
       if !opt_trace_binary_paths then
 	Printf.printf "Path: %s\n" dt#get_hist_str;
       if !opt_trace_binary_paths_delimited then

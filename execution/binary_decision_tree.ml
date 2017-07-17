@@ -392,6 +392,15 @@ class binary_decision_tree = object(self)
 
   method get_depth = depth
 
+  method get_depth_bracketed = 
+    let str = String.concat ""
+      (List.map
+	 (fun q -> let s = String.concat ""
+	    (List.map (fun b -> if b then "1" else "0") q) in
+	    if String.length s = 1 then s else "0")
+	 self#get_hist_queries) in
+    String.length str
+
   method private forget_unsat b =
     if !opt_trace_decision_tree then
       Printf.printf "DT: Forgetting unsat of %B child to %d\n" b cur.ident;

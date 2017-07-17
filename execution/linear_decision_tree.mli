@@ -13,6 +13,7 @@ class linear_decision_tree : object
   method get_hist_str_queries : string
   method get_hist_str_bracketed : string
   method get_depth : int
+  method get_depth_bracketed : int
   method add_kid : bool -> unit
   method start_new_query : unit
   method start_new_query_binary : unit

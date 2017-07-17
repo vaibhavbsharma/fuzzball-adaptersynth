@@ -13,6 +13,7 @@ class virtual decision_tree = object
   method virtual get_hist_str_queries : string
   method virtual get_hist_str_bracketed : string
   method virtual get_depth : int
+  method virtual get_depth_bracketed : int
   method virtual add_kid : bool -> unit
   method virtual start_new_query : unit
   method virtual start_new_query_binary : unit

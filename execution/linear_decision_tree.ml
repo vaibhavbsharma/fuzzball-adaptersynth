@@ -31,6 +31,8 @@ class linear_decision_tree = object(self)
   method get_hist_str_bracketed = self#get_hist_str
 
   method get_depth = depth
+  
+  method get_depth_bracketed = depth
 
   method add_kid b = ()
 
