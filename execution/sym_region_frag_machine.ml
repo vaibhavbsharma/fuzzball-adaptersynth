@@ -907,8 +907,9 @@ struct
 	     is_sym_input_region_l := true;)
 	  | _ -> ());
 	Hashtbl.replace region_vals_per_path e new_region;
-	Hashtbl.replace region_conc_addr_h new_region !conc_addr;
-	Hashtbl.replace conc_addr_region_h !conc_addr new_region;
+	if !conc_addr <> 0L then (
+	  Hashtbl.replace region_conc_addr_h new_region !conc_addr;
+	  Hashtbl.replace conc_addr_region_h !conc_addr new_region;);
 	if !is_sym_input_region_l = true then
 	  sym_input_region_l <- sym_input_region_l @ [new_region];
 	if !opt_trace_regions then
