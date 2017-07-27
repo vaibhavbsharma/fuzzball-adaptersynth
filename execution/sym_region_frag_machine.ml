@@ -268,6 +268,30 @@ struct
 	  [V.UnOp(V.NEG, masked);
 	   V.BinOp(V.BITOR, masked, e_narrow)]
     in
+    (* the is_offset and subtract_offset functions work together  *)
+    let rec is_offset e k =
+      match e with
+      | V.BinOp(V.PLUS, e1, k) -> true
+      | V.Ite(cond, e1, e2) -> (is_offset e1 k) && (is_offset e2 k)
+      | V.Constant(_) -> true
+      | _ -> false
+    in
+    (* subtract_offset can only subtract an offset k from expression e
+       if is_offset previously determined it to be possible *)
+    let rec subtract_offset e k =
+      let offset_k = 
+	match k with
+	| V.Constant(V.Int(ty, _offset_k)) -> _offset_k
+	| _ -> failwith "cannot extract constant in SRFM#subtract_offset"
+      in
+      match e with
+      | V.BinOp(V.PLUS, e1, k) -> e1
+      | V.Ite(cond, e1, e2) -> 
+	(V.Ite(cond, (subtract_offset e1 k), (subtract_offset e2 k)))
+      | V.Constant(V.Int(ty, k1)) -> 
+	(V.Constant(V.Int(ty, (Int64.sub k1 offset_k))))
+      | _ -> failwith "dont know how to perform subtract_offset"
+    in
     let rec loop e =
       (*Printf.printf "    split_terms inside loop e = %s\n" (V.exp_to_string e);*)
       match e with
@@ -278,6 +302,10 @@ struct
 	| V.Ite(cond, V.BinOp(V.PLUS, e1, e2), V.BinOp(V.PLUS, e3, e2'))
 	    when e2 = e2' ->
 	    (loop (V.Ite(cond, e1, e3))) @ (loop e2)
+	| V.Ite(cond, V.BinOp(V.PLUS, e1, V.Constant(V.Int(ty, k))), else_expr)
+	    when (is_offset else_expr (V.Constant(V.Int(ty,k)))) ->
+	  (loop (subtract_offset e (V.Constant(V.Int(ty, k))))) @ 
+	    (loop (V.Constant(V.Int(ty, k))))
 	| V.BinOp(V.BITAND, e, V.Constant(V.Int(ty, v)))
 	    when is_high_mask ty v ->
 	    (* x & 0xfffffff0 = x - (x & 0xf), etc. *)
