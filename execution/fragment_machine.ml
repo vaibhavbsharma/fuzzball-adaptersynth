@@ -932,11 +932,12 @@ struct
 	  with Not_found ->
 	    (* is this correct ? wont this mem#load_long give us the same expr
 	       that is f2's non-local side-effect *)
-	    let f1_exp = D.to_symbolic_64 (mem#load_long addr) in
-	    if !opt_trace_mem_snapshots = true then
-	      Printf.printf "addr = %Lx f1_exp = %s f2_exp = %s\n"
-		addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
-	    self#query_exp f1_exp f2_exp;
+	    if f2_exp <> V.Constant(V.Int(V.REG_64, 0L)) then (
+	      if !opt_trace_mem_snapshots = true then
+		Printf.printf "addr = %Lx f2_exp = %s, f2 wrote to an address, f1 did not\n"
+		  addr (V.exp_to_string f2_exp);
+	      raise DisqualifiedPath;
+	    );
 	) f2_nonlocal_se;
       );
       mem#reset4_3 ();
