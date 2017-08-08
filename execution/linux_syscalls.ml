@@ -725,10 +725,12 @@ object(self)
       if vt_fd > 2 then (
 	match unix_fds.(vt_fd) with
 	| Some _fd ->
-	  let cur_pos = Unix.lseek (self#get_fd vt_fd) 0 Unix.SEEK_CUR in
+	  (try 
+	    let cur_pos = Unix.lseek (self#get_fd vt_fd) 0 Unix.SEEK_CUR in
 	  (*Printf.printf "linux_syscalls#save_unix_fd_positions before len = %d fname = %s cur_pos = %d\n"
 	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname cur_pos;*)
 	  Stack.push (Some cur_pos) fd_info.(vt_fd).snap_pos;
+	  with | Unix.Unix_error(err, _, _) -> self#put_errno err);
 	  (*Printf.printf "linux_syscalls#save_unix_fd_positions after len = %d fname = %s cur_pos = %d\n"
 	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname cur_pos;*)
 	| _ -> ()
@@ -739,19 +741,23 @@ object(self)
     for vt_fd = 0 to (Array.length unix_fds)-1 do 
       if vt_fd > 2 then (
 	match unix_fds.(vt_fd) with
-	| Some _fd ->
-	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s\n"
-	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname;
-	  let snap_pos = *)
-	  let _ =
-	    match Stack.top fd_info.(vt_fd).snap_pos with
-	    | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
-	    | None -> 0
-	  in
-	  if Stack.length fd_info.(vt_fd).snap_pos > 1 then
-	    ignore(Stack.pop fd_info.(vt_fd).snap_pos);
-	  (*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
-	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
+	| Some _fd -> 
+	  (try
+	     (* Printf.printf "linux_syscalls#reset_unix_fd_positions before len = %d fname = %s\n"
+		(Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname; *)
+	     (* let snap_pos = *)
+	     let _ =
+	       if Stack.length fd_info.(vt_fd).snap_pos > 0 then
+		 match Stack.top fd_info.(vt_fd).snap_pos with
+		 | Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
+		 | None -> 0
+	       else 0
+	     in
+	     if Stack.length fd_info.(vt_fd).snap_pos > 1 then
+	       ignore(Stack.pop fd_info.(vt_fd).snap_pos);
+	   with | Unix.Unix_error(err, _, _) -> self#put_errno err);
+	(* Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
+	   (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos; *)
 	| _ -> ()
       )
     done
@@ -767,7 +773,7 @@ object(self)
 	      ignore(Stack.pop fd_info.(vt_fd).snap_pos);
 	    done 
 	  in
-	  (*let snap_pos = *)
+	  (* let snap_pos = *)
 	  let _ =
 	    if (Stack.length fd_info.(vt_fd).snap_pos) > 0 then (
 	      match Stack.top fd_info.(vt_fd).snap_pos with
@@ -777,8 +783,8 @@ object(self)
 	  in
 	  if Stack.length fd_info.(vt_fd).snap_pos > 1 then
 	    ignore(Stack.pop fd_info.(vt_fd).snap_pos);
-	(*Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
-	  (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos;*)
+	(* Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s snap_pos = %d\n"
+	  (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname snap_pos; *)
 	| _ -> ()
       );
     done
