@@ -603,11 +603,12 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 (*** simple adaptor ***)
 
 let simple_adaptor fm out_nargs in_nargs =
-  Printf.printf "Starting simple adaptor\n";
+  Printf.printf "Starting simple adaptor (%Ld)\n" out_nargs;
   let arg_regs = 
-    match !opt_arch with
-    | X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-    | ARM -> [R0; R1; R2; R3; R4]
+    match (!opt_arch, !opt_fragments) with
+    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+    | (ARM,false) -> [R0; R1; R2; R3; R4]
+    | (ARM,true) -> [R0; R1; R2; R3; R4; R5]
     | _ -> failwith "argregs unsupported for architecture"
   in
   let symbolic_args = ref [] in

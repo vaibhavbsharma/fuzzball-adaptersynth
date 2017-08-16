@@ -227,6 +227,8 @@ let symbolic_state_cmdline_opts =
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
+    ("-fragments", Arg.Set(opt_fragments),
+    "run adaptor synthesis assuming the target function is a code fragment");
     ("-synthesize-simple+len-adaptor", Arg.String 
       (add_delimited_simplelen_info opt_synth_simplelen_adaptor ':'),
      "addr1:nargs1:addr2:nargs2:length Using the simple+length adaptor, "^
