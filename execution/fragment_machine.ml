@@ -699,7 +699,7 @@ struct
       let arg_regs = match (!opt_arch,!opt_fragments) with
 	| (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
 	| (ARM,false) -> [R0; R1; R2; R3;]
-	| (ARM,true) -> [R0; R1; R2; R3; R4; R5]
+	| (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10]
 	| _ -> failwith "unsupported architecture for save_arg_regs";
       in
       if (List.length saved_arg_regs) = 0 then (
