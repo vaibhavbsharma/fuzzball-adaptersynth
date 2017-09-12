@@ -116,6 +116,7 @@ let opt_offset_strategy = ref UniformStrat
 let opt_concretize_divisors = ref false
 let opt_nonzero_divisors = ref false
 let opt_trace_stopping = ref false
+let opt_redirect_stderr_to_stdout = ref false
 let opt_trace_setup = ref false
 let opt_extra_env = Hashtbl.create 10
 let opt_skip_call_addr = ref []

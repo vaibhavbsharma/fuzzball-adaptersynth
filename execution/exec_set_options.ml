@@ -544,6 +544,8 @@ let cmdline_opts =
      " Print symbolic memory regions");
     ("-trace-struct-adaptor", Arg.Set(opt_trace_struct_adaptor),
      " Print formulae created by the structure adaptor");
+    ("-redirect-stderr-to-stdout", Arg.Set(opt_redirect_stderr_to_stdout),
+     " Redirect stderr to stdout");
     ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
      " Print memory snapshot/reset operations");
     ("-dont-compare-memory-sideeffects", Arg.Set(opt_dont_compare_mem_se),

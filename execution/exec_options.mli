@@ -95,6 +95,7 @@ val opt_concretize_divisors : bool ref
 val opt_nonzero_divisors : bool ref
 val opt_trace_stopping : bool ref
 val opt_trace_setup : bool ref
+val opt_redirect_stderr_to_stdout: bool ref
 val opt_extra_env : (string, string) Hashtbl.t
 val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref

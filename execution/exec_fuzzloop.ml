@@ -60,6 +60,8 @@ let loop_w_stats count fn =
 
 let fuzz start_eip opt_fuzz_start_eip end_eips
     (fm : fragment_machine) asmir_gamma symbolic_init reset_cb =
+  if !opt_redirect_stderr_to_stdout then
+    ( Unix.dup2 Unix.stdout Unix.stderr;); 
   if !opt_trace_setup then
     (Printf.printf "Initial registers:\n";
      fm#print_regs);
