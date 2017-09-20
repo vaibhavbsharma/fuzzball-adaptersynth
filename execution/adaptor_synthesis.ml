@@ -727,17 +727,24 @@ let get_typeconv_expr src_operand src_type extend_op =
 let typeconv_adaptor fm out_nargs in_nargs =
   Printf.printf "Starting typeconv adaptor\n";
   let arg_regs = 
-    match !opt_arch with
-    | X64 -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-    | ARM -> [R0; R1; R2; R3]
+    match (!opt_arch, !opt_fragments) with
+    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+    | (ARM,false) -> [R0; R1; R2; R3; R4]
+    | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+    | _ -> failwith "argregs unsupported for architecture"
+  in
+  let (size, vine_size) = 
+    match !opt_arch with 
+    | X64 -> (64, V.REG_64)
+    | ARM -> (32, V.REG_32)
     | _ -> failwith "argregs unsupported for architecture"
   in
   (* argument registers -- assumes SSE floating point *)
   (*let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in*)
   let symbolic_args = ref [] in
-    let rec main_loop n =
+  let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    let var_val = fm#get_fresh_symbolic (var_name^"_val") 64 in
+    let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
     let var_type = fm#get_fresh_symbolic (var_name^"_type") 8 in
     let arg =  
       (if out_nargs = 0L then (
@@ -749,7 +756,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	var_val
        ) 
        else ( 
-	 let ite_arg_expr = (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) in
+	 let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
 	 let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
 	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
 	 let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
@@ -759,9 +766,9 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
 	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
 	 let type_43_expr = 
-	   (get_ite_expr ite_arg_expr V.EQ V.REG_64 0L 
-	      (V.Constant(V.Int(V.REG_64,0L))) 
-	      (V.Constant(V.Int(V.REG_64,1L)))) in
+	   (get_ite_expr ite_arg_expr V.EQ vine_size 0L 
+	      (V.Constant(V.Int(vine_size,0L))) 
+	      (V.Constant(V.Int(vine_size,1L)))) in
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
