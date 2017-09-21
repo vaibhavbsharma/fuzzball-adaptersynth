@@ -792,15 +792,38 @@ let typeconv_adaptor fm out_nargs in_nargs =
        )
       )
     in
-    (*Printf.printf "setting arg=%s\n" (V.exp_to_string arg);*)
+    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
     symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
-  if in_nargs > 0L then  (
+  (* if in_nargs > 0L then  (
     main_loop ((Int64.to_int in_nargs)-1);
     List.iteri (fun index expr ->
 	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
+  ) *)
+  if in_nargs > 0L then  (
+    main_loop ((Int64.to_int in_nargs)-1);
+    List.iteri (fun index _expr ->
+      let expr =  
+	if (not !opt_adaptor_ivc) || !opt_adaptor_search_mode then 
+	  _expr
+	else (
+	  match fm#query_unique_value _expr vine_size with
+	  | Some v ->
+	    Printf.printf "%s has unique value %Lx\n" 
+	      (V.exp_to_string _expr) v;
+	    (V.Constant(V.Int(vine_size, v)))
+	  | None -> 
+	    Printf.printf "%s does not have unique value\n" 
+	      (V.exp_to_string _expr);
+	    _expr
+	)
+      in
+      fm#set_reg_symbolic (List.nth arg_regs index) expr;
+    ) !symbolic_args;
   )
+
+
 
 (* Type conversion adaptor code ends here *)
 
