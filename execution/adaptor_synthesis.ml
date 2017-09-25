@@ -26,7 +26,9 @@ let rec get_ite_arg_expr fm arg_idx idx_type regs n =
   else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
          (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
          (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
-
+    
+let constify value size = 
+  V.Constant(V.Int(size, value)) 
 
 (* build an expression that restricts v to be in a certain range; the lower 
    and upper bounds are inclusive *)
@@ -715,6 +717,7 @@ let get_typeconv_expr src_operand src_type extend_op =
    type = 1 -> constant in var_val
    type = 11 -> 32-to-64 bit sign extension on outer function arg in var_val
    type = 12 -> 32-to-64 bit zero extension on outer function arg in var_val
+   type = 13 -> 32-to-32 bit signedness change on inner function arg in ret_val
    type = 21 -> 16-to-64 bit sign extension on outer function arg in var_val
    type = 22 -> 16-to-64 bit zero extension on outer function arg in var_val
    type = 31 -> 8-to-64 bit sign extension on outer function arg in var_val
@@ -767,8 +770,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
 	 let type_43_expr = 
 	   (get_ite_expr ite_arg_expr V.EQ vine_size 0L 
-	      (V.Constant(V.Int(vine_size,0L))) 
-	      (V.Constant(V.Int(vine_size,1L)))) in
+	      (constify 0L vine_size) (constify 1L vine_size)) in 
+	 let type_13_expr = (V.BinOp(V.PLUS, ite_arg_expr, (constify 0x80000000L V.REG_32))) in
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -781,14 +784,15 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
 	    (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
              (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
-	      (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
-               (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
-	        (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
-                 (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
-	          (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
-                   (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
-		      type_43_expr)
-		  ))))))))
+              (get_ite_expr var_type V.EQ V.REG_8 13L type_13_expr
+	       (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
+                (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
+	         (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
+                  (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
+	           (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
+                    (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
+	      	      type_43_expr)
+	      	  )))))))))
        )
       )
     in
