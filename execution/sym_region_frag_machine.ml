@@ -820,8 +820,13 @@ struct
 	   Printf.printf "SRFM#region_for found in region_val_queried expr = %s\n"
 	     (V.exp_to_string e);
        with Not_found ->
+	 let vine_size = match !opt_arch with
+	   | X86 
+	   | ARM -> V.REG_32
+	   | X64 -> V.REG_64
+	 in
 	 let (b_is_regexp_null,_) = self#query_condition 
-	   (V.BinOp(V.NEQ, e, V.Constant(V.Int(V.REG_64, 0L))))
+	   (V.BinOp(V.NEQ, e, V.Constant(V.Int(vine_size, 0L))))
 	   (Some true) 0x6d01 in
 	 if !opt_trace_regions then
 	   Printf.printf "SRFM#region_for took branch %b in Not_found case expr = %s\n" 
