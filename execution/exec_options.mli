@@ -85,6 +85,7 @@ val opt_no_sym_regions : bool ref
 val opt_trace_regions : bool ref
 val opt_trace_struct_adaptor : bool ref
 val opt_trace_mem_snapshots : bool ref
+val opt_trace_adaptor : bool ref
 val opt_fragments  : bool ref
 val opt_dont_compare_mem_se : bool ref
 val opt_dont_compare_syscalls : bool ref

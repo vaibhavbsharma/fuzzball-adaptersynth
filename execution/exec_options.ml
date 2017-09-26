@@ -107,6 +107,7 @@ let opt_no_sym_regions = ref false
 let opt_trace_regions = ref false
 let opt_trace_struct_adaptor = ref false
 let opt_trace_mem_snapshots = ref false
+let opt_trace_adaptor = ref false
 let opt_fragments = ref false
 let opt_check_store_sequence = ref false
 let opt_dont_compare_mem_se = ref false

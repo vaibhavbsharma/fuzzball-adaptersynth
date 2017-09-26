@@ -548,6 +548,8 @@ let cmdline_opts =
      " Redirect stderr to stdout");
     ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
      " Print memory snapshot/reset operations");
+    ("-trace-adaptor", Arg.Set(opt_trace_adaptor),
+     " Print adaptor debugging statements");
     ("-dont-compare-memory-sideeffects", Arg.Set(opt_dont_compare_mem_se),
      " Dont compare side-effects on concrete memory and symbolic regions");
     ("-dont-compare-linux-syscalls", Arg.Set(opt_dont_compare_syscalls),

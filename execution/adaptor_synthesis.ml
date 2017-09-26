@@ -666,7 +666,8 @@ let simple_adaptor fm out_nargs in_nargs =
 	else arg
       | _ -> arg)))
     in
-    Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
+    if !opt_trace_adaptor then
+      Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
     symbolic_args := arg' :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
@@ -679,12 +680,14 @@ let simple_adaptor fm out_nargs in_nargs =
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-	    Printf.printf "%s has unique value %Lx\n" 
-	      (V.exp_to_string _expr) v;
+      if !opt_trace_adaptor then
+	      Printf.printf "%s has unique value %Lx\n" 
+	        (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
-	  | None -> 
-	    Printf.printf "%s does not have unique value\n" 
-	      (V.exp_to_string _expr);
+	  | None ->
+      if !opt_trace_adaptor then
+	      Printf.printf "%s does not have unique value\n" 
+	        (V.exp_to_string _expr);
 	    _expr
 	)
       in
@@ -796,7 +799,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
        )
       )
     in
-    Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+    if !opt_trace_adaptor then
+      Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
     symbolic_args := arg :: !symbolic_args;
     if n > 0 then main_loop (n-1); 
   in
@@ -814,12 +818,14 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-	    Printf.printf "%s has unique value %Lx\n" 
-	      (V.exp_to_string _expr) v;
+      if !opt_trace_adaptor then
+	      Printf.printf "%s has unique value %Lx\n" 
+	        (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
 	  | None -> 
-	    Printf.printf "%s does not have unique value\n" 
-	      (V.exp_to_string _expr);
+      if !opt_trace_adaptor then
+	      Printf.printf "%s does not have unique value\n" 
+	        (V.exp_to_string _expr);
 	    _expr
 	)
       in
