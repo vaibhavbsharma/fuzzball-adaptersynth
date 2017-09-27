@@ -343,6 +343,7 @@ struct
 	      List.iter query_engine#add_decl qdecls;
 	      let time_before = get_time () in
 	      let (result_o, ce') = query_engine#query cond_e in
+	      let time_after = get_time () in
 	      let is_sat' = match result_o with
 		| Some true ->
 		    solver_unsats := Int64.succ !solver_unsats;
@@ -364,6 +365,9 @@ struct
 	        if is_slow then
 		Printf.printf "Slow query (%f sec)\n"
 		  ((get_time ()) -. time_before);
+	        if !opt_solver_stats then
+		  Printf.printf "Query time = %f sec\n"
+		    (time_after -. time_before);
 	        flush stdout;
 		query_engine#after_query is_slow;
 		query_engine#pop;
