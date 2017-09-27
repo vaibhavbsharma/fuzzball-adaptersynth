@@ -956,23 +956,27 @@ let ret_typeconv_adaptor fm in_nargs =
   in
   let saved_args_list = fm#get_saved_arg_regs () in
   assert((List.length saved_args_list) = (Int64.to_int in_nargs));
-  let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
-  (* TODO: try using other return argument registers like XMM0 *)
+  (* let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
   let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
   let type_53_expr = (get_ite_expr return_arg V.EQ vine_size 0L 
 			       (V.Constant(V.Int(vine_size,0L))) 
-			       (V.Constant(V.Int(vine_size,1L)))) in
+			       (V.Constant(V.Int(vine_size,1L)))) in *)
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
   let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
   let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
   let type_72_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_UNSIGNED) in
-  let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
-  let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in
+  (* let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
+  let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in *)
     
-  let arg =  
-    (if in_nargs = 0L then (
+  let arg = 
+ get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
+   (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+      (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+         (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr type_72_expr
+      )))
+    (* (if in_nargs = 0L then (
       (*opt_extra_conditions := 
 	V.BinOp(V.BITOR, 
 		V.BinOp(V.LE,ret_type,V.Constant(V.Int(V.REG_8,1L))),
@@ -1030,7 +1034,7 @@ let ret_typeconv_adaptor fm in_nargs =
                           type_82_expr)
 			  ))))))))))))))))
 	)
-    )
+    ) *)
   in
   (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
   fm#reset_saved_arg_regs;
