@@ -264,10 +264,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
       
      done; (* end for i *)
      
-     if (List.length !opt_synth_ret_adaptor) <> 0 then (
+       ignore(fm#get_fresh_symbolic ("ret_type") 8);
+       ignore(fm#get_fresh_symbolic ("ret_val") size);
+     (* if (List.length !opt_synth_ret_adaptor) <> 0 then (
        let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
-       let var_type = (fm#get_fresh_symbolic ("ret_type") 8) in
-       let var_val = (fm#get_fresh_symbolic ("ret_val") size) in
        if in_nargs > 0L then
 	 ( let tmp_cond = 
 	     V.BinOp(
@@ -278,7 +278,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 (*Printf.printf "opt_extra_condition.length = %d in_nargs=%Lx tmp_cond = %s\n" 
 	   (List.length !opt_extra_conditions) in_nargs (V.exp_to_string tmp_cond);*)
 	 );
-     );
+     ); *)
 
      if !opt_trace_setup then
        (Printf.printf "Setting up symbolic values:\n"; flush stdout);

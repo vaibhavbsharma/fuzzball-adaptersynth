@@ -763,8 +763,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
        ) 
        else ( 
 	 let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
-	 let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
-	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
+	 (* let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
+	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in *)
 	 let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
 	 let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
 	 let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
@@ -785,8 +785,6 @@ let typeconv_adaptor fm out_nargs in_nargs =
 
 	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
 	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
-	    (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
-             (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
               (get_ite_expr var_type V.EQ V.REG_8 13L type_13_expr
 	       (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
                 (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
@@ -796,8 +794,6 @@ let typeconv_adaptor fm out_nargs in_nargs =
                     (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
 	      	      type_43_expr)
 	      	  )))))))))
-       )
-      )
     in
     if !opt_trace_adaptor then
       Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
@@ -959,23 +955,27 @@ let ret_typeconv_adaptor fm in_nargs =
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   (* let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
-  let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
+  let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in *)
   let type_53_expr = (get_ite_expr return_arg V.EQ vine_size 0L 
 			       (V.Constant(V.Int(vine_size,0L))) 
-			       (V.Constant(V.Int(vine_size,1L)))) in *)
+			       (V.Constant(V.Int(vine_size,1L)))) in
   let type_61_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_SIGNED) in
   let type_62_expr = (get_typeconv_expr return_arg V.REG_16 V.CAST_UNSIGNED) in
   let type_71_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_SIGNED) in
   let type_72_expr = (get_typeconv_expr return_arg V.REG_8 V.CAST_UNSIGNED) in
-  (* let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
-  let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in *)
+  let type_81_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_SIGNED) in
+  let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in
     
   let arg = 
- get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
-   (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
-      (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
-         (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr type_72_expr
-      )))
+        get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
+          (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
+           (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
+            (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
+             (get_ite_expr ret_type V.EQ V.REG_8 71L type_71_expr
+              (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
+               (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
+                 type_82_expr)
+	      )))))
     (* (if in_nargs = 0L then (
       (*opt_extra_conditions := 
 	V.BinOp(V.BITOR, 
