@@ -938,7 +938,8 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
 *)
 
 let ret_typeconv_adaptor fm in_nargs =
-  Printf.printf "Starting return-typeconv adaptor\n";
+  if !opt_trace_adaptor then
+    Printf.printf "Starting return-typeconv adaptor\n";
   let return_arg = fm#get_reg_symbolic 
     (match !opt_arch with
     | X64 -> R_RAX
@@ -1036,7 +1037,8 @@ let ret_typeconv_adaptor fm in_nargs =
 	)
     ) *)
   in
-  (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
+  if !opt_trace_adaptor then
+    Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
   fm#reset_saved_arg_regs;
   fm#set_reg_symbolic ( match !opt_arch with
   | X64 -> R_RAX

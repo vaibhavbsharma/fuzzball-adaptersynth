@@ -404,7 +404,8 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 		  [||]
 		)
 	    | (ARM, 0L,_) -> 
-	      Printf.printf "no adaptor synth. call replacement to be done\n";
+	      if !opt_trace_adaptor then 
+		Printf.printf "no adaptor synth. call replacement to be done\n";
 	      flush(stdout);
 	      [||] (* nop *)
 	      (* [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] *) (* bx lr *)
