@@ -23,6 +23,7 @@ let solver_sats = ref 0L
 let solver_unsats = ref 0L
 let solver_fake_unsats = ref 0L
 let solver_fails = ref 0L
+let solver_time = ref 0.0
 
 let ce_cache_refs = ref 0L
 let ce_cache_hits = ref 0L
@@ -368,6 +369,7 @@ struct
 	        if !opt_solver_stats then
 		  Printf.printf "Query time = %f sec\n"
 		    (time_after -. time_before);
+		solver_time := !solver_time +. (time_after -. time_before);
 	        flush stdout;
 		query_engine#after_query is_slow;
 		query_engine#pop;

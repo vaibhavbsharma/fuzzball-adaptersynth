@@ -74,7 +74,8 @@ let periodic_stats fm at_end force =
        !solver_unsats;
      Printf.printf "Solver timed out (treated as unsat) %Ld time(s)\n"
        !solver_fake_unsats;
-     Printf.printf "Solver failed %Ld time(s)\n" !solver_fails)
+     Printf.printf "Solver failed %Ld time(s)\n" !solver_fails);
+  Printf.printf "total query time = %f\n" !solver_time
 
 let add_periodic_hook fm period =
   let insn_count = ref 0L in
