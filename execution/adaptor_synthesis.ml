@@ -605,7 +605,8 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 (*** simple adaptor ***)
 
 let simple_adaptor fm out_nargs in_nargs =
-  Printf.printf "Starting simple adaptor (%Ld)\n" out_nargs;
+  if !opt_trace_adaptor then
+    Printf.printf "Starting simple adaptor (%Ld)\n" out_nargs;
   let arg_regs = 
     match (!opt_arch, !opt_fragments) with
     | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
@@ -731,7 +732,8 @@ let get_typeconv_expr src_operand src_type extend_op =
 *)
 
 let typeconv_adaptor fm out_nargs in_nargs =
-  Printf.printf "Starting typeconv adaptor\n";
+  if !opt_trace_adaptor then
+    Printf.printf "Starting typeconv adaptor\n";
   let arg_regs = 
     match (!opt_arch, !opt_fragments) with
     | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 

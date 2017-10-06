@@ -170,7 +170,8 @@ let call_replacements fm last_eip eip =
 	)
 	else if (adaptor_mode = "return-typeconv") && addr1 = eip then
         Some (fun () -> 
-	  Printf.printf "exec_runloop#thunk() should save arg regs here\n";
+	  if !opt_trace_adaptor then
+	    Printf.printf "exec_runloop#thunk() should save arg regs here\n";
 	  fm#save_arg_regs in_nargs;
           (Some addr1))
 	else if (adaptor_mode = "return-simple+len") && addr2 = eip then
