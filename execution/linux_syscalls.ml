@@ -307,7 +307,7 @@ object(self)
 
   method string_create len =
     try String.create len
-    with Invalid_argument("String.create")
+    with Invalid_argument(_ (* "String.create" *) )
 	-> raise (Unix.Unix_error(Unix.EFAULT, "String.create", ""))
 
   (* Right now we always redirect the program's FDs 1 and 2 (stdout
@@ -2732,7 +2732,7 @@ object(self)
 	   | (false, ARM) ->
 	       ["Linux"; (* sysname *)
 		nodename; (* nodename *)
-		"2.6.32-5-versatile"; (* release *)
+		"3.2.0-1-ARCH"; (* release *)
 		"#1 Wed Jun 15 07:34:48 UTC 2011"; (* version *)
 		"armv5tejl"; (* machine *)
 		"example.com" (* domain *)

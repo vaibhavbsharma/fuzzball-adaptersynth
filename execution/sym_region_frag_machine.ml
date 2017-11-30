@@ -181,11 +181,13 @@ struct
       FormMan.map_expr_temp form_man e f combine
 
   let narrow_bitwidth_cutoff () =
-    match (!opt_narrow_bitwidth_cutoff, (reg_addr ())) with
-      | ((Some i), _) -> i
-      | (_, V.REG_32) -> 23
-      | (_, V.REG_64) -> 40
-      | (_, _) -> 23
+    match (!opt_narrow_bitwidth_cutoff, !opt_arch, (reg_addr ())) with
+      | ((Some i), _, _) -> i
+      | (_, ARM, V.REG_32) -> 15 (* ARM often uses lower memory regions *)
+      | (_, _, V.REG_32) -> 23
+      | (_, _, V.REG_64) -> 23 (* also experimented with 40,
+			          not clear what's best *)
+      | (_, _, _) -> 23
 
   let ctz i =
     let rec loop = function
@@ -608,7 +610,7 @@ struct
 	let tmp_val = (List.nth regions r_num)#load_long 0L in
 	Printf.printf "SRFM#print_reg regions[%d][0] = %s\n" 
 	  r_num (D.to_string_64 tmp_val)
-      with Failure("nth") -> 
+      with Failure(_ (*"nth"*) ) -> 
 	Printf.printf "SRFM#print_reg regions.length = %d\n" 
 	  (List.length regions);
 	
@@ -975,8 +977,9 @@ struct
 
     val mutable concrete_cache = Hashtbl.create 101
 
-    method private choose_conc_offset_cached ty e ident =
+    method private choose_conc_offset_cached ty e_orig ident =
       let const x = V.Constant(V.Int(ty, x)) in
+      let e = form_man#tempify_exp e_orig ty in
       let (bits, verb) = 
 	if Hashtbl.mem concrete_cache e then
 	  (Hashtbl.find concrete_cache e, "Reused")
