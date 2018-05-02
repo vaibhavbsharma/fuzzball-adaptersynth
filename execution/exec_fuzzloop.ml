@@ -300,10 +300,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 | V.BinOp(V.EQ,V.Constant(V.Int(ty,value)),
 		   V.Lval(V.Temp((_, s, _)))) ->
 	   if !opt_trace_struct_adaptor then (
-	     if Hashtbl.mem Adaptor_synthesis.adaptor_vals s then 
+	     if Hashtbl.mem Adaptor_vars.adaptor_vals s then 
 	       Printf.printf "adaptor_vals already had value for %s, panic!\n" s
 	     else Printf.printf "adding %s to adaptor_vals\n" s;);
-	   Hashtbl.replace Adaptor_synthesis.adaptor_vals s
+	   Hashtbl.replace Adaptor_vars.adaptor_vals s
 	     (V.Constant(V.Int(ty,value)))
 	 | _ -> ());
        ) !opt_extra_conditions; 

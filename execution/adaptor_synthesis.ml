@@ -7,9 +7,7 @@ open Fragment_machine;;
 open Exec_options;;
 open Exec_exceptions;;
 open Exec_utils;;
-
-
-let adaptor_vals = Hashtbl.create 10
+open Adaptor_vars;;
 
 let adaptor_score = ref 0
  
@@ -606,7 +604,7 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 
 let simple_adaptor fm out_nargs in_nargs =
   if !opt_trace_adaptor then
-    Printf.printf "Starting simple adaptor (%Ld)\n" out_nargs;
+    Printf.printf "Starting simple adaptor (%Ld,%Ld)\n" out_nargs in_nargs;
   let arg_regs = 
     match (!opt_arch, !opt_fragments) with
     | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
@@ -659,13 +657,13 @@ let simple_adaptor fm out_nargs in_nargs =
 	     
        )) 
     in
-    let arg' =
-      (V.Cast(V.CAST_LOW, vine_size, (match arg with 
+    let arg' = arg
+      (* (V.Cast(V.CAST_LOW, vine_size, (match arg with 
       | V.Lval(V.Temp((_, s, _))) -> 
 	if Hashtbl.mem adaptor_vals s then
 	  Hashtbl.find adaptor_vals s
 	else arg
-      | _ -> arg)))
+      | _ -> arg))) *)
     in
     if !opt_trace_adaptor then
       Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
@@ -956,9 +954,9 @@ let ret_typeconv_adaptor fm in_nargs =
   let saved_args_list = fm#get_saved_arg_regs () in
   assert((List.length saved_args_list) = (Int64.to_int in_nargs));
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
-  (* let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
+  let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
   let type_51_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_SIGNED) in
-  let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in *)
+  let type_52_expr = (get_typeconv_expr return_arg V.REG_32 V.CAST_UNSIGNED) in
   let type_53_expr = (get_ite_expr return_arg V.EQ vine_size 0L 
 			       (V.Constant(V.Int(vine_size,0L))) 
 			       (V.Constant(V.Int(vine_size,1L)))) in
@@ -970,7 +968,7 @@ let ret_typeconv_adaptor fm in_nargs =
   let type_82_expr = (get_typeconv_expr return_arg V.REG_1 V.CAST_UNSIGNED) in
     
   let arg = 
-        get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
+        (* get_ite_expr ret_type V.EQ V.REG_8 0L return_arg
           (get_ite_expr ret_type V.EQ V.REG_8 53L type_53_expr
            (get_ite_expr ret_type V.EQ V.REG_8 61L type_61_expr
             (get_ite_expr ret_type V.EQ V.REG_8 62L type_62_expr
@@ -978,8 +976,8 @@ let ret_typeconv_adaptor fm in_nargs =
               (get_ite_expr ret_type V.EQ V.REG_8 72L type_72_expr
                (get_ite_expr ret_type V.EQ V.REG_8 81L type_81_expr 
                  type_82_expr)
-	      )))))
-    (* (if in_nargs = 0L then (
+	      ))))) *)
+    (if in_nargs = 0L then (
       (*opt_extra_conditions := 
 	V.BinOp(V.BITOR, 
 		V.BinOp(V.LE,ret_type,V.Constant(V.Int(V.REG_8,1L))),
@@ -1037,7 +1035,7 @@ let ret_typeconv_adaptor fm in_nargs =
                           type_82_expr)
 			  ))))))))))))))))
 	)
-    ) *)
+    )
   in
   if !opt_trace_adaptor then
     Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
@@ -1169,8 +1167,6 @@ let from_concrete v sz =
 *)
 let t_array_field_ranges_l' = ref []
 let i_array_field_ranges_l' = ref []
-let i_byte_arr' = ref (Array.make 0 (ref [])) 
-let i_n_arr' = ref (Array.make 0 (ref [])) 
 let ranges_by_field_num = ref (Array.make 0 (ref []))
 let create_field_ranges_l fm =
   (* Since we number fields from 1, 

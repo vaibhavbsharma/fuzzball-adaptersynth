@@ -15,7 +15,6 @@ open Stpvc_engine;;
 open Stp_external_engine;;
 open Concrete_memory;;
 open Granular_memory;;
-(* open Adaptor_synthesis;; *)
 
 let bool64 f = fun a b -> if (f a b) then 1L else 0L
 
@@ -3352,8 +3351,8 @@ struct
       = self#load_long_conc addr
     method make_sink_region (s:string) (i:int64) = ()
 
-     method conc_mem_struct_adaptor end_of_f1 = ()
-      (* let get_ite_expr arg op const_type const then_val else_val = 
+     method conc_mem_struct_adaptor end_of_f1 =
+      let get_ite_expr arg op const_type const then_val else_val = 
 	V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
               then_val,
               else_val)
@@ -3400,7 +3399,7 @@ struct
 	   flush stdout);
 	let addr_list_ind = if end_of_f1 then !e_o_f1_count else !f2_init_count in
 	let addr = List.nth !opt_synth_struct_adaptor addr_list_ind in
-	let adaptor_vals = Hashtbl.copy Adaptor_synthesis.adaptor_vals in
+	let adaptor_vals = Hashtbl.copy Adaptor_vars.adaptor_vals in
 	  if !opt_time_stats then
 	    (Printf.printf "(0x%08Lx)..." addr;
 	     flush stdout);
@@ -3506,8 +3505,8 @@ struct
 	    in
 	    let field_exprs = Hashtbl.create 1001 in
 	    let t_field_h = Hashtbl.create 1000 in
-	    let i_n_arr = !Adaptor_synthesis.i_n_arr' in
-	    let i_byte_arr = !Adaptor_synthesis.i_byte_arr' in
+	    let i_n_arr = !Adaptor_vars.i_n_arr' in
+	    let i_byte_arr = !Adaptor_vars.i_byte_arr' in
 	    let unique_str = if end_of_f1 then "_f1_" else "" in
 	    let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte = 
 		(* i_byte = interesting_byte *)
@@ -3670,7 +3669,6 @@ struct
       if !opt_time_stats then
 	(Printf.printf "AS#ready to apply (%f sec). %s\n" (Sys.time () -. start_time) step_str;
 	 flush stdout); 
-    *)
 
   end
 end

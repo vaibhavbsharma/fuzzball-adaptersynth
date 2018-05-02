@@ -18,6 +18,7 @@ open Decision_tree;;
 open Sym_path_frag_machine;;
 open Vine_util;;
 open Adaptor_synthesis;;
+open Adaptor_vars;;
 
 module SymRegionFragMachineFunctor =
   functor (D : DOMAIN) ->
@@ -2266,8 +2267,8 @@ struct
 	  (* Moving array_field_ranges_l, i_byte_arr, i_n_arr computation 
 	     from here to AS.ml *)	
 
-	  let i_byte_arr = Adaptor_synthesis.i_byte_arr' in
-	  let i_n_arr = Adaptor_synthesis.i_n_arr' in
+	  let i_byte_arr = Adaptor_vars.i_byte_arr' in
+	  let i_n_arr = Adaptor_vars.i_n_arr' in
 	  
 	  
 	  let rec get_arr_t_field_expr field_num this_array_field_ranges_l 

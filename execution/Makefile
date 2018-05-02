@@ -35,8 +35,9 @@ export SOURCES = \
 	smtlib_batch_engine.mli smtlib_batch_engine.ml \
 	concrete_memory.mli concrete_memory.ml \
 	granular_memory.mli granular_memory.ml \
-	adaptor_synthesis.mli adaptor_synthesis.ml \
+	adaptor_vars.mli adaptor_vars.ml \
 	fragment_machine.mli fragment_machine.ml \
+	adaptor_synthesis.mli adaptor_synthesis.ml \
 	decision_tree.mli decision_tree.ml \
 	linear_decision_tree.mli linear_decision_tree.ml \
 	binary_decision_tree.mli binary_decision_tree.ml \
