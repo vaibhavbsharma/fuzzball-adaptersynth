@@ -761,6 +761,9 @@ when special_ec_vars\n"; *)
 		Printf.printf "%s = %s\n" s (encode_printable_exp e);
 	      if !opt_trace_temps then
 		Printf.printf "%s = %s\n" s (V.exp_to_string e);
+	      (match e with
+	      | V.Constant(_) -> failwith "creating temp_var for constant"
+	      | _ -> ());
 	      var
 
     (* Expand the definitions of all the temporaries that occur directly
@@ -1013,8 +1016,11 @@ when special_ec_vars\n"; *)
       in
 	loop e
     method tempify_exp e ty =
-      let e' = self#simplify_exp e in
-	V.Lval(V.Temp(self#make_temp_var e' ty))
+      let e2 = self#simplify_exp e in
+      match e2 with
+      | V.Constant(_) -> e2
+      | _ ->
+	 V.Lval(V.Temp(self#make_temp_var e2 ty))
 
     method private tempify (v:D.t) ty =
       D.inside_symbolic (fun e -> self#tempify_exp e ty) v
