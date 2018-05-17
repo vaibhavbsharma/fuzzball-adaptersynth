@@ -920,9 +920,11 @@ struct
 	    Hashtbl.find f2_nonlocal_se addr
 	  with Not_found -> (* f1 wrote to an address that f2 did not *)
 	    D.to_symbolic_64 (mem#load_long addr) in
-	  if !opt_trace_mem_snapshots = true then
+	  if !opt_trace_mem_snapshots = true then (
 	    Printf.printf "addr = %Lx f1_exp = %s f2_exp = %s\n"
 	      addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
+	    flush(stdout);
+	  );
 	  self#query_exp f1_exp f2_exp;
 	) f1_nonlocal_se;
 	Hashtbl.iter ( fun addr f2_exp -> 
@@ -970,7 +972,8 @@ struct
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  (* adaptor_score := !adaptor_score + 1; *)
 	)
-      )
+      );
+	flush(stdout);
 
     method simplify_exp e =
       let v = D.from_symbolic e in
@@ -1024,12 +1027,14 @@ struct
 	  | _ -> failwith "Initial program should fall through"
 
     val mutable loop_cnt = 0L
+    val mutable f2_loop_cnt = 0L
     method get_loop_cnt = loop_cnt
 
     method set_frag (dl, sl) =
       frag <- (dl, sl);
       V.VarHash.clear temps;
       loop_cnt <- 0L;
+      f2_loop_cnt <- 0L;
       self#concretize_misc;
       insns <- sl
 
@@ -2843,9 +2848,14 @@ struct
 	  | V.Label(l) :: rest when l = lab -> Some sl
 	  | st :: rest -> find_label lab rest 
       in
-	loop_cnt <- Int64.succ loop_cnt;
+      loop_cnt <- Int64.succ loop_cnt;
+      (if (self#get_in_f2_range ()) then
+	f2_loop_cnt <- Int64.succ f2_loop_cnt;);
         (match !opt_iteration_limit_enforced with
 	| Some lim -> if loop_cnt > lim then raise TooManyIterations;
+	| _ -> ());
+	(match !opt_f2_iteration_limit_enforced with
+	| Some lim -> if f2_loop_cnt > lim then raise TooManyIterations;
 	| _ -> ());
 	let (_, sl) = frag in
 	  match find_label lab sl with

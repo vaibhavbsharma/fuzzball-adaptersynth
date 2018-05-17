@@ -302,6 +302,7 @@ let call_replacements fm last_eip eip =
 	failwith "Contradictory replacement options"
 
 let loop_detect = Hashtbl.create 1000
+let f2_loop_detect = Hashtbl.create 1000
 
 let decode_insn_at fm gamma eipT =
   try
@@ -355,17 +356,31 @@ let decode_insns_cached fm gamma eip =
 
 let rec runloop (fm : fragment_machine) eip asmir_gamma until =
   let rec loop last_eip eip is_final_loop num_insns_executed =
-    (let old_count =
-       (try
-	  Hashtbl.find loop_detect eip
-	with Not_found ->
-	  Hashtbl.replace loop_detect eip 1L;
-	  1L)
-     in
-       Hashtbl.replace loop_detect eip (Int64.succ old_count);
-       (match !opt_iteration_limit_enforced with
-       | Some lim -> if old_count > lim then raise TooManyIterations
-       | _ -> ()););
+    let is_too_many_iterations loop_detect eip f2_only =
+      let old_count =
+	(try
+	   Hashtbl.find loop_detect eip
+	 with Not_found ->
+	   Hashtbl.replace loop_detect eip 1L;
+	   1L)
+      in
+      if f2_only && (fm#get_in_f2_range ()) then
+	Hashtbl.replace loop_detect eip (Int64.succ old_count);
+      if not f2_only then
+	Hashtbl.replace loop_detect eip (Int64.succ old_count);
+      let it_lim_enforced =
+	if f2_only then opt_f2_iteration_limit_enforced
+	else opt_iteration_limit_enforced
+      in
+      (match !it_lim_enforced with
+      | Some lim -> if old_count > lim then raise TooManyIterations
+      | _ -> ())
+    in
+    is_too_many_iterations loop_detect eip false;
+    is_too_many_iterations f2_loop_detect eip true;
+    if ((fm#get_in_f2_range () = false) &&
+      ((Hashtbl.length f2_loop_detect) <> 0)) then
+      (Hashtbl.clear f2_loop_detect;);
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
       let prog' = match call_replacements fm last_eip eip with
@@ -437,4 +452,5 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	      | _ -> loop eip new_eip false (Int64.succ num_insns_executed)
     in
     Hashtbl.clear loop_detect;
+    Hashtbl.clear f2_loop_detect;
     loop (0L) eip false 1L

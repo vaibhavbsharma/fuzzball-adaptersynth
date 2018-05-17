@@ -312,6 +312,9 @@ let explore_cmdline_opts =
     ("-iteration-limit", Arg.String
        (fun s -> opt_iteration_limit := Int64.of_string s),
      "N Stop path if a loop iterates more than N times");
+    ("-iteration-f2-limit", Arg.String
+       (fun s -> opt_f2_iteration_limit := Int64.of_string s),
+     "N Stop path if a loop iterates more than N times inside f2 when doing adaptor synthesis");
     ("-insn-limit", Arg.String
        (fun s -> opt_insn_limit := Int64.of_string s),
      "N Stop path after N instructions");

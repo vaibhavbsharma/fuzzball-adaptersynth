@@ -938,13 +938,14 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
 *)
 
 let ret_typeconv_adaptor fm in_nargs =
-  if !opt_trace_adaptor then
-    Printf.printf "Starting return-typeconv adaptor\n";
   let return_arg = fm#get_reg_symbolic 
     (match !opt_arch with
     | X64 -> R_RAX
     | ARM -> R0
     | _ -> failwith "unsupported return register for architecture") in
+  if !opt_trace_adaptor then
+    Printf.printf "Starting return-typeconv adaptor with return_arg = %s\n"
+  (V.exp_to_string return_arg);
   let (size, vine_size) = 
     match !opt_arch with 
     | X64 -> (64, V.REG_64)

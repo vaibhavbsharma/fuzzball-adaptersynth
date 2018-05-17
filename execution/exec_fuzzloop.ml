@@ -96,6 +96,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		  (decr opt_fuzz_start_addr_count;
 		   if !opt_fuzz_start_addr_count = 0 then 
 		     opt_iteration_limit_enforced := Some !opt_iteration_limit;
+		     opt_f2_iteration_limit_enforced := Some !opt_f2_iteration_limit;
 		   !opt_fuzz_start_addr_count = 0
 		  )
 		else
