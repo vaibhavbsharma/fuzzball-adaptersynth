@@ -1018,6 +1018,7 @@ when special_ec_vars\n"; *)
     method tempify_exp e ty =
       let e2 = self#simplify_exp e in
       match e2 with
+      | V.Lval(V.Temp(_)) -> e2
       | V.Constant(_) -> e2
       | _ ->
 	 V.Lval(V.Temp(self#make_temp_var e2 ty))
