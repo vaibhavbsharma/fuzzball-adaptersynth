@@ -897,16 +897,20 @@ struct
 		(V.exp_to_string exp);
 	    new_rnum := region;)
 	) region_vals_per_path;
+	if !conc_addr = 0L then
+	  raise DisqualifiedPath;
 	let is_sym_input_region_l = ref false in
-	let new_region =
-	  if !new_rnum <> 0 then !new_rnum 
-	  else if Hashtbl.mem region_vals e then Hashtbl.find region_vals e 
-	  else ( 
-	    let rnum' = self#fresh_region in
-	    Hashtbl.replace region_vals e rnum';
-	    rnum'
-	  )
-	in
+	let new_region = ref (-1) in
+	if (!new_rnum <> 0) then 
+	  new_region := !new_rnum
+	else if Hashtbl.mem region_vals e then 
+	  new_region := Hashtbl.find region_vals e
+	else 
+	  (let rnum' = self#fresh_region in
+	   Hashtbl.replace region_vals e rnum';
+	   new_region := rnum';
+	   if !opt_trace_regions then
+	     Printf.printf "made fresh region when conc_addr = 0x%Lx\n" !conc_addr;);
 	if !opt_adaptor_search_mode = false then (
 	  match e with
 	  | V.Lval(V.Temp((i,s,ty))) when 
@@ -914,16 +918,16 @@ struct
 	    (Printf.printf "found symbolic input(%s) as address \n" s;
 	     is_sym_input_region_l := true;)
 	  | _ -> ());
-	Hashtbl.replace region_vals_per_path e new_region;
+	Hashtbl.replace region_vals_per_path e !new_region;
 	if !conc_addr <> 0L then (
-	  Hashtbl.replace region_conc_addr_h new_region !conc_addr;
-	  Hashtbl.replace conc_addr_region_h !conc_addr new_region;);
+	  Hashtbl.replace region_conc_addr_h !new_region !conc_addr;
+	  Hashtbl.replace conc_addr_region_h !conc_addr !new_region;);
 	if !is_sym_input_region_l = true then
-	  sym_input_region_l <- sym_input_region_l @ [new_region];
+	  sym_input_region_l <- sym_input_region_l @ [!new_region];
 	if !opt_trace_regions then
 	  Printf.printf "Address %s is region %d\n"
-	    (V.exp_to_string e) new_region;
-	new_region
+	    (V.exp_to_string e) !new_region;
+	!new_region
 
     method private is_region_base e =
       Hashtbl.mem region_vals e
@@ -1139,35 +1143,40 @@ struct
 	   else
 	     Printf.printf "Can be out of bounds.\n");
 	  sink_read_count <- Int64.add sink_read_count 0x10L;
-	  SingleLocation(None, sink_read_count)
+	  SingleLocation(None, sink_read_count) 
 	| _ ->
-	  let off_expr = (sum_list (eoffs @ off_syms)) in
-	  match decide_fn off_expr 0L with
-	  | Some wd ->
-	    if !opt_trace_tables then (
-	      let off_expr_str = 
+	   let (new_base, new_cloc) = (match base with
+	     | Some r when Hashtbl.mem region_conc_addr_h r ->
+		(Some 0, (Int64.add cloc (Hashtbl.find region_conc_addr_h r)))
+	     | _ -> (base, cloc))
+	   in
+	   let off_expr = (sum_list (eoffs @ off_syms)) in
+	   match decide_fn off_expr 0L with
+	   | Some wd ->
+	      if !opt_trace_tables then (
+		let off_expr_str = 
 		  if (List.length ambig)<>0 && (List.length syms)=0 then 
 		    V.exp_to_string (List.hd ambig)
 		  else if (List.length syms)<>0 then 
 		    V.exp_to_string (List.hd syms)
 		  else "invalid_table_treatment_offset_expr" in
-	      Printf.printf 
-		"Table treatment for sym region with base = %s and offset expr = %s\n"
-		off_expr_str (V.exp_to_string off_expr););
-	    TableLocation(base, off_expr, cloc)
-	  | None -> 
-	    let coff = List.fold_left Int64.add 0L coffs in
-	    let offset = Int64.add (Int64.add cbase coff)
-	      (match (eoffs, off_syms) with
-	      | ([], []) -> 0L
-	      | (el, vel) -> 
-		dt#start_new_query;
-		(self#concretize_inner (reg_addr())
-		   (simplify_fp (sum_list (el @ vel))))
-		  (ident + 0x200)) in
-	    dt#count_query;
-	    SingleLocation(base, (fix_u32 offset))
-
+		Printf.printf 
+		  "Table treatment for sym region with base = %s and offset expr = %s\n"
+		  off_expr_str (V.exp_to_string off_expr););
+	     TableLocation(new_base, off_expr, new_cloc)
+	   | None -> 
+	      let coff = List.fold_left Int64.add 0L coffs in
+	      let offset = Int64.add (Int64.add cbase coff)
+		(match (eoffs, off_syms) with
+		| ([], []) -> 0L
+		| (el, vel) -> 
+		   dt#start_new_query;
+		  (self#concretize_inner (reg_addr())
+		     (simplify_fp (sum_list (el @ vel))))
+		    (ident + 0x200)) in
+	      dt#count_query;
+	      SingleLocation(base, (fix_u32 offset))
+		
     method private eval_addr_exp_region_conc_path e ident =
       let term_is_known_base = function
 	| V.Lval(V.Temp(var)) -> form_man#known_region_base var
@@ -1768,7 +1777,7 @@ struct
 	let addr' = ref 0L in
 	let sym_region_table_v = 
 	  match location with
-	  | TableLocation(r, off_expr, _) ->
+	  | TableLocation(r, off_expr, cloc) ->
 	    (match self#decide_wd "Load" off_expr 0L with
 	    | None -> None
 	    | Some wd ->
@@ -1776,7 +1785,7 @@ struct
 		Printf.printf 
 		  "SRFM#handle_load table load for sym region with offset expr = %s\n"
 		  (V.exp_to_string off_expr);
-	      self#table_load 0L r off_expr (Int64.to_int wd) ty)
+	      self#table_load cloc r off_expr (Int64.to_int wd) ty)
 	  | SingleLocation(r, addr) -> 
 	    r' := r; addr' := addr; None
 	in 

@@ -1291,9 +1291,10 @@ let create_field_ranges_l fm =
       let h = (List.nth !array_offsets_l_h (k-1)) in
       Hashtbl.iter ( fun (field_num, _, end_byte, _, _) prev_cond  ->
 	assert(field_num = (k-1));
-	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields ; 
-	Printf.printf "SRFM#field=%d Hashtbl.len = %d\n" k
-	  (Hashtbl.length (List.nth !array_offsets_l_h k));
+	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields ;
+	if !opt_trace_adaptor then
+	  Printf.printf "AS.ml#field=%d Hashtbl.len = %d\n" k
+	    (Hashtbl.length (List.nth !array_offsets_l_h k));
       ) h;
   in
 
@@ -1385,19 +1386,19 @@ let create_field_ranges_l fm =
       done;
       Printf.printf "\n";
     done;
-  );
   
-  Printf.printf "i_byte_arr list lengths = \n";
-  for i=0 to max_size-1 do
-    Printf.printf "%d "(List.length !((!i_byte_arr').(i)));
-  done;
-  Printf.printf "\n\n";
-
-  Printf.printf "i_n_arr_h Hashtbl lengths = \n";
-  for i=0 to max_size do
-    Printf.printf "%d "(Hashtbl.length ((!i_n_arr_h).(i))); 
-  done;
-  Printf.printf "\n\n";
+    Printf.printf "i_byte_arr list lengths = \n";
+    for i=0 to max_size-1 do
+      Printf.printf "%d "(List.length !((!i_byte_arr').(i)));
+    done;
+    Printf.printf "\n\n";
+    
+    Printf.printf "i_n_arr_h Hashtbl lengths = \n";
+    for i=0 to max_size do
+      Printf.printf "%d "(Hashtbl.length ((!i_n_arr_h).(i))); 
+    done;
+    Printf.printf "\n\n";
+  );
  
   for i=0 to max_size do
     let l = (Hashtbl.fold (fun k () ul -> k::ul) ((!i_n_arr_h).(i)) []) in 

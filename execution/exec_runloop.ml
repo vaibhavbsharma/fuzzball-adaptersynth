@@ -364,8 +364,9 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	   Hashtbl.replace loop_detect eip 1L;
 	   1L)
       in
-      if f2_only && (fm#get_in_f2_range ()) then
+      if f2_only && (fm#get_in_f2_range ()) then (
 	Hashtbl.replace loop_detect eip (Int64.succ old_count);
+      );
       if not f2_only then
 	Hashtbl.replace loop_detect eip (Int64.succ old_count);
       let it_lim_enforced =
@@ -373,7 +374,8 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	else opt_iteration_limit_enforced
       in
       (match !it_lim_enforced with
-      | Some lim -> if old_count > lim then raise TooManyIterations
+      | Some lim -> if old_count > lim then (
+	raise TooManyIterations;);
       | _ -> ())
     in
     is_too_many_iterations loop_detect eip false;

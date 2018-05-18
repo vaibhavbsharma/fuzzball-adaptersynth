@@ -815,8 +815,7 @@ struct
 		         | None -> "can be true or false"
 	   in Printf.printf "chose branch %B with choices %s\n" b str;
        if b then () 
-       else (Printf.printf "fragment_machine: expression violates restriction, raising DisqualifiedPath\n";
-             raise DisqualifiedPath))
+       else (raise DisqualifiedPath))
 	
     method check_adaptor_condition expr =
       (* TODO this function is still in progress *)
@@ -2855,7 +2854,9 @@ struct
 	| Some lim -> if loop_cnt > lim then raise TooManyIterations;
 	| _ -> ());
 	(match !opt_f2_iteration_limit_enforced with
-	| Some lim -> if f2_loop_cnt > lim then raise TooManyIterations;
+	| Some lim -> if f2_loop_cnt > lim then
+	    (Printf.printf "fragment_machine raising TooManyIterations, f2_loop_cnt = %Ld\n" f2_loop_cnt;
+	     raise TooManyIterations;);
 	| _ -> ());
 	let (_, sl) = frag in
 	  match find_label lab sl with

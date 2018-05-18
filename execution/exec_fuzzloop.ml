@@ -219,8 +219,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 				  V.BinOp(V.LE, j_start_b, i_end_b), 
 				  V.BinOp(V.LE, i_end_b,   j_end_b)) in
 	   let tmp_cond2 = V.UnOp(V.NOT, V.BinOp(V.BITOR, expr_s_b, expr_e_b)) in
-	   Printf.printf "exec_fuzzloop adding tmp_cond2 = %s\n"
-	     (V.exp_to_string tmp_cond2);
+	   if !opt_trace_adaptor then
+	     Printf.printf "exec_fuzzloop adding tmp_cond2 = %s\n"
+	       (V.exp_to_string tmp_cond2);
 	   opt_extra_conditions := tmp_cond2 :: !opt_extra_conditions; 
 	 );
        done; (* end for j *)
@@ -237,8 +238,9 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 			       V.BinOp(V.MOD, i_bytes, 
 				       V.Cast(V.CAST_UNSIGNED, V.REG_64, field_n)), 
 			       V.Constant(V.Int(V.REG_64, 0L))) in
-       Printf.printf "exec_fuzzloop adding tmp_cond3 = %s\n"
-	 (V.exp_to_string tmp_cond3);
+       if !opt_trace_adaptor then
+	 Printf.printf "exec_fuzzloop adding tmp_cond3 = %s\n"
+	   (V.exp_to_string tmp_cond3);
        opt_extra_conditions := tmp_cond3 :: !opt_extra_conditions; 
        
        (* (end_byte-start_byte+1)/n == 1, 2, 4, or 8 *)
@@ -344,7 +346,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
        in
        let this_cond = (or_list !ranges) in
-       Printf.printf "list of valid values = %s\n" (V.exp_to_string this_cond);
+       if !opt_trace_struct_adaptor then
+	 Printf.printf "list of valid values = %s\n" (V.exp_to_string this_cond);
        opt_extra_conditions := this_cond :: !opt_extra_conditions;
      done;
 
