@@ -590,6 +590,7 @@ struct
   class sym_region_frag_machine (dt:decision_tree) = object(self)
     inherit SPFM.sym_path_frag_machine dt as spfm
 
+    val mutable table_store_num : int ref = ref 0
     val mutable regions : GM.granular_snapshot_memory list = []
     val mutable region_conc_addr_h = Hashtbl.create 101
     val mutable conc_addr_region_h = Hashtbl.create 101
@@ -1600,10 +1601,11 @@ struct
     val mutable dummy_counter = 0
 
     method private decide_maxval op_name off_exp cloc =
-      let compute_maxval off_exp =
-	if !opt_table_limit = 0 then
+      if !opt_table_limit = 0 ||
+	((op_name = "Store") && !opt_no_table_store) then
 	  None
-	else
+      else (
+	let compute_maxval off_exp =
 	  let maxval = self#query_maxval off_exp (reg_addr()) in
 	    if maxval > Int64.shift_left 1L !opt_table_limit then
 	      (if !opt_trace_tables then
@@ -1631,7 +1633,7 @@ struct
 		with Not_found ->
 		  let limit = compute_maxval off_exp in
 		    Hashtbl.replace maxval_cache key limit;
-		    limit
+	     limit)
 
     method private decide_offset_maxval off_exp =
       let compute_maxval off_exp =
@@ -2005,6 +2007,12 @@ struct
 	      self#finish_fuzz "target full match"
 
     method private table_store cloc region_num off_exp e maxval ty value =
+      if not !opt_no_table_store then
+	table_store_num := !table_store_num + 1;
+      if !opt_trace_tables then
+	Printf.printf "table_store_num = %d\n" !table_store_num;
+      if !table_store_num > !opt_max_table_store_num then false
+      else 
       let load_ent addr = match ty with
 	| V.REG_8  -> form_man#simplify8
 	  (self#region_load region_num 8 addr) 
@@ -2033,11 +2041,11 @@ struct
 	  let old_v = load_ent addr in
 	  let cond_e = (V.BinOp(V.EQ, off_exp, 
 				addr_const (Int64.of_int (i*stride)))) in
-	  if !opt_trace_tables then
-	    Printf.printf "SRFM#table_store i = %d cond_e = %s off_exp = %s\n" i
-	      (V.exp_to_string cond_e) (V.exp_to_string off_exp);
 	  let cond_v = D.from_symbolic cond_e in
 	  let ite_v = form_man#make_ite cond_v ty value old_v in
+	  if !opt_trace_tables then
+	    Printf.printf "SRFM#table_store i = %d cond_e = %s off_exp = %s addr = 0x%Lx ite = %s\n" i
+	      (V.exp_to_string cond_e) (V.exp_to_string off_exp) addr (V.exp_to_string (D.to_symbolic_8 ite_v));
 	    store_ent addr ite_v;
 	    (match (self#started_symbolic, !opt_target_region_start) with
 	      | (true, Some from) ->			 
@@ -2099,7 +2107,10 @@ struct
 	  
     method private handle_store addr_e ty rhs_e =
       if !opt_trace_offset_limit then
-	Printf.printf "Storing to... %s\n" (V.exp_to_string addr_e);
+	Printf.printf "Storing to... %s %s\n" (V.exp_to_string addr_e)
+	  (V.exp_to_string rhs_e);
+      if !table_store_num > !opt_max_table_store_num then 
+	opt_no_table_store := true;
       let value = self#eval_int_exp_simplify rhs_e in
       if (!opt_no_table_store) ||
 	not (self#maybe_table_or_concrete_store addr_e ty value)
@@ -2111,6 +2122,8 @@ struct
 	let table_store_status =
 	  match location with
 	  | TableLocation(r, off_exp, cloc) ->
+	     if !opt_no_table_store then false
+	     else 
 	    (match self#decide_maxval "Store" off_exp 0L with
 	    | None -> false
 	    | Some maxval -> 
@@ -2217,6 +2230,10 @@ struct
       sym_input_region_l <- [];
       f1_hash_list <- [];
       f2_hash_list <- [];
+      if !table_store_num = !opt_max_table_store_num then (
+	table_store_num := 0;
+	opt_no_table_store := false;
+      );
       Hashtbl.clear concrete_cache
 
     method sym_region_struct_adaptor = 
