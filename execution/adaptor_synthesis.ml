@@ -763,8 +763,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
        ) 
        else ( 
 	 let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
-	 (* let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
-	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in *)
+	 let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
+	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
 	 let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
 	 let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
 	 let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
@@ -774,7 +774,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let type_43_expr = 
 	   (get_ite_expr ite_arg_expr V.EQ vine_size 0L 
 	      (constify 0L vine_size) (constify 1L vine_size)) in 
-	 let type_13_expr = (V.BinOp(V.PLUS, ite_arg_expr, (constify 0x80000000L V.REG_32))) in
+	 let type_13_expr = (V.BinOp(V.PLUS, ite_arg_expr, (constify 0x80000000L vine_size))) in
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -785,6 +785,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
 
 	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
 	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
+              (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
+               (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
               (get_ite_expr var_type V.EQ V.REG_8 13L type_13_expr
 	       (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
                 (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
@@ -793,7 +795,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	           (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
                     (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
 	      	      type_43_expr)
-	      	  )))))))))
+	      	  )))))))))))
     in
     if !opt_trace_adaptor then
       Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
@@ -1045,7 +1047,8 @@ let ret_typeconv_adaptor fm in_nargs =
   | X64 -> R_RAX
   | ARM -> R0
   | _ -> failwith "unsupported architecture for ret_typeconv adaptor") 
-    (V.Cast(V.CAST_LOW, vine_size, arg))
+(* (V.Cast(V.CAST_LOW, vine_size, arg)) not very well-tested change *)
+    arg
   
 (* Return value type conversion adaptor code ends here *)
 
@@ -1734,8 +1737,11 @@ let struct_adaptor (fm:fragment_machine) =
 	  (Printf.printf "byte expressions...";
 	   flush stdout);
 	let byte_expr_l = ref [] in 
+	
+	let simplify e = 
+	  if !opt_split_target_formulas = true then fm#simplify_exp e else e in
 	for i=0 to (max_size-1) do 
-	  let byte_expr = (get_arr_ite_ai_byte_expr (List.rev !((!i_byte_arr').(i))) i) in
+	  let byte_expr = simplify (get_arr_ite_ai_byte_expr (List.rev !((!i_byte_arr').(i))) i) in
 	  let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i addr_list_ind) in
 	  let byte_expr_sym = fm#get_fresh_symbolic byte_expr_sym_str 8 in
 	  let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
