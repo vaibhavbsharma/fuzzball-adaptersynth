@@ -954,9 +954,13 @@ struct
 	 List.iter (fun e -> Printf.printf "& (%s)\n" (V.exp_to_string e))
 	   (List.rev (self#get_path_cond)));
       if !opt_solve_final_pc then
-	assert(let (b,_) =
+	assert(let (b,ce) =
 		 self#query_with_path_cond_wcache V.exp_true true false
-	       in b);
+	       in
+	      if !opt_trace_assigns_final_pc then
+		(Printf.printf "Input vars: ";
+		 self#print_ce ce);
+	       b);
       flush(stdout);
       dt#try_again_p
 

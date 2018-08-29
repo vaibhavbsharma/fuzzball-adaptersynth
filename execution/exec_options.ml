@@ -82,6 +82,7 @@ let opt_influence_bound = ref (-2.0)
 let opt_disqualify_addrs = ref []
 let opt_check_condition_at = ref []
 let opt_trace_assigns = ref false
+let opt_trace_assigns_final_pc = ref false
 let opt_trace_assigns_string = ref false
 let opt_trace_conditions = ref false
 let opt_trace_decisions = ref false

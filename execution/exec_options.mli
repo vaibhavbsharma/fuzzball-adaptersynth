@@ -60,6 +60,7 @@ val opt_influence_bound : float ref
 val opt_disqualify_addrs : int64 list ref
 val opt_check_condition_at : (int64 * Vine.exp) list ref
 val opt_trace_assigns : bool ref
+val opt_trace_assigns_final_pc : bool ref
 val opt_trace_assigns_string : bool ref
 val opt_trace_conditions : bool ref
 val opt_trace_decisions : bool ref
