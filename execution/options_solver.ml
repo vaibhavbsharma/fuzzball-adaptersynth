@@ -44,8 +44,6 @@ let solver_cmdline_opts =
      " Print satisfying assignments");
     ("-trace-assigns-final-pc", Arg.Set(opt_trace_assigns),
      " Print satisfying assignments found for the final path condition");
-    ("-trace-assigns-final-pc", Arg.Set(opt_trace_assigns),
-     " Print satisfying assignments found for the final path condition");
     ("-trace-assigns-string", Arg.Set(opt_trace_assigns_string),
      " Print satisfying assignments as a string");
     ("-trace-solver", Arg.Set(opt_trace_solver),
