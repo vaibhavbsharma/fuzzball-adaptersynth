@@ -238,9 +238,9 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 2
+let int_arith_depth = 1
 (* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = V.REG_64
+let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
@@ -263,7 +263,7 @@ let int_restrict_constant_list = None
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
    int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
    this list must contain zero if used) *)
-let int_restrict_input_range = Some (0L, 2147483647L) (* Used for killpg <- kill *)
+let int_restrict_input_range = None (*Some (0L, 2147483647L) *)(* Used for killpg <- kill *)
 let int_restrict_input_list = None
 let int_restrict_output_range = None
 let int_restrict_output_list = None
@@ -273,7 +273,13 @@ let int_restrict_output_list = None
    exec_runloop *)
 let arithmetic_int_adaptor fm out_nargs in_nargs =
   (* argument registers -- assumes x86-64 *)
-  let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
+  let arg_regs = 
+    match (!opt_arch, !opt_fragments) with
+    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+    | (ARM,false) -> [R0; R1; R2; R3; R4]
+    | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+    | _ -> failwith "argregs unsupported for architecture"
+  in
   (* operators that require special handling *)
   let div_ops = [V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD] in
   let shift_ops = [V.LSHIFT; V.RSHIFT; V.ARSHIFT] in
@@ -392,7 +398,9 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
           fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
           fm#check_adaptor_condition 
             (restrict root_sym int_val_type int_restrict_output_range 
-               int_restrict_output_list)*)
+            int_restrict_output_list)*)
+	 (Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
+	  flush stdout);
           fm#set_reg_symbolic (List.nth arg_regs idx) expr;
           fm#check_adaptor_condition 
             (restrict expr int_val_type int_restrict_output_range 
@@ -403,9 +411,9 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
 let arithmetic_int_init_sym_vars fm in_nargs = 
   let rec create_arith_int_sym_vars prev_type_str prev_val_str d =
     ignore(fm#get_fresh_symbolic (prev_type_str^"0") 8);
-    ignore(fm#get_fresh_symbolic (prev_val_str^"0") 64);
+    ignore(fm#get_fresh_symbolic (prev_val_str^"0") (if int_val_type = V.REG_32 then 32 else 64));
     ignore(fm#get_fresh_symbolic (prev_type_str^"1") 8);
-    ignore(fm#get_fresh_symbolic (prev_val_str^"1") 64);
+    ignore(fm#get_fresh_symbolic (prev_val_str^"1") (if int_val_type = V.REG_32 then 32 else 64));
     if d <> 1 then (
       create_arith_int_sym_vars (prev_type_str^"0") (prev_val_str^"0") (d-1);
       create_arith_int_sym_vars (prev_type_str^"1") (prev_val_str^"1") (d-1);
@@ -415,7 +423,7 @@ let arithmetic_int_init_sym_vars fm in_nargs =
     let type_str = Printf.sprintf "%c_type_R" (Char.chr ((Char.code 'a') + i)) in
     let val_str = Printf.sprintf "%c_val_R" (Char.chr ((Char.code 'a') + i)) in
     ignore(fm#get_fresh_symbolic type_str 8);
-    ignore(fm#get_fresh_symbolic val_str 64);
+    ignore(fm#get_fresh_symbolic val_str (if int_val_type = V.REG_32 then 32 else 64));
     create_arith_int_sym_vars type_str val_str int_arith_depth;
   done;
  ()
