@@ -238,7 +238,7 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    counterexamples that can be synthesized; these variables will be used
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
-let int_arith_depth = 1
+let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
 let int_val_type = V.REG_32
 (* binary and unary operators; all possible operators:
@@ -250,14 +250,16 @@ let int_val_type = V.REG_32
    other (consecutive); do the smae if mod or division operations are included
    in the list; this makes placing restrictions on the operands to these
    operators a little easier *)
-let int_binops = [V.PLUS; V.MINUS; V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]
-let int_unops = [V.NEG; V.NOT]
+let int_binops = [V.PLUS; V.MINUS] (*V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]*)
+let int_unops = [] (*[V.NEG; V.NOT]*)
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
    zero if used) *)
 let int_restrict_constant_range = None (* Some (0L, 16L) used for killpg <- kill *) (* Some (-187L, 187L) used for isupper <-> islower *)
-let int_restrict_constant_list = None
+let rec buildList i n = let x = (Int64.succ i) in if i <= n then i::(buildList x n) else []
+(* NOTE: Done only for the reverse engineering experiment with ARM32 code fragments *)
+let int_restrict_constant_list = Some (List.append (buildList Int64.minus_one 255L) [511L; 1023L; 2047L; 4095L; 8191L; 16383L; 32767L; 65535L; 131071L; 262143L; 524287L; 1048575L; 2097151L; 4194303L; 8388607L; 16777215L; 33554431L; 67108863L; 134217727L; 268435455L; 536870911L; 1073741823L; 2147483647L])
 (* restrict the input and output of the adaptor (input restrictions reflect
    f1 preconditions and output restrictions reflect f2 preconditions)
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
