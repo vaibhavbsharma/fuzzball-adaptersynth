@@ -240,7 +240,7 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
 (* tree depth *)
 let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = V.REG_32
+let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64)
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
