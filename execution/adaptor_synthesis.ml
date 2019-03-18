@@ -401,7 +401,9 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
           fm#check_adaptor_condition 
             (restrict root_sym int_val_type int_restrict_output_range 
             int_restrict_output_list)*)
-	 (Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
+	 (
+	if !opt_trace_adaptor then
+     Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
 	  flush stdout);
           fm#set_reg_symbolic (List.nth arg_regs idx) expr;
           fm#check_adaptor_condition 

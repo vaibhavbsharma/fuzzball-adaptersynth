@@ -343,6 +343,8 @@ struct
 	      query_engine#start_query;
 	      List.iter query_engine#add_decl qdecls;
 	      let time_before = get_time () in
+	      Printf.printf "Starting new query\n";
+	      flush stdout;
 	      let (result_o, ce') = query_engine#query cond_e in
 	      let time_after = get_time () in
 	      let is_sat' = match result_o with
