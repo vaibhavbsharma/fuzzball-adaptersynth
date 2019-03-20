@@ -368,8 +368,8 @@ struct
 	        if is_slow then
 		Printf.printf "Slow query (%f sec)\n"
 		  ((get_time ()) -. time_before);
-	      (* Printf.printf "Query time = %f sec\n"
-		 (time_after -. time_before); *)
+	      Printf.printf "Query time = %f sec\n"
+		 (time_after -. time_before);
 		solver_time := !solver_time +. (time_after -. time_before);
 	        flush stdout;
 		query_engine#after_query is_slow;

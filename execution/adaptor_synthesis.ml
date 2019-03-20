@@ -239,8 +239,8 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
    in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
 (* tree depth *)
 let int_arith_depth = 2
-(* 32 or 64-bit values (int vs. long int) *)
-let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64)
+(* 32 or 64-bit values (int vs. long int) defined for each use below *)
+(* let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64) *)
 (* binary and unary operators; all possible operators:
    V.PLUS; V.MINUS; V.TIMES; V.BITAND; V.BITOR; V.XOR; V.DIVIDE; 
    V.SDIVIDE;V.MOD; V.SMOD; V.LSHIFT; V.RSHIFT; V.ARSHIFT;
@@ -274,6 +274,7 @@ let int_restrict_output_list = None
    the rules for applying the adaptor function; this function is called in 
    exec_runloop *)
 let arithmetic_int_adaptor fm out_nargs in_nargs =
+  let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64) in
   (* argument registers -- assumes x86-64 *)
   let arg_regs = 
     match (!opt_arch, !opt_fragments) with
@@ -412,12 +413,13 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
        !symbolic_exprs)
   else ()
    
-let arithmetic_int_init_sym_vars fm in_nargs = 
+let arithmetic_int_init_sym_vars fm in_nargs =
+  let int_val_size = if !opt_arch = ARM then 32 else 64 in
   let rec create_arith_int_sym_vars prev_type_str prev_val_str d =
     ignore(fm#get_fresh_symbolic (prev_type_str^"0") 8);
-    ignore(fm#get_fresh_symbolic (prev_val_str^"0") (if int_val_type = V.REG_32 then 32 else 64));
+    ignore(fm#get_fresh_symbolic (prev_val_str^"0") int_val_size);
     ignore(fm#get_fresh_symbolic (prev_type_str^"1") 8);
-    ignore(fm#get_fresh_symbolic (prev_val_str^"1") (if int_val_type = V.REG_32 then 32 else 64));
+    ignore(fm#get_fresh_symbolic (prev_val_str^"1") int_val_size);
     if d <> 1 then (
       create_arith_int_sym_vars (prev_type_str^"0") (prev_val_str^"0") (d-1);
       create_arith_int_sym_vars (prev_type_str^"1") (prev_val_str^"1") (d-1);
@@ -427,7 +429,7 @@ let arithmetic_int_init_sym_vars fm in_nargs =
     let type_str = Printf.sprintf "%c_type_R" (Char.chr ((Char.code 'a') + i)) in
     let val_str = Printf.sprintf "%c_val_R" (Char.chr ((Char.code 'a') + i)) in
     ignore(fm#get_fresh_symbolic type_str 8);
-    ignore(fm#get_fresh_symbolic val_str (if int_val_type = V.REG_32 then 32 else 64));
+    ignore(fm#get_fresh_symbolic val_str int_val_size);
     create_arith_int_sym_vars type_str val_str int_arith_depth;
   done;
  ()
@@ -435,6 +437,7 @@ let arithmetic_int_init_sym_vars fm in_nargs =
 (* adds extra conditions on the input variables and associated 
    adaptor variables; this function is called in exec_fuzzloop *)
 let rec arithmetic_int_extra_conditions fm out_nargs n = 
+  let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64) in
   let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
   let var = fm#get_fresh_symbolic var_name 
       (if int_val_type = V.REG_32 then 32 else 64) in
