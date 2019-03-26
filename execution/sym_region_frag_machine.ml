@@ -906,8 +906,8 @@ struct
 		(V.exp_to_string exp);
 	    new_rnum := region;)
 	) region_vals_per_path;
-	if !conc_addr = 0L then
-	  raise DisqualifiedPath;
+	(* if !conc_addr = 0L then
+	   raise DisqualifiedPath; commented out for glibc evaluation *)
 	let is_sym_input_region_l = ref false in
 	let new_region = ref (-1) in
 	if (!new_rnum <> 0) then 
@@ -1587,8 +1587,7 @@ struct
 	      loop (Int64.succ mid) max
       in
       let wd = narrow_bitwidth form_man e in
-      let max_limit = Int64.shift_right_logical (-1L) (64-wd)
-      in
+      let max_limit = Int64.shift_right_logical (-1L) (64 - wd) in
       let limit = loop 0L max_limit in
 	if !opt_trace_tables then
 	  Printf.printf "Largest value based on queries is %Lu\n" limit;
@@ -1603,36 +1602,36 @@ struct
     method private decide_maxval op_name off_exp cloc =
       if !opt_table_limit = 0 ||
 	((op_name = "Store") && !opt_no_table_store) then
-	  None
+	None
       else (
 	let compute_maxval off_exp =
 	  let maxval = self#query_maxval off_exp (reg_addr()) in
-	    if maxval > Int64.shift_left 1L !opt_table_limit then
-	      (if !opt_trace_tables then
-		 Printf.printf
-		   ("%s with base %08Lx, offset %s of size %Ld "
-		    ^^ "is not a table\n")
-		   op_name cloc (V.exp_to_string off_exp) maxval;
-	       None)
-	    else
-	      Some maxval
-      in
+	  if maxval > Int64.shift_left 1L !opt_table_limit then
+	    (if !opt_trace_tables then
+		Printf.printf
+		  ("%s with base %08Lx, offset %s of size %Ld "
+		   ^^ "is not a table\n")
+		  op_name cloc (V.exp_to_string off_exp) maxval;
+	     None)
+	  else
+	    Some maxval
+	in
 	match off_exp with
-	  | V.Constant(V.Int(_, 0L)) -> None
-	  | V.Constant(V.Int(_, v)) -> Some v
-	  | _ ->
-	      let key = (off_exp, dt#get_hist_str) in
-		try
-		  let limit = Hashtbl.find maxval_cache key in
-		    if !opt_trace_tables then
-		      Printf.printf ("Reusing cached maxval %Ld "
-				     ^^ "for %s at [%s]\n")
-			(match limit with Some l -> l | None -> -1L)
-			(V.exp_to_string off_exp) dt#get_hist_str;
-		    limit
-		with Not_found ->
-		  let limit = compute_maxval off_exp in
-		    Hashtbl.replace maxval_cache key limit;
+	| V.Constant(V.Int(_, 0L)) -> None
+	| V.Constant(V.Int(_, v)) -> Some v
+	| _ ->
+	   let key = (off_exp, dt#get_hist_str) in
+	   try
+	     let limit = Hashtbl.find maxval_cache key in
+	     if !opt_trace_tables then
+	       Printf.printf ("Reusing cached maxval %Ld "
+			      ^^ "for %s at [%s]\n")
+		 (match limit with Some l -> l | None -> -1L)
+		 (V.exp_to_string off_exp) dt#get_hist_str;
+	     limit
+	   with Not_found ->
+	     let limit = compute_maxval off_exp in
+	     Hashtbl.replace maxval_cache key limit;
 	     limit)
 
     method private decide_offset_maxval off_exp =
@@ -1822,6 +1821,24 @@ struct
 	     (if !opt_use_tags then
 		 Printf.printf " (%Ld @ %08Lx)" (D.get_tag v) location_id);
 	     Printf.printf "\n"));
+	(* this code chunk was added for the security case study *)
+	let sane_addr = ref 0L in
+	List.iter ( fun (eip, expr) ->
+	  if (eip = 0x401221L) then (
+	    match expr with
+	    | V.BinOp(V.LT, _, V.Constant(V.Int(V.REG_64, addr))) -> sane_addr := addr;
+	    | _ -> ());
+	) !opt_check_condition_at;
+	if (self#get_eip) = 0x401221L then (
+	  Printf.printf "found interesting eip, sane_addr = 0x%Lx\n" !sane_addr;
+	  if !addr' > 0x424200ffL || !addr' < 0x42420000L then (
+	    Printf.printf "found disqualifying address: 0x%Lx\n" !addr';
+	    raise DisqualifiedPath)
+	  else (
+	    Printf.printf "found qualifying address: 0x%Lx\n" !addr';
+	  )
+	);
+	(* end code chunk for security case study *)
 	if !opt_track_sym_usage then
 	  (let stack_off = Int64.sub !addr' self#get_esp_conc_base in
 	   let is_stack = stack_off >= -128L && stack_off <= 0x100000L in
@@ -2013,29 +2030,29 @@ struct
 	Printf.printf "table_store_num = %d\n" !table_store_num;
       if !table_store_num > !opt_max_table_store_num then false
       else 
-      let load_ent addr = match ty with
-	| V.REG_8  -> form_man#simplify8
-	  (self#region_load region_num 8 addr) 
-	| V.REG_16 -> form_man#simplify16
-	  (self#region_load region_num 16 addr) 
-	| V.REG_32 -> form_man#simplify32
-	  (self#region_load region_num 32 addr) 
-	| V.REG_64 -> form_man#simplify64
-	  (self#region_load region_num 64 addr) 
-	| _ -> failwith "Unexpected type in table_store" 
-      in
-      let store_ent addr v = match ty with
-	| V.REG_8  ->self#region_store region_num 8 addr v
-	| V.REG_16 ->self#region_store region_num 16 addr v
-	| V.REG_32 ->self#region_store region_num 32 addr v
-	| V.REG_64 ->self#region_store region_num 64 addr v
-	| _ -> failwith "Unexpected store type in table_store"
-      in
-      let stride = stride form_man off_exp in
-      let stride64 = Int64.of_int stride in
-      let num_ents64 = Int64.succ (Int64.div maxval stride64) in
-      let num_ents = Int64.to_int num_ents64 in
-      let target_conds = ref [] in
+	let load_ent addr = match ty with
+	  | V.REG_8  -> form_man#simplify8
+	     (self#region_load region_num 8 addr) 
+	  | V.REG_16 -> form_man#simplify16
+	     (self#region_load region_num 16 addr) 
+	  | V.REG_32 -> form_man#simplify32
+	     (self#region_load region_num 32 addr) 
+	  | V.REG_64 -> form_man#simplify64
+	     (self#region_load region_num 64 addr) 
+	  | _ -> failwith "Unexpected type in table_store" 
+	in
+	let store_ent addr v = match ty with
+	  | V.REG_8  ->self#region_store region_num 8 addr v
+	  | V.REG_16 ->self#region_store region_num 16 addr v
+	  | V.REG_32 ->self#region_store region_num 32 addr v
+	  | V.REG_64 ->self#region_store region_num 64 addr v
+	  | _ -> failwith "Unexpected store type in table_store"
+	in
+	let stride = stride form_man off_exp in
+	let stride64 = Int64.of_int stride in
+	let num_ents64 = Int64.succ (Int64.div maxval stride64) in
+	let num_ents = Int64.to_int num_ents64 in
+	let target_conds = ref [] in
         for i = 0 to num_ents - 1 do
 	  let addr = Int64.add cloc (Int64.of_int (i * stride)) in
 	  let old_v = load_ent addr in
@@ -2046,7 +2063,7 @@ struct
 	  if !opt_trace_tables then
 	    Printf.printf "SRFM#table_store i = %d cond_e = %s off_exp = %s addr = 0x%Lx ite = %s\n" i
 	      (V.exp_to_string cond_e) (V.exp_to_string off_exp) addr (V.exp_to_string (D.to_symbolic_8 ite_v));
-	    store_ent addr ite_v;
+	  store_ent addr ite_v;
 	    (match (self#started_symbolic, !opt_target_region_start) with
 	      | (true, Some from) ->			 
 	          (match self#target_store_condition addr from ite_v ty with
@@ -2124,12 +2141,12 @@ struct
 	  | TableLocation(r, off_exp, cloc) ->
 	     if !opt_no_table_store then false
 	     else 
-	    (match self#decide_maxval "Store" off_exp 0L with
-	    | None -> false
-	    | Some maxval -> 
-	      self#table_store cloc r off_exp 
-		(D.to_symbolic_32 (self#eval_int_exp_simplify addr_e)) 
-		maxval ty value)
+	       (match self#decide_maxval "Store" off_exp 0L with
+	       | None -> false
+	       | Some maxval -> 
+		  self#table_store cloc r off_exp 
+		    (D.to_symbolic_32 (self#eval_int_exp_simplify addr_e)) 
+		    maxval ty value)
 	  | SingleLocation(r', addr') -> r := r'; addr := addr'; false
 	in
 	if !r = Some 0 && (Int64.abs (fix_s32 !addr)) < 4096L then
