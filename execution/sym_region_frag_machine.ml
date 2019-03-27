@@ -1822,7 +1822,14 @@ struct
 	     (if !opt_use_tags then
 		 Printf.printf " (%Ld @ %08Lx)" (D.get_tag v) location_id);
 	     Printf.printf "\n"));
-	(* this code chunk was added for the security case study *)
+	(* this code chunk was added for the security case study. 
+	   The case study can be found in fuzzball-synth/eg/lookup. The adapter synthesis involves checking 
+	   a condition that ensures that an index into a table is within bounds. This check is needed because
+	   we would like to only disqualify paths where this condition fails instead of ending the symbolic
+	   exploration altogether. The EIP 0x401221L is the address in the target function where we would
+	   like to check if the access is within bounds. If the load is happening outside the bounds 0 and 255
+	   (the lookup case study involves a table lookup where the table has 255 entries), then we disqualify
+	   this execution path *)
 	let sane_addr = ref 0L in
 	List.iter ( fun (eip, expr) ->
 	  if (eip = 0x401221L) then (
