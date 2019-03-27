@@ -906,8 +906,9 @@ struct
 		(V.exp_to_string exp);
 	    new_rnum := region;)
 	) region_vals_per_path;
-	(* if !conc_addr = 0L then
-	   raise DisqualifiedPath; commented out for glibc evaluation *)
+	(* this change only makes sense for the reverse engineering evaluation of adapter synthesis *)
+	if !opt_fragments = true && !conc_addr = 0L then 
+	   raise DisqualifiedPath; 
 	let is_sym_input_region_l = ref false in
 	let new_region = ref (-1) in
 	if (!new_rnum <> 0) then 
