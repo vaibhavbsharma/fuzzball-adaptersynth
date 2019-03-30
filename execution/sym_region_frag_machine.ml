@@ -605,8 +605,12 @@ struct
        maintained in region_vals_per_path *)
     val region_vals_per_path = Hashtbl.create 101
     val mutable have_snap = false
-    val mutable f1_hash_list : (((int64, GM.gran64) Hashtbl.t) list )= []
+    val mutable f1_hash_list : (((int64, GM.gran64) Hashtbl.t) list ) = []
     val mutable f2_hash_list : (((int64, GM.gran64) Hashtbl.t) list )= []
+    val f1_start_ind : int ref = ref (0-1)
+    val f1_end_ind : int ref = ref (0-1)
+    val f2_start_ind : int ref = ref (0-1)
+    val f2_end_ind : int ref = ref (0-1)
 
     val mutable location_id = 0L
 
@@ -681,26 +685,30 @@ struct
       | _ -> failwith "wrong size password to region_store"
 
     method make_f1_sym_snap =
+      f1_start_ind := List.length regions;
       if !opt_trace_mem_snapshots = true then
-	Printf.printf "SRFM#make_sym_snap called\n";
+	Printf.printf "SRFM#make_sym_snap called, f1_start_ind = %d\n" !f1_start_ind;
       List.iter (fun m -> m#make_snap ();) regions;
       have_snap <- true;
       ()
 	
     method save_f1_sym_se =
+      f1_end_ind := List.length regions;
       List.iteri (fun ind ele -> 
 	let f1_hash = Hashtbl.copy (ele#get_mem) in
-	f1_hash_list <- f1_hash_list @ [f1_hash];
+	if ind >= (!f1_start_ind+1) && ind <= !f1_end_ind then
+	  f1_hash_list <- f1_hash_list @ [f1_hash];
       ) regions;
       
       if !opt_trace_mem_snapshots = true then
-	Printf.printf "SRFM#save_sym_se saving f1_hash_list.length = %d\n"
-	  (List.length f1_hash_list);
+	Printf.printf "SRFM#save_sym_se saving f1_hash_list.length = %d, f1_end_ind = %d\n"
+	  (List.length f1_hash_list) !f1_end_ind;
       ()
 
     method make_f2_sym_snap =
+      f2_start_ind := List.length regions;
       if !opt_trace_mem_snapshots = true then
-	Printf.printf "SRFM#make_f2_sym_snap called\n";
+	Printf.printf "SRFM#make_f2_sym_snap called, f2_start_ind = %d\n" !f2_start_ind;
       List.iter (fun m -> 
 	if (m#get_snap ()) = false then
 	  failwith "unsnapped region being reset, panic!";
@@ -709,15 +717,17 @@ struct
       ()
 
     method compare_sym_se =
+      f2_end_ind := List.length regions;
+      List.iteri (fun ind ele -> 
+	let f2_hash = Hashtbl.copy (ele#get_mem) in
+	if ind >= (!f2_start_ind+1) && ind <= !f2_end_ind then
+	  f2_hash_list <- f2_hash_list @ [f2_hash];
+      ) regions;
+
       if !opt_trace_mem_snapshots = true then
 	Printf.printf "SRFM#compare_sym_se called len(f1_h_l) = %d len(f2_h_l)=%d\n"
 	  (List.length f1_hash_list) (List.length f2_hash_list);
       
-      List.iteri (fun ind ele -> 
-	let f2_hash = Hashtbl.copy (ele#get_mem) in
-	f2_hash_list <- f2_hash_list @ [f2_hash];
-      ) regions;
-
       let inequiv = ref 0 in
       let f2_hash_list_len = List.length f2_hash_list in
       let f1_hash_list_len = List.length f1_hash_list in
@@ -788,8 +798,8 @@ struct
 	 adaptor_score := !adaptor_score + 1;
 	)
       else (
-	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
-	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
+	(* let q_exp = V.BinOp(V.EQ, exp1, exp2) in *)
+	let (b,_) = (false, None) (* (self#query_condition q_exp (Some true) 0x6df0)*) in
 	if b = false then (
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "inequivalent symbolic region side-effects %s!=\n%s\n" 
@@ -850,7 +860,7 @@ struct
       try
 	let ret = Hashtbl.find region_vals_per_path e in
 	if !opt_trace_regions then
-	  Printf.printf "SRFM#region_for found region number in region_vals, ret = %d expr = %s\n" 
+	  Printf.printf "SRFM#region_for found region number in region_vals_per_path, ret = %d expr = %s\n" 
 	    ret (V.exp_to_string e);
 	ret
       with Not_found ->
@@ -860,17 +870,17 @@ struct
 	  match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
 	  | V.Constant(V.Int(V.REG_64, _const)) -> 
-	    if (Int64.abs (fix_s32 _const)) > 4096L then (
+	     if (Int64.abs (fix_s32 _const)) > 4096L then (
 	      (* if a concrete address has already been used for eager
 		 concretization of region R, then add to the tail of const
 		 so that it does not force this region to be equal to region R *)
-	      if Hashtbl.length conc_addr_region_h = 0 || 
-		Hashtbl.mem conc_addr_region_h _const then
-		  const := !const @ [_const] 
-		else const := _const :: !const );
+	       if Hashtbl.length conc_addr_region_h = 0 || 
+		 Hashtbl.mem conc_addr_region_h _const then
+		 const := !const @ [_const] 
+	       else const := _const :: !const );
 	    V.Constant(V.Int(V.REG_64, _const))
 	  | V.Ite(ce, te, fe) ->
-	    V.Ite((loop ce), (loop te), (loop fe))
+	     V.Ite((loop ce), (loop te), (loop fe))
 	  | _ -> e
 	in
 	let conc_addr = ref 0L in
@@ -908,7 +918,7 @@ struct
 	) region_vals_per_path;
 	(* this change only makes sense for the reverse engineering evaluation of adapter synthesis *)
 	if !opt_fragments = true && !conc_addr = 0L then 
-	   raise DisqualifiedPath; 
+	  raise DisqualifiedPath; 
 	let is_sym_input_region_l = ref false in
 	let new_region = ref (-1) in
 	if (!new_rnum <> 0) then 
@@ -925,13 +935,18 @@ struct
 	  match e with
 	  | V.Lval(V.Temp((i,s,ty))) when 
 	      (((String.length s) = 1) && ((Char.code s.[0]) - (Char.code 'a') < 6)) -> 
-	    (Printf.printf "found symbolic input(%s) as address \n" s;
-	     is_sym_input_region_l := true;)
+	     (Printf.printf "found symbolic input(%s) as address \n" s;
+	      is_sym_input_region_l := true;)
 	  | _ -> ());
 	Hashtbl.replace region_vals_per_path e !new_region;
 	if !conc_addr <> 0L then (
 	  Hashtbl.replace region_conc_addr_h !new_region !conc_addr;
-	  Hashtbl.replace conc_addr_region_h !conc_addr !new_region;);
+	  Hashtbl.replace conc_addr_region_h !conc_addr !new_region;)
+	else (
+	  if !opt_adaptor_search_mode then
+	    (if !opt_trace_adaptor || !opt_trace_regions then
+		(Printf.printf "disqualifying path because we dont want to use a purely symbolic region during adapter search\n";););
+	  raise DisqualifiedPath );
 	if !is_sym_input_region_l = true then
 	  sym_input_region_l <- sym_input_region_l @ [!new_region];
 	if !opt_trace_regions then
