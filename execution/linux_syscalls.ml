@@ -2891,10 +2891,11 @@ object(self)
 	 (ebx, ecx, edx, esi, edi, ebp) 
      in
      if (fm#get_in_f1_range ()) && (not !opt_dont_compare_syscalls) then (
-       Printf.printf "f1:syscall(%d)\n" syscall_num;
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
-	 syscall_num name num_args;
+       if !opt_trace_syscalls || !opt_trace_adaptor then
+	 (Printf.printf "f1:syscall(%d)\n" syscall_num;
+	  Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
+	    syscall_num name num_args;);
        let arg_list = 
 	 (if num_args = 1 then
 	     let arg1 = read_1_reg_sym () in
@@ -2922,13 +2923,14 @@ object(self)
        fm#add_f1_syscall_with_args syscall_num arg_list;
      );
      if (fm#get_in_f2_range ()) && (not !opt_dont_compare_syscalls) then (
-       Printf.printf "f2:syscall(%d)\n" syscall_num;
+       let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
+       if !opt_trace_syscalls || !opt_trace_adaptor then
+	 (Printf.printf "f2:syscall(%d)\n" syscall_num;
+	  Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
+	    syscall_num name num_args;);
        if fm#check_f2_syscall syscall_num = false then (
 	 Printf.printf "linux_syscalls:syscall divergence: raising DisqualifiedPath\n";
-	  raise DisqualifiedPath;);
-       let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
-	 syscall_num name num_args;
+	 raise DisqualifiedPath;);
        let arg_list = 
 	 (if num_args = 1 then
 	     let arg1 = read_1_reg_sym () in
