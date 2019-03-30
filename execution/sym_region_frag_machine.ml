@@ -943,6 +943,7 @@ struct
 	  Hashtbl.replace region_conc_addr_h !new_region !conc_addr;
 	  Hashtbl.replace conc_addr_region_h !conc_addr !new_region;)
 	else (
+	  (* dont allow purely symbolic regions (ones that dont correspond to concrete memory pointed to by conc_addr) to be used during adapter search *)
 	  if !opt_adaptor_search_mode then
 	    (if !opt_trace_adaptor || !opt_trace_regions then
 		(Printf.printf "disqualifying path because we dont want to use a purely symbolic region during adapter search\n";););
