@@ -250,8 +250,8 @@ let int_arith_depth = 2
    other (consecutive); do the smae if mod or division operations are included
    in the list; this makes placing restrictions on the operands to these
    operators a little easier *)
-let int_binops = [V.PLUS; V.MINUS] (*V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]*)
-let int_unops = [] (*[V.NEG; V.NOT]*)
+let int_binops = [V.PLUS; V.MINUS; V.BITAND; V.BITOR; V.XOR; V.LSHIFT; V.RSHIFT; V.ARSHIFT]
+let int_unops = [V.NEG; V.NOT]
 (* restrict the constant values generated; int_restrict_constant_range
    should be 'None' or 'Some (lower, upper)' and int_restrict_constant_list 
    should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE: this list must contain
