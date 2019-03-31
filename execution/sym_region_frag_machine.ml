@@ -945,9 +945,10 @@ struct
 	else (
 	  (* dont allow purely symbolic regions (ones that dont correspond to concrete memory pointed to by conc_addr) to be used during adapter search *)
 	  if !opt_adaptor_search_mode then
-	    (if !opt_trace_adaptor || !opt_trace_regions then
-		(Printf.printf "disqualifying path because we dont want to use a purely symbolic region during adapter search\n";););
-	  raise DisqualifiedPath );
+	    (if (!opt_trace_adaptor = true) || (!opt_trace_regions = true) then
+		(Printf.printf "disqualifying path because we dont want to use a purely symbolic region during adapter search\n";
+		flush stdout;);
+	  raise DisqualifiedPath) );
 	if !is_sym_input_region_l = true then
 	  sym_input_region_l <- sym_input_region_l @ [!new_region];
 	if !opt_trace_regions then
