@@ -869,8 +869,16 @@ struct
 	let rec loop e =
 	  match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
-	  | V.Constant(V.Int(V.REG_64, _const)) -> 
-	     if (Int64.abs (fix_s32 _const)) > 4096L then (
+	  | V.Constant(V.Int(V.REG_64, _const)) ->
+	     let starting_sane_addr = 0x42420000L in (* assuming this value is used in synth-argsub.pl, synth-typeconv.pl, synth-arithmetic.ml *)
+	     let max_steps = 10000L in (* assuming we would never run more than 10K CE searches *)
+	     let const_val = (Int64.abs (fix_s32 _const)) in
+	     if (const_val >= starting_sane_addr) &&
+	       (const_val < (Int64.add starting_sane_addr
+			       (Int64.mul max_steps
+				  (match !opt_region_limit with
+				  | Some region_limit -> region_limit
+				  | None -> 0L)))) then (
 	      (* if a concrete address has already been used for eager
 		 concretization of region R, then add to the tail of const
 		 so that it does not force this region to be equal to region R *)
