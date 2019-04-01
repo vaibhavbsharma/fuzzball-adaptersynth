@@ -620,72 +620,72 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 let simple_adaptor fm out_nargs in_nargs =
   if !opt_trace_adaptor then
     Printf.printf "Starting simple adaptor (%Ld,%Ld)\n" out_nargs in_nargs;
-  let arg_regs = 
-    match (!opt_arch, !opt_fragments) with
-    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-    | (ARM,false) -> [R0; R1; R2; R3; R4]
-    | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-    | _ -> failwith "argregs unsupported for architecture"
-  in
-  let symbolic_args = ref [] in
-  let (size, vine_size) = 
-    match !opt_arch with 
-    | X64 -> (64, V.REG_64)
-    | ARM -> (32, V.REG_32)
-    | _ -> failwith "argregs unsupported for architecture"
-  in
-  let rec main_loop n =
-    let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
-    let var_is_const = fm#get_fresh_symbolic (var_name^"_is_const") 1 in
-    let arg =  
-      (if out_nargs = 0L then (
+  if in_nargs > 0L then (
+    let arg_regs = 
+      match (!opt_arch, !opt_fragments) with
+      | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+      | (ARM,false) -> [R0; R1; R2; R3; R4]
+      | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+      | _ -> failwith "argregs unsupported for architecture"
+    in
+    let symbolic_args = ref [] in
+    let (size, vine_size) = 
+      match !opt_arch with 
+      | X64 -> (64, V.REG_64)
+      | ARM -> (32, V.REG_32)
+      | _ -> failwith "argregs unsupported for architecture"
+    in
+    let rec main_loop n =
+      let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+      let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
+      let var_is_const = fm#get_fresh_symbolic (var_name^"_is_const") 1 in
+      let arg =  
+	(if out_nargs = 0L then (
 	(* These extra conditions should be getting added in exec_fuzzloop 
 	   to make them get added at the beginning of each iteration *)
 	(*opt_extra_conditions :=  
           V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L)))
 	  :: !opt_extra_conditions;*)
-	var_val
-       ) 
-       else ( 
+				var_val
+	 ) 
+	 else ( 
 	 (* Assuming adaptor_vals maps strings to Vine expressions
 	    where each string is the name of an adaptor variable *)
-	 if not !opt_adaptor_search_mode then (
-	   let var_is_const_val = Hashtbl.find adaptor_vals (var_name^"_is_const") in
-	   let var_val_val = Hashtbl.find adaptor_vals (var_name^"_val") in
-	   if var_is_const_val = V.Constant(V.Int(V.REG_1, 0L)) then (
-	     match var_val_val with
-	     | V.Constant(V.Int(vine_size, n)) ->
-	       let r = if n >= out_nargs then (Int64.pred out_nargs) else n in
-	       (fm#get_reg_symbolic (List.nth arg_regs (Int64.to_int r) ))
-	     | _ -> failwith (Printf.sprintf "failed to get value of %s_val" var_name)
-	   ) else var_val_val
-	 ) else 
-	   get_ite_expr var_is_const V.NEQ V.REG_1 0L  
-	     var_val (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) 
-	 (*opt_extra_conditions :=  
-	   V.BinOp(
-           V.BITOR,
-           V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
-           V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-	   :: !opt_extra_conditions;*)
-	     
-       )) 
+	   if not !opt_adaptor_search_mode then (
+	     let var_is_const_val = Hashtbl.find adaptor_vals (var_name^"_is_const") in
+	     let var_val_val = Hashtbl.find adaptor_vals (var_name^"_val") in
+	     if var_is_const_val = V.Constant(V.Int(V.REG_1, 0L)) then (
+	       match var_val_val with
+	       | V.Constant(V.Int(vine_size, n)) ->
+		  let r = if n >= out_nargs then (Int64.pred out_nargs) else n in
+		  (fm#get_reg_symbolic (List.nth arg_regs (Int64.to_int r) ))
+	       | _ -> failwith (Printf.sprintf "failed to get value of %s_val" var_name)
+	     ) else var_val_val
+	   ) else 
+	     get_ite_expr var_is_const V.NEQ V.REG_1 0L  
+	       var_val (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) 
+       (*opt_extra_conditions :=  
+	 V.BinOp(
+         V.BITOR,
+         V.BinOp(V.EQ,var_is_const,V.Constant(V.Int(V.REG_1,1L))),
+         V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	 :: !opt_extra_conditions;*)
+	       
+	 )) 
+      in
+      let arg' = arg
+    (* (V.Cast(V.CAST_LOW, vine_size, (match arg with 
+       | V.Lval(V.Temp((_, s, _))) -> 
+       if Hashtbl.mem adaptor_vals s then
+       Hashtbl.find adaptor_vals s
+       else arg
+       | _ -> arg))) *)
+      in
+      if !opt_trace_adaptor then
+	Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
+      symbolic_args := arg' :: !symbolic_args;
+      if n > 0 then main_loop (n-1); 
     in
-    let arg' = arg
-      (* (V.Cast(V.CAST_LOW, vine_size, (match arg with 
-      | V.Lval(V.Temp((_, s, _))) -> 
-	if Hashtbl.mem adaptor_vals s then
-	  Hashtbl.find adaptor_vals s
-	else arg
-      | _ -> arg))) *)
-    in
-    if !opt_trace_adaptor then
-      Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
-    symbolic_args := arg' :: !symbolic_args;
-    if n > 0 then main_loop (n-1); 
-  in
-  if in_nargs > 0L then  (
     main_loop ((Int64.to_int in_nargs)-1);
     List.iteri (fun index _expr ->
       let expr =  
@@ -694,20 +694,20 @@ let simple_adaptor fm out_nargs in_nargs =
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-      if !opt_trace_adaptor then
-	      Printf.printf "%s has unique value %Lx\n" 
-	        (V.exp_to_string _expr) v;
+	     if !opt_trace_adaptor then
+	       Printf.printf "%s has unique value %Lx\n" 
+	         (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
 	  | None ->
-      if !opt_trace_adaptor then
-	      Printf.printf "%s does not have unique value\n" 
-	        (V.exp_to_string _expr);
+	     if !opt_trace_adaptor then
+	       Printf.printf "%s does not have unique value\n" 
+	         (V.exp_to_string _expr);
 	    _expr
 	)
       in
       fm#set_reg_symbolic (List.nth arg_regs index) expr;
     ) !symbolic_args;
-  )
+  ) else ()
 
 (* Simple adaptor code ends here *)
 
@@ -747,87 +747,82 @@ let get_typeconv_expr src_operand src_type extend_op =
 let typeconv_adaptor fm out_nargs in_nargs =
   if !opt_trace_adaptor then
     Printf.printf "Starting typeconv adaptor\n";
-  let arg_regs = 
-    match (!opt_arch, !opt_fragments) with
-    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-    | (ARM,false) -> [R0; R1; R2; R3; R4]
-    | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-    | _ -> failwith "argregs unsupported for architecture"
-  in
-  let (size, vine_size) = 
-    match !opt_arch with 
-    | X64 -> (64, V.REG_64)
-    | ARM -> (32, V.REG_32)
-    | _ -> failwith "argregs unsupported for architecture"
-  in
+  if in_nargs > 0L then (
+    let arg_regs = 
+      match (!opt_arch, !opt_fragments) with
+      | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+      | (ARM,false) -> [R0; R1; R2; R3; R4]
+      | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+      | _ -> failwith "argregs unsupported for architecture"
+    in
+    let (size, vine_size) = 
+      match !opt_arch with 
+      | X64 -> (64, V.REG_64)
+      | ARM -> (32, V.REG_32)
+      | _ -> failwith "argregs unsupported for architecture"
+    in
   (* argument registers -- assumes SSE floating point *)
   (*let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in*)
-  let symbolic_args = ref [] in
-  let rec main_loop n =
-    let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    let var_val = if not !opt_adaptor_search_mode then 
+    let symbolic_args = ref [] in
+    let rec main_loop n =
+      let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+      let var_val = if not !opt_adaptor_search_mode then 
 	  Hashtbl.find adaptor_vals (var_name^"_val")
-      else fm#get_fresh_symbolic (var_name^"_val") size in
-    let simplify e = if not !opt_adaptor_search_mode then fm#simplify_exp e else e in
-    let var_type = if not !opt_adaptor_search_mode then 
+	else fm#get_fresh_symbolic (var_name^"_val") size in
+      let simplify e = if not !opt_adaptor_search_mode then fm#simplify_exp e else e in
+      let var_type = if not !opt_adaptor_search_mode then 
 	  Hashtbl.find adaptor_vals (var_name^"_type")
 	else fm#get_fresh_symbolic (var_name^"_type") 8 in
-    let arg =  
-      (if out_nargs = 0L then (
+      let arg =  
+	(if out_nargs = 0L then (
 	(* These extra conditions should be getting added in exec_fuzzloop 
 	   to make them get added at the beginning of each iteration *)
 	(*opt_extra_conditions :=  
           V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L)))
-			      :: !opt_extra_conditions;*)
-	var_val
-       ) 
-       else ( 
-	 let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
-	 let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
-	 let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
-	 let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
-	 let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
-	 let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
-	 let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
-	 let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
-	 let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
-	 let type_43_expr = 
-	   (get_ite_expr ite_arg_expr V.EQ vine_size 0L 
-	      (constify 0L vine_size) (constify 1L vine_size)) in 
-	 let type_13_expr = (V.BinOp(V.PLUS, ite_arg_expr, (constify 0x80000000L vine_size))) in
+	  :: !opt_extra_conditions;*)
+				var_val
+	 ) 
+	 else ( 
+	   let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
+	   let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
+	   let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
+	   let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
+	   let type_22_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_UNSIGNED) in
+	   let type_31_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_SIGNED) in
+	   let type_32_expr = (get_typeconv_expr ite_arg_expr V.REG_8 V.CAST_UNSIGNED) in
+	   let type_41_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_SIGNED) in
+	   let type_42_expr = (get_typeconv_expr ite_arg_expr V.REG_1 V.CAST_UNSIGNED) in
+	   let type_43_expr = 
+	     (get_ite_expr ite_arg_expr V.EQ vine_size 0L 
+		(constify 0L vine_size) (constify 1L vine_size)) in 
+	   let type_13_expr = (V.BinOp(V.PLUS, ite_arg_expr, (constify 0x80000000L vine_size))) in
 	 (*opt_extra_conditions :=  
 	   V.BinOp(
-             V.BITOR,
-             V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
-             V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-			       :: !opt_extra_conditions;*)
+           V.BITOR,
+           V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
+           V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
+	   :: !opt_extra_conditions;*)
 
 
-	 simplify (get_ite_expr var_type V.EQ V.REG_8 1L var_val 
-	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
-              (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
-               (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
-              (get_ite_expr var_type V.EQ V.REG_8 13L type_13_expr
-	       (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
-                (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
-	         (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
-                  (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
-	           (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
-                    (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
-	      	      type_43_expr)
-	      	  ))))))))))))
+	   simplify (get_ite_expr var_type V.EQ V.REG_8 1L var_val 
+		       (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
+			  (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
+			     (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
+				(get_ite_expr var_type V.EQ V.REG_8 13L type_13_expr
+				   (get_ite_expr var_type V.EQ V.REG_8 21L type_21_expr
+				      (get_ite_expr var_type V.EQ V.REG_8 22L type_22_expr
+					 (get_ite_expr var_type V.EQ V.REG_8 31L type_31_expr
+					    (get_ite_expr var_type V.EQ V.REG_8 32L type_32_expr
+					       (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
+						  (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
+	      					     type_43_expr)
+	      				       ))))))))))))
+      in
+      if !opt_trace_adaptor then
+	Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
+      symbolic_args := arg :: !symbolic_args;
+      if n > 0 then main_loop (n-1); 
     in
-    if !opt_trace_adaptor then
-      Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
-    symbolic_args := arg :: !symbolic_args;
-    if n > 0 then main_loop (n-1); 
-  in
-  (* if in_nargs > 0L then  (
-    main_loop ((Int64.to_int in_nargs)-1);
-    List.iteri (fun index expr ->
-	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
-  ) *)
-  if in_nargs > 0L then  (
     main_loop ((Int64.to_int in_nargs)-1);
     List.iteri (fun index _expr ->
       let expr =  
@@ -836,20 +831,20 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-      if !opt_trace_adaptor then
-	      Printf.printf "%s has unique value %Lx\n" 
-	        (V.exp_to_string _expr) v;
+	     if !opt_trace_adaptor then
+	       Printf.printf "%s has unique value %Lx\n" 
+	         (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
 	  | None -> 
-      if !opt_trace_adaptor then
-	      Printf.printf "%s does not have unique value\n" 
-	        (V.exp_to_string _expr);
+	     if !opt_trace_adaptor then
+	       Printf.printf "%s does not have unique value\n" 
+	         (V.exp_to_string _expr);
 	    _expr
 	)
       in
       fm#set_reg_symbolic (List.nth arg_regs index) expr;
     ) !symbolic_args;
-  )
+  ) else ()
 
 
 

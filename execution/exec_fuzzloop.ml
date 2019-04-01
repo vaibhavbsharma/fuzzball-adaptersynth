@@ -146,7 +146,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      in
      let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
       (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adaptor in
-      simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
+       if in_nargs > 0L then
+	 simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
      in
      (if ((List.length !opt_synth_adaptor) <> 0) then
 	 let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
@@ -154,18 +155,18 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 let var_name = "tableX" ^ (Printf.sprintf "%02x" n) in
 	 ignore(fm#get_fresh_symbolic var_name 8);
 	 if n > -1 then chartrans_loop (n-1); in
-       if mode = "simple" 
+       if mode = "simple" && in_nargs > 0L
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
-       else if mode = "typeconv"
+       else if mode = "typeconv" && in_nargs > 0L
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
-       else if (mode = "arithmetic_int")   
+       else if (mode = "arithmetic_int") && in_nargs > 0L
        then (
 	 (* if (in_nargs <> 0L) then
 	   Adaptor_synthesis.arithmetic_int_extra_conditions
 	     fm out_nargs ((Int64.to_int in_nargs)-1);) *)
 	 Adaptor_synthesis.arithmetic_int_init_sym_vars fm (Int64.to_int in_nargs);
 	 )
-       else if mode = "arithmetic_float"
+       else if mode = "arithmetic_float" && in_nargs > 0L
        then Adaptor_synthesis.arithmetic_float_extra_conditions
          fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
