@@ -765,8 +765,13 @@ let typeconv_adaptor fm out_nargs in_nargs =
   let symbolic_args = ref [] in
   let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-    let var_val = fm#get_fresh_symbolic (var_name^"_val") size in
-    let var_type = fm#get_fresh_symbolic (var_name^"_type") 8 in
+    let var_val = if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals (var_name^"_val")
+      else fm#get_fresh_symbolic (var_name^"_val") size in
+    let simplify e = if not !opt_adaptor_search_mode then fm#simplify_exp e else e in
+    let var_type = if not !opt_adaptor_search_mode then 
+	  Hashtbl.find adaptor_vals (var_name^"_type")
+	else fm#get_fresh_symbolic (var_name^"_type") 8 in
     let arg =  
       (if out_nargs = 0L then (
 	(* These extra conditions should be getting added in exec_fuzzloop 
@@ -798,7 +803,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 			       :: !opt_extra_conditions;*)
 
 
-	 get_ite_expr var_type V.EQ V.REG_8 1L var_val 
+	 simplify (get_ite_expr var_type V.EQ V.REG_8 1L var_val 
 	   (get_ite_expr var_type V.EQ V.REG_8 0L ite_arg_expr
               (get_ite_expr var_type V.EQ V.REG_8 11L type_11_expr
                (get_ite_expr var_type V.EQ V.REG_8 12L type_12_expr
@@ -810,7 +815,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	           (get_ite_expr var_type V.EQ V.REG_8 41L type_41_expr
                     (get_ite_expr var_type V.EQ V.REG_8 42L type_42_expr
 	      	      type_43_expr)
-	      	  )))))))))))
+	      	  ))))))))))))
     in
     if !opt_trace_adaptor then
       Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
