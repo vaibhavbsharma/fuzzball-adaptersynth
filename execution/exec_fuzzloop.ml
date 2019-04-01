@@ -293,7 +293,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 
      (* Populate hashtable of adaptor vars *)
      let _ =
-       if !opt_trace_struct_adaptor then
+       if !opt_trace_adaptor then
 	 Printf.printf "adaptor_vals: Iterating through %d extra conditions\n" 
 	   (List.length !opt_extra_conditions);
        List.iter ( fun cond ->
@@ -302,7 +302,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   V.Constant(V.Int(ty,value))) 
 	 | V.BinOp(V.EQ,V.Constant(V.Int(ty,value)),
 		   V.Lval(V.Temp((_, s, _)))) ->
-	   if !opt_trace_struct_adaptor then (
+	   if !opt_trace_adaptor then (
 	     if Hashtbl.mem Adaptor_vars.adaptor_vals s then 
 	       Printf.printf "adaptor_vals already had value for %s, panic!\n" s
 	     else Printf.printf "adding %s to adaptor_vals\n" s;);
