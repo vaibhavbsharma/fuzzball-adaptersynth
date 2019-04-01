@@ -740,8 +740,8 @@ struct
 	  (* If region has concrete address then fragment_machine#compare_conc_se
 	     will do the side-effect equivalence checking for this region *)
 	  if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
-	    if ind >= f2_hash_list_len then 
-	      failwith "region list became smaller after f2, panic!"
+	    if ind >= f2_hash_list_len && ((Hashtbl.length ele) <> 0) then 
+	      inequiv := 1
 	    else (
 	      Hashtbl.iter ( fun addr chunk ->
 	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
@@ -755,27 +755,28 @@ struct
 	      ) ele;
 	    ));
 	) f1_hash_list;
-	
-	(* Compare each of f2's symbolic region writes with f1 *)
-	List.iteri ( fun ind ele ->
-	  (* If region has concrete address then fragment_machine#compare_conc_se
-	     will do the side-effect equivalence checking for this region *)
-	  if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
-	    if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
-	      inequiv := 1
-	    else (
-	      Hashtbl.iter ( fun addr chunk ->
-		let f2_exp = (List.nth regions ind)#load_long addr in
-		(List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
-		let f1_exp = (List.nth regions ind)#load_long addr in
-		(List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
-		if !opt_trace_mem_snapshots = true then
-		  Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
-		    ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
-		self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
-	      ) ele;
-	    ));
-	) f2_hash_list;
+
+	if !inequiv <> 1 then (
+	  (* Compare each of f2's symbolic region writes with f1 *)
+	  List.iteri ( fun ind ele ->
+	    (* If region has concrete address then fragment_machine#compare_conc_se
+	       will do the side-effect equivalence checking for this region *)
+	    if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
+	      if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
+		inequiv := 1
+	      else (
+		Hashtbl.iter ( fun addr chunk ->
+		  let f2_exp = (List.nth regions ind)#load_long addr in
+		  (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
+		  let f1_exp = (List.nth regions ind)#load_long addr in
+		  (List.nth regions ind)#set_mem (List.nth f2_hash_list ind);
+		  if !opt_trace_mem_snapshots = true then
+		    Printf.printf "SRFM#compare_sym_se region = %d addr = %Ld f1_exp = %s f2_exp = %s\n"
+		      ind addr (D.to_string_64 f1_exp) (D.to_string_64 f2_exp);
+		  self#query_exp (D.to_symbolic_64 f1_exp) (D.to_symbolic_64 f2_exp);
+		) ele;
+	      ));
+	  ) f2_hash_list;);
 	
 	if !inequiv = 1 then
 	  ( if !opt_trace_mem_snapshots = true then
