@@ -740,8 +740,9 @@ struct
 	  (* If region has concrete address then fragment_machine#compare_conc_se
 	     will do the side-effect equivalence checking for this region *)
 	  if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
-	    if ind >= f2_hash_list_len && ((Hashtbl.length ele) <> 0) then 
-	      inequiv := 1
+	    if ind >= f2_hash_list_len then (
+	      if (Hashtbl.length ele) <> 0 then
+		inequiv := 1 else ())
 	    else (
 	      Hashtbl.iter ( fun addr chunk ->
 	      (List.nth regions ind)#set_mem (List.nth f1_hash_list ind);
@@ -762,8 +763,9 @@ struct
 	    (* If region has concrete address then fragment_machine#compare_conc_se
 	       will do the side-effect equivalence checking for this region *)
 	    if (Hashtbl.mem region_conc_addr_h (ind+1)) = false then (
-	      if (ind >= f1_hash_list_len) && ((Hashtbl.length ele) <> 0) then 
-		inequiv := 1
+	      if ind >= f1_hash_list_len then (
+		if (Hashtbl.length ele) <> 0 then
+		  inequiv := 1 else ())
 	      else (
 		Hashtbl.iter ( fun addr chunk ->
 		  let f2_exp = (List.nth regions ind)#load_long addr in
