@@ -227,6 +227,9 @@ let symbolic_state_cmdline_opts =
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
+    ("-turn-opt-off-range", Arg.String
+      (add_delimited_info_3_nolist opt_turn_opt_off_range ':'),
+    "string:addr1:addr2 Turns option 'string' off in address range addr1 to addr2");
     ("-fragments", Arg.Set(opt_fragments),
     "run adaptor synthesis assuming the target function is a code fragment");
     ("-synthesize-simple+len-adaptor", Arg.String 

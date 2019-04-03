@@ -75,6 +75,7 @@ val opt_trace_sym_addrs : bool ref
 val opt_trace_sym_addr_details : bool ref
 val opt_trace_syscalls : bool ref
 val opt_match_syscalls_addr_range : (int64 * int64 * int64 * int64 ) list ref
+val opt_turn_opt_off_range : (string * int64 * int64) ref
 val opt_ret_zero_missing_x64_syscalls : bool ref
 val opt_trace_detailed_ranges : (int64 * int64) list ref
 val opt_extra_conditions : Vine.exp list ref
@@ -214,6 +215,8 @@ val add_delimited_info_s_i_i_i :
   (string * int64 * int64 * int64) list ref -> char -> string -> unit
 val add_delimited_info_3 :
   (string * int64 * int64 ) list ref -> char -> string -> unit
+val add_delimited_info_3_nolist :
+  (string * int64 * int64 ) ref -> char -> string -> unit
 val add_delimited_simplelen_info :
   (int64 * int64 * int64 * int64 * int64) list ref -> char -> string -> unit
 val add_delimited_num_str_pair :
