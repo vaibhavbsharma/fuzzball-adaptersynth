@@ -1125,13 +1125,14 @@ struct
 	  );
       ) !opt_match_syscalls_addr_range;
       let (opt, eip1, eip2) = !opt_turn_opt_off_range in
+      if (eip1 > 0L) && (eip2 > 0L) then (
       if (String.compare opt "implied-value-conc") = 0 then (
 	if eip = eip1 then (
 	  if not !opt_implied_value_conc then (
 	    failwith "implied value conc is not turned on");
 	  opt_implied_value_conc := false)
 	else (if eip = eip2 then opt_implied_value_conc := true)
-      ) else failwith (Printf.sprintf "turning %s off in an address range is unsupported\n" opt);
+      ) else failwith (Printf.sprintf "turning %s off in an address range is unsupported\n" opt););
       self#watchpoint
 
     method reset_struct_counts = 
