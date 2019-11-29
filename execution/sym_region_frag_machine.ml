@@ -366,7 +366,7 @@ struct
 		   | AmbiguousExpr of V.exp
 		   | Symbol of V.exp
 
-  let rec classify_term form_man e =
+  let rec classify_term form_man if_weird e =
     match e with
       | V.Constant(V.Int(V.REG_32, off))
 	  when (Int64.abs (fix_s32 off)) < 0x4000L
@@ -443,8 +443,9 @@ struct
 			V.UnOp(V.NOT, V.Cast(V.CAST_SIGNED, _, _))))
       | V.Ite(_, x, y)
 	->
-	  (* ITE expression "_ ? x : y" *)
-	  (match (classify_term form_man x), (classify_term form_man y) with
+	 (* ITE expression "_ ? x : y" *)
+	 (match (classify_term form_man if_weird x),
+	   (classify_term form_man if_weird y) with
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) ->
 	       ExprOffset(e)
@@ -458,8 +459,9 @@ struct
 		V.BinOp(V.BITAND, V.UnOp(V.NOT, c2), y))
 	  when c1 = c2
 	->
-	  (* ITE expression "_ ? x : y" *)
-	  (match (classify_term form_man x), (classify_term form_man y) with
+	 (* ITE expression "_ ? x : y" *)
+	 (match (classify_term form_man if_weird x),
+	   (classify_term form_man if_weird y) with
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) ->
 		 ExprOffset(e)
@@ -471,7 +473,7 @@ struct
       | V.BinOp(V.BITAND, V.UnOp(V.NOT, V.Cast(V.CAST_SIGNED, _, _)), x)
       | V.BinOp(V.BITAND, x, V.Cast(V.CAST_SIGNED, _, _))
       | V.BinOp(V.BITAND, V.Cast(V.CAST_SIGNED, _, _), x) ->
-	  (match (classify_term form_man x) with
+	  (match (classify_term form_man if_weird x) with
 	     | (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
 	     | _ -> AmbiguousExpr(e)
 	  )
@@ -480,17 +482,18 @@ struct
       | V.BinOp(V.BITAND, x, V.Constant(V.Int(V.REG_32, off)))
 	  when (fix_u32 off) >= 0xffffff00L
 	    ->
-	  (classify_term form_man x)
+	  (classify_term form_man if_weird x)
       | V.BinOp(V.BITAND, x, V.Constant(V.Int(V.REG_64, off)))
 	  when off >= 0xffffffffffffff00L
 	    ->
-	  (classify_term form_man x)
+	  (classify_term form_man if_weird x)
 
       (* Addition inside another operation (top-level addition should
 	 be handled by split_terms) *)
       | V.BinOp(V.PLUS, e1, e2)
 	->
-	  (match (classify_term form_man e1), (classify_term form_man e2) with
+	 (match (classify_term form_man if_weird e1),
+	   (classify_term form_man if_weird e2) with
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
 	     | _,_ -> AmbiguousExpr(e))
@@ -507,9 +510,7 @@ struct
 (* 	  -> ExprOffset(e) *)
       | V.Cast(V.CAST_SIGNED, _, _) -> ExprOffset(e)
       | V.Lval(_) -> Symbol(e)
-      | _ -> if (!opt_fail_offset_heuristic) then (
-	  failwith ("Strange term "^(V.exp_to_string e)^" in address")
-	) else ExprOffset(e)
+      | e -> if_weird e
 
   (* When we're not going to try for symbolic regions, just separate
      the concrete terms from everything else; they should be the base *)
@@ -529,7 +530,7 @@ struct
     let terms = loop e in
       (!constants, terms)
 
-  let classify_terms e form_man =
+  let classify_terms e form_man if_weird =
     match (e, !opt_no_sym_regions) with
       | (V.Constant(V.Int(_, k)), _) ->
 	  (* Most common case: all concrete is a concrete base *)
@@ -544,7 +545,8 @@ struct
       | (_, _) ->
 	  if !opt_trace_sym_addr_details then
 	    Printf.printf "Analyzing addr expr %s\n" (V.exp_to_string e);
-	  let l = List.map (classify_term form_man) (split_terms e form_man) in
+	let l = List.map (classify_term form_man if_weird)
+	  (split_terms e form_man) in
 	  let (cbases, coffs, eoffs, ambig, syms) =
 	    (ref [], ref [], ref [], ref [], ref []) in
 	    List.iter
@@ -1091,6 +1093,18 @@ struct
 	       ignore(b));
 	!choices
 
+    method private handle_weird_addr_expr e =
+      if !opt_stop_on_weird_sym_addr || !opt_finish_on_weird_sym_addr then
+	(if !opt_finish_on_weird_sym_addr then
+	   (self#finish_fuzz "weird symbolic-controlled address";
+	    ExprOffset(e))
+	 else
+	   raise WeirdSymbolicAddress)
+      else if !opt_fail_offset_heuristic then
+	failwith ("Strange term "^(V.exp_to_string e)^" in address")
+      else
+	ExprOffset(e)
+
     method private region_expr e ident decide_fn =
       if !opt_check_for_null then
 	(match
@@ -1106,7 +1120,8 @@ struct
 	 offsets may create decision tree nodes. It should match with a
 	 call to dt#count_query at every return from this method. *)
       dt#start_new_query;
-      let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man in
+      let (cbases, coffs, eoffs, ambig, syms) =
+	classify_terms e form_man self#handle_weird_addr_expr in
       let eoffs = List.map simplify_fp eoffs in
 	if !opt_trace_sym_addr_details then
 	  (Printf.printf "Concrete base terms: %s\n"
@@ -1297,7 +1312,7 @@ struct
                  if !opt_trace_end_jump = (Some self#get_eip) then
                    let e = D.to_symbolic_32 (self#eval_int_exp_simplify exp) in
                    let (cbases, coffs, eoffs, ambig, syms) =
-                     classify_terms e form_man in
+                     classify_terms e form_man self#handle_weird_addr_expr in
 	             if cbases = [] && coffs = [] && eoffs = [] &&
                        ambig = [] && syms <> [] then
                        Printf.printf "Completely symbolic load\n");
@@ -1775,7 +1790,7 @@ struct
 
     method private maybe_table_or_concrete_load addr_e ty =
       let e = D.to_symbolic_32 (self#eval_int_exp_simplify addr_e) in
-      let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man in
+      let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man self#handle_weird_addr_expr in
       let cbase = List.fold_left Int64.add 0L cbases in
       let cloc = Int64.add cbase (List.fold_left Int64.add 0L coffs) in
       let off_exp = sum_list (eoffs @ ambig @ syms) in
@@ -2151,7 +2166,7 @@ struct
 
     method private maybe_table_or_concrete_store addr_e ty value =
       let e = D.to_symbolic_32 (self#eval_int_exp_simplify addr_e) in
-      let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man in
+      let (cbases, coffs, eoffs, ambig, syms) = classify_terms e form_man self#handle_weird_addr_expr in
       let cbase = List.fold_left Int64.add 0L cbases in
       let cloc = Int64.add cbase (List.fold_left Int64.add 0L coffs) in
       let off_exp = sum_list (eoffs @ ambig @ syms) in

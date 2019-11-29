@@ -29,3 +29,4 @@ exception TooManyIterations
 exception UnhandledSysCall of string
 exception UnhandledTrap
 exception UnproductivePath
+exception WeirdSymbolicAddress
