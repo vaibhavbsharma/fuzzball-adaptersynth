@@ -314,7 +314,8 @@ class virtual fragment_machine = object
   method virtual set_frag : Vine.program -> unit
   method virtual concretize_misc : unit
   method virtual add_extra_eip_hook :
-    (fragment_machine -> int64 -> unit) -> unit
+      (fragment_machine -> int64 -> unit) -> unit
+  method virtual add_range_opt : string -> bool ref -> unit
   method virtual eip_hook : int64 -> unit
   method virtual get_eip : int64
   method virtual set_eip : int64 -> unit
@@ -524,6 +525,8 @@ class virtual fragment_machine = object
   method virtual print_tree : out_channel -> unit
 
   method virtual set_iter_seed : int -> unit
+
+  method virtual random_byte : int
 
   method virtual finish_path : bool
 
@@ -1050,6 +1053,11 @@ struct
 
     val mutable insn_count = 0L
 
+    val range_opts_tbl = Hashtbl.create 2
+
+    method add_range_opt opt_str opt =
+      Hashtbl.replace range_opts_tbl opt_str opt	
+
     method eip_hook eip =
       (* Shouldn't be needed; we instead simplify the registers when
 	 writing to them: *)
@@ -1124,15 +1132,17 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
-      let (opt, eip1, eip2) = !opt_turn_opt_off_range in
-      if (eip1 > 0L) && (eip2 > 0L) then (
-      if (String.compare opt "implied-value-conc") = 0 then (
-	if eip = eip1 then (
-	  if not !opt_implied_value_conc then (
-	    failwith "implied value conc is not turned on");
-	  opt_implied_value_conc := false)
-	else (if eip = eip2 then opt_implied_value_conc := true)
-      ) else failwith (Printf.sprintf "turning %s off in an address range is unsupported\n" opt););
+      let control_range_opts opts_list range_val other_val =
+	List.iter (
+	  fun (opt_str, eip1, eip2) ->
+	    let opt = Hashtbl.find range_opts_tbl opt_str in
+	    if eip = eip1 then
+	      opt := range_val
+	    else if eip = eip2 then 
+	      opt := other_val
+	) opts_list in
+      control_range_opts !opt_turn_opt_off_range false true;
+      control_range_opts !opt_turn_opt_on_range true false;
       self#watchpoint
 
     method reset_struct_counts = 
@@ -1187,7 +1197,9 @@ struct
 	      let s = last_insn ^ "    " in
 		if (String.sub s 0 4) = "call" then
 		  "call"
-		else if (String.sub s 0 3) = "ret" then
+		else if ((String.sub s 0 3) = "ret")
+                  || ((String.length s >= 8) &&  ((String.sub s 0 8) = "repz ret"))
+                then
 		  "return"
 		else if (String.sub s 0 3) = "jmp" then
 		  "unconditional jump"
@@ -1386,8 +1398,24 @@ struct
 	reg R_SF (D.from_concrete_1 0);
 	reg R_OF (D.from_concrete_1 0);
 	reg R_ZF (D.from_concrete_1 0);
-	reg R_FTOP (D.from_concrete_32 0L);	
+	reg R_FTOP (D.from_concrete_32 7L);
 	reg R_FC3210 (D.from_concrete_32 0L);
+	reg R_FPREG0 (D.from_concrete_64 0L);
+	reg R_FPREG1 (D.from_concrete_64 0L);
+	reg R_FPREG2 (D.from_concrete_64 0L);
+	reg R_FPREG3 (D.from_concrete_64 0L);
+	reg R_FPREG4 (D.from_concrete_64 0L);
+	reg R_FPREG5 (D.from_concrete_64 0L);
+	reg R_FPREG6 (D.from_concrete_64 0L);
+	reg R_FPREG7 (D.from_concrete_64 0L);
+	reg R_FPTAG0 (D.from_concrete_8 0);
+	reg R_FPTAG1 (D.from_concrete_8 0);
+	reg R_FPTAG2 (D.from_concrete_8 0);
+	reg R_FPTAG3 (D.from_concrete_8 0);
+	reg R_FPTAG4 (D.from_concrete_8 0);
+	reg R_FPTAG5 (D.from_concrete_8 0);
+	reg R_FPTAG6 (D.from_concrete_8 0);
+	reg R_FPTAG7 (D.from_concrete_8 0);
 	reg R_RFLAGSREST (D.from_concrete_64 0L);
 	reg R_DFLAG (D.from_concrete_64 1L);
 	reg R_IDFLAG (D.from_concrete_64 0L);
@@ -1700,10 +1728,8 @@ struct
 	reg R_SF (D.from_concrete_1 0);
 	reg R_OF (D.from_concrete_1 0);
 	reg R_ZF (D.from_concrete_1 0);
-	reg R_FTOP (D.from_concrete_32 0L);
-	reg R_FC3210 (D.from_concrete_32 0L);
-	reg R_YMM0_0 (form_man#fresh_symbolic_tracked_64 "initial_ymm0_0");
-	reg R_YMM0_1 (form_man#fresh_symbolic_tracked_64 "initial_ymm0_1");
+	reg R_YMM0_0 (form_man#fresh_symbolic_64 "initial_ymm0_0");
+	reg R_YMM0_1 (form_man#fresh_symbolic_64 "initial_ymm0_1");
 	reg R_YMM0_2 (form_man#fresh_symbolic_64 "initial_ymm0_2");
 	reg R_YMM0_3 (form_man#fresh_symbolic_64 "initial_ymm0_3");
 	reg R_YMM1_0 (form_man#fresh_symbolic_tracked_64 "initial_ymm1_0");
@@ -1766,8 +1792,7 @@ struct
 	reg R_YMM15_1 (form_man#fresh_symbolic_64 "initial_ymm15_1");
 	reg R_YMM15_2 (form_man#fresh_symbolic_64 "initial_ymm15_2");
 	reg R_YMM15_3 (form_man#fresh_symbolic_64 "initial_ymm15_3");
-	reg R_SSEROUND (D.from_concrete_64 0L); (* to nearest *)
-	reg R_FTOP (D.from_concrete_32 0L);
+	reg R_FTOP (D.from_concrete_32 7L);
 	reg R_FC3210 (D.from_concrete_32 0L);
 	reg R_FPREG0 (D.from_concrete_64 0L);
 	reg R_FPREG1 (D.from_concrete_64 0L);
@@ -1950,6 +1975,20 @@ struct
       self#print_reg64 "%r13" R_R13;
       self#print_reg64 "%r14" R_R14;
       self#print_reg64 "%r15" R_R15;
+      (* Here's how you would print the low 128 bits of the low 8 XMM
+         registers, analogous to what we currently do on 32-bit. In
+         many cases on x64 though you'd really want to print 16
+         registers, and each is really 256 bits, but that would make
+         this output even more unwieldy. Leave this disabled for now.
+      self#print_reg128 "XMM0" R_YMM0_1 R_YMM0_0;
+      self#print_reg128 "XMM1" R_YMM1_1 R_YMM1_0;
+      self#print_reg128 "XMM2" R_YMM2_1 R_YMM2_0;
+      self#print_reg128 "XMM3" R_YMM3_1 R_YMM3_0;
+      self#print_reg128 "XMM4" R_YMM4_1 R_YMM4_0;
+      self#print_reg128 "XMM5" R_YMM5_1 R_YMM5_0;
+      self#print_reg128 "XMM6" R_YMM6_1 R_YMM6_0;
+      self#print_reg128 "XMM7" R_YMM7_1 R_YMM7_0;
+       *)
       self#print_reg1 "CF" R_CF;
       self#print_reg1 "PF" R_PF;
       self#print_reg1 "AF" R_AF;
@@ -2421,26 +2460,56 @@ struct
 	  (form_man#fresh_region_base_concolic name addr);
 	symbol_uniq <- symbol_uniq + 1
 
+    (* This relatively simple-looking "handle_load" method is used in
+       the concrete-only "vinegrind" tool. In full-fledged FuzzBALL it's
+       is overridden by a more complicated version in
+       sym_region_frag_machine.ml. *)
     method private handle_load addr_e ty =
       let addr = self#eval_addr_exp addr_e in
-      let v =
+      let (v, to_str) =
 	(match ty with
-	   | V.REG_8 -> self#load_byte addr
-	   | V.REG_16 -> self#load_short addr
-	   | V.REG_32 -> self#load_word addr
-	   | V.REG_64 -> self#load_long addr
+	   | V.REG_8  -> (self#load_byte addr,  D.to_string_8)
+	   | V.REG_16 -> (self#load_short addr, D.to_string_16)
+	   | V.REG_32 -> (self#load_word addr,  D.to_string_32)
+	   | V.REG_64 -> (self#load_long addr,  D.to_string_64)
 	   | _ -> failwith "Unsupported memory type") in
+	(if !opt_trace_loads then
+	   (if !opt_trace_eval then
+	      Printf.printf "    "; (* indent to match other details *)
+	    Printf.printf "Load from conc. mem ";
+	    Printf.printf "%08Lx = %s" addr (to_str v);
+	    (if !opt_use_tags then
+	       Printf.printf " (%Ld @ %08Lx)" (D.get_tag v) (self#get_eip));
+	    Printf.printf "\n"));
+	if addr >= 0L && addr < 4096L then
+	  raise NullDereference;
 	(v, ty)
 
+    (* This relatively simple-looking "handle_store" method is used in
+       the concrete-only "vinegrind" tool. In full-fledged FuzzBALL it's
+       is overridden by a more complicated version in
+       sym_region_frag_machine.ml. *)
     method private handle_store addr_e ty rhs_e =
       let addr = self#eval_addr_exp addr_e and
 	  value = self#eval_int_exp_simplify rhs_e in
+      let (_, to_str) =
 	match ty with
-	  | V.REG_8 -> self#store_byte addr value
-	  | V.REG_16 -> self#store_short addr value
-	  | V.REG_32 -> self#store_word addr value
-	  | V.REG_64 -> self#store_long addr value
-	  | _ -> failwith "Unsupported type in memory move"
+	  | V.REG_8  -> (self#store_byte  addr value, D.to_string_8)
+	  | V.REG_16 -> (self#store_short addr value, D.to_string_16)
+	  | V.REG_32 -> (self#store_word  addr value, D.to_string_32)
+	  | V.REG_64 -> (self#store_long  addr value, D.to_string_64)
+	  | _ -> failwith "Unsupported type in memory store"
+      in
+	if !opt_trace_stores then
+	  (if !opt_trace_eval then
+	     Printf.printf "    "; (* indent to match other details *)
+	   Printf.printf "Store to conc. mem ";
+	   Printf.printf "%08Lx = %s" addr (to_str value);
+	   (if !opt_use_tags then
+	      Printf.printf " (%Ld @ %08Lx)" (D.get_tag value) (self#get_eip));
+	   Printf.printf "\n");
+	if addr >= 0L && addr < 4096L then
+	  raise NullDereference
 
     method private maybe_concretize_binop op v1 v2 ty1 ty2 =
       (v1, v2)
@@ -2926,24 +2995,37 @@ struct
 		 | V.Move(V.Temp((n,s,t) as v), e) ->
 		   let tmp_func e1 = 
 		     let rhs = self#eval_int_exp_simplify e1 in
+		     let trace_eval () =
+		       Printf.printf "    %s <- %s\n" s (D.to_string_32 rhs)
+		     in
 		     if !opt_trace_eval then
-		       Printf.printf "    %s <- %s\n" s (D.to_string_32 rhs);
+		       trace_eval ()
+		     else if !opt_trace_register_updates then
+		       if String.sub s 0 1 = "T" then
+			 () (* skip updates to temps *)
+		       else if String.length s = 4 &&
+			      String.sub s 0 2 = "R_" &&
+			      String.sub s 3 1 = "F" then
+			 () (* skip updates to flags *)
+		       else
+			 trace_eval ();
 		     self#set_int_var v rhs;
 		   in
+		   (* optimization added in 881a8fc3da52775404121a83ec830165a45847a3 *)		   
 		   (match e with
 		   | V.Ite(cond, true_e, false_e) ->
-		     let (v_c, ty_c) = self#eval_int_exp_ty cond in
-		     (try 
-			let v_c_c = D.to_concrete_1 v_c in
-			let other_e = 
-			  if v_c_c = 1 then true_e else false_e in
-			(match other_e with
-			| V.Lval(V.Temp(n1, s1, t1)) ->
-			  if not (n = n1 && t = t1 && s = s1) then tmp_func e
-			| _ ->  tmp_func e);
-		      with NotConcrete _ -> tmp_func e);
+		      let (v_c, ty_c) = self#eval_int_exp_ty cond in
+		      (try 
+			 let v_c_c = D.to_concrete_1 v_c in
+			 let other_e = 
+			   if v_c_c = 1 then true_e else false_e in
+			 (match other_e with
+			 | V.Lval(V.Temp(n1, s1, t1)) ->
+			    if not (n = n1 && t = t1 && s = s1) then tmp_func e
+			 | _ ->  tmp_func e);
+		       with NotConcrete _ -> tmp_func e);
 		   | _ -> 
-		     tmp_func e);
+		      tmp_func e);
 		   loop rest
 		 | V.Move(V.Mem(memv, idx_e, ty), rhs_e) ->
 		   (match rhs_e with
@@ -2971,7 +3053,8 @@ struct
 			| Some sl -> 
 			    loop (sl @ rest)
 			| None ->
-			    Printf.printf "Unhandled special %s\n" str;
+			    Printf.printf "Unhandled special %s near 0x%Lx (%s)\n"
+			      str (self#get_eip) last_insn;
 			    failwith "Unhandled special")
 		 | V.Label(l) ->
 		     if ((String.length l > 5) && 
@@ -3353,6 +3436,7 @@ struct
     method set_query_engine (qe:Query_engine.query_engine) = ()
     method print_tree (oc:out_channel) = ()
     method set_iter_seed (i:int) = ()
+    method random_byte = Random.int 256
     method finish_path = false
     method after_exploration = ()
     method make_x86_segtables_symbolic = ()

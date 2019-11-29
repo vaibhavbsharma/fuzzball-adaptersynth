@@ -25,7 +25,12 @@ let execution_arch_of_string s =
     | "i386"|"x86" -> X86
     | "x64"|"x86-64"|"x86_64"|"amd64"|"intel64" -> X64
     | "arm" -> ARM
-    | _ -> failwith "Unrecognized architecture"
+    | _ -> failwith ("Unrecognized architecture `" ^ s ^ "'")
+
+let string_of_execution_arch = function
+  | X86 -> "x86"
+  | X64 -> "x64"
+  | ARM -> "arm"
 
 let asmir_arch_of_execution_arch = function
   | X86 -> Asmir.arch_i386
@@ -97,8 +102,9 @@ let opt_trace_sym_addrs = ref false
 let opt_trace_sym_addr_details = ref false
 let opt_trace_syscalls = ref false
 let opt_match_syscalls_addr_range = ref []
-let opt_turn_opt_off_range = ref ("", Int64.minus_one, Int64.minus_one)
 let opt_ret_zero_missing_x64_syscalls = ref false
+let opt_turn_opt_off_range = ref []
+let opt_turn_opt_on_range = ref []
 let opt_trace_detailed_ranges = ref []
 let opt_extra_conditions = ref []
 let opt_tracepoints = ref []
@@ -195,6 +201,8 @@ let opt_global_ce_cache_limit = ref 100
 let opt_disable_ce_cache = ref false
 let opt_narrow_bitwidth_cutoff = ref None
 let opt_t_expr_size = ref 10
+let opt_sanity_checks = ref false
+let opt_trace_simplify = ref false
 
 let opt_symbolic_memory = ref false
 let opt_zero_memory = ref false
@@ -209,6 +217,7 @@ let opt_check_read_operands = ref false
 let opt_check_write_operands = ref false
 let opt_fix_write_operands = ref false
 let opt_trace_registers = ref false
+let opt_trace_register_updates = ref false
 let opt_trace_segments = ref false
 let opt_trace_taint = ref false
 let opt_trace_unexpected = ref false
@@ -216,7 +225,15 @@ let opt_progress_interval = ref None
 let opt_final_pc = ref false
 let opt_solve_final_pc = ref false
 let opt_skip_untainted = ref false
+
+(* We avoid making this an option type becaue there is a lot of code
+   that matches on it, and it should always be set to a paticular
+   architecture from quite early in the run. But the behavior when the
+   -arch option is ommitted is no longer to default to X86: instead we
+   try to detect the architecture from the headers of a supplied ELF
+   executable. *)
 let opt_arch = ref X86
+
 let opt_trace_stmts = ref false
 let opt_trace_eval = ref false
 let opt_track_sym_usage = ref false
@@ -378,6 +395,23 @@ let add_delimited_int_triple opt char s=
   let (s2, s3) = split_string char s2' in
   opt := ((int_of_string s1), (int_of_string s2), (int_of_string s3))
 
+let add_delimited_triple opt char s =
+  let rec loop arg_str =
+    try 
+      let (str1, str2) = split_string char arg_str in
+      [str1] @ (loop str2)
+    with Not_found -> [arg_str]
+  in
+  let list_str = loop s in
+  if (List.length list_str) <> 3 then
+    failwith
+      (Printf.sprintf
+	 "add_delimited_triple did not find 3 delimited values in option value: %s" s);
+  opt := (List.nth list_str 0, 
+   (Int64.of_string (List.nth list_str 1)), 
+   (Int64.of_string (List.nth list_str 2))) :: !opt
+
+      
 let opt_program_name = ref None
 let opt_start_addr = ref None
 let opt_argv = ref []

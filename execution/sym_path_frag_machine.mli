@@ -73,6 +73,8 @@ sig
     method add_extra_eip_hook :
       (Fragment_machine.fragment_machine -> int64 -> unit) -> unit
 
+    method add_range_opt : string -> bool ref -> unit
+
     method eip_hook : int64 -> unit
 	  
     method finish_path : bool
@@ -81,6 +83,8 @@ sig
 
     method set_iter_seed : int -> unit
       
+    method random_byte : int
+
     method reset : unit -> unit
 
     method conc_mem_struct_adaptor: bool -> unit

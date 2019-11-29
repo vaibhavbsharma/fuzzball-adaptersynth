@@ -864,8 +864,19 @@ when special_ec_vars\n"; *)
     method private simplify_exp e =
       let e2 = self#expand_temps_1level e in
       let e3 = Frag_simplify.simplify_fp e2 in
-      if expr_size e3 < expr_size e then e3 else e
-    (* self#collapse_temps e3 *)
+      let e4 = self#collapse_temps e3 in
+	if !opt_sanity_checks && !opt_concolic_prob <> None then
+	  (let pre_val = self#eval_expr e and
+	       post_val = self#eval_expr e4
+	   in
+	     if pre_val <> post_val then
+	       let pre_str = V.exp_to_string e and
+		   post_str = V.exp_to_string e4
+	       in
+		 Printf.printf "Uh oh, %s (%Ld) 'simplified' to %s (%Ld)\n"
+		   pre_str pre_val post_str post_val;
+		 failwith "Incorrect simplification occurred");
+	e4
 
     method private simplify (v:D.t) ty =
       D.inside_symbolic
@@ -1027,11 +1038,10 @@ when special_ec_vars\n"; *)
     method tempify_exp e ty =
       let e2 = self#simplify_exp e in
       match e2 with
-      | V.Lval(V.Temp(_)) -> e2
       | V.Constant(_) -> e2
       | _ ->
 	 V.Lval(V.Temp(self#make_temp_var e2 ty))
-
+    
     method private tempify (v:D.t) ty =
       D.inside_symbolic (fun e -> self#tempify_exp e ty) v
 

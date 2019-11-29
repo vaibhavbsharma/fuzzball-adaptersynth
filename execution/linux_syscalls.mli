@@ -35,6 +35,8 @@ object
   method flags_to_oc_flags : int -> Unix.open_flag list
 
   method add_symbolic_file : string -> bool -> unit
+  method add_symbolic_fd : int -> bool -> unit
+
   method make_snap : unit
   method reset : unit
 
@@ -97,7 +99,6 @@ object
   method sys_getppid : unit -> unit
   method sys_getsid : unit -> unit
   method sys_gettid : unit
-  method sys_getrusage : int -> int64 -> unit
   method sys_getpeername : int -> int64 -> int64 -> unit
   method sys_socketpair : int -> int -> int -> int64 -> unit
   method sys_getsockname : int -> int64 -> int64 -> unit
@@ -128,7 +129,6 @@ object
   method sys_recv : int -> int64 -> int -> int -> unit
   method sys_recvfrom : int -> int64 -> int -> int -> int64 -> int64 -> unit
   method sys_shutdown: int -> int -> unit
-  method sys_recvmsg : int -> int64 -> int -> unit
   method sys_rename : string -> string -> unit
   method sys_sched_getparam : int -> int64 -> unit
   method sys_sched_get_priority_max : int -> unit
