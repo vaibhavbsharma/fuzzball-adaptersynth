@@ -500,7 +500,7 @@ struct
 
       | V.BinOp(V.XOR, e1, e2)
 	->
-	  (match (classify_term form_man e1), (classify_term form_man e2) with
+	  (match (classify_term form_man if_weird e1), (classify_term form_man if_weird e2) with
 	     | (ExprOffset(_)|ConstantOffset(_)),
 	       (ExprOffset(_)|ConstantOffset(_)) -> ExprOffset(e)
 	     | _,_ -> AmbiguousExpr(e))
@@ -1821,7 +1821,7 @@ struct
 	| V.REG_64 -> D.to_symbolic_64 (self#get_long_var_d reg)
 	| _ -> failwith "Unexpected SP type in get_esp_conc_base"
       in
-      let (cbases, _, _, _, _) = classify_terms e form_man in
+      let (cbases, _, _, _, _) = classify_terms e form_man self#handle_weird_addr_expr in
       let cbase = List.fold_left Int64.add 0L cbases in
 	cbase
 

@@ -118,8 +118,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
     
      let (size, vine_size) = match !opt_arch with
        | X64 -> (64, V.REG_64)
+       | X86 -> (32, V.REG_32)
        | ARM -> (32, V.REG_32)
-       | _ -> failwith "unsupported architecture for simple adaptor"
      in
      
      let rec simple_loop n out_nargs type_name type_size =
@@ -415,7 +415,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
 	       if (List.length !opt_synth_ret_adaptor) <> 0 then
-		 fm#reset_saved_arg_regs ;
+		 fm#reset_saved_args ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then
 		   Printf.printf "Coverage increased to %d on %Ld\n"

@@ -37,9 +37,8 @@ let call_replacements fm last_eip eip =
       (fun ret (str, addr1, val1, addr2, val2) -> 
 	let addr = match !opt_arch with 
 	  (* not a function of the architecture, just how we're doing things *)
-	  | X64 -> addr1 
+	  | X64 | X86 -> addr1 
 	  | ARM -> addr2
-	  | _ -> failwith "unsupported architecture for adaptor synthesis"
 	in
 	 if ((canon_eip addr) = (canon_eip targ)) then 
            Some (str,val1,addr2,val2) 
@@ -65,9 +64,8 @@ let call_replacements fm last_eip eip =
   in
   let my_eip = match !opt_arch with
     (* not a function of the architecture, just how we're doing things *)
-    | X64 -> last_eip
+    | X64 | X86 -> last_eip
     | ARM -> eip
-    | _ -> failwith "unsupported architecture for adaptor synthesis"
   in
     match ((lookup eip      !opt_skip_func_addr),
 	   (lookup eip      !opt_skip_func_addr_symbol),
@@ -164,7 +162,9 @@ let call_replacements fm last_eip eip =
       | (None, None, None, None, None, None, None, None, 
           Some (adaptor_mode, addr1, addr2, in_nargs), None) ->
 	if (adaptor_mode = "return-typeconv") && addr2 = eip then (
-          Some (fun () -> 
+          Some (fun () ->
+	    Printf.printf "addr2 = 0x%Lx, eip = 0x%Lx\n" addr2 eip;
+	    flush(stdout);
 	    Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
             (Some addr2))
 	)
@@ -172,7 +172,7 @@ let call_replacements fm last_eip eip =
         Some (fun () -> 
 	  if !opt_trace_adaptor then
 	    Printf.printf "exec_runloop#thunk() should save arg regs here\n";
-	  fm#save_arg_regs in_nargs;
+	  fm#save_args in_nargs;
           (Some addr1))
 	else if (adaptor_mode = "return-simple+len") && addr2 = eip then
           Some (fun () ->
@@ -180,7 +180,7 @@ let call_replacements fm last_eip eip =
 		  (Some addr2))
 	else if (adaptor_mode = "return-simple+len") && addr1 = eip then
           Some (fun () ->
-		  fm#save_arg_regs in_nargs;
+		  fm#save_args in_nargs;
 		  (Some addr1))
 	else Some (fun () ->
           Printf.printf "unsupported adaptor\n";
@@ -395,8 +395,9 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	| Some thunk ->
 	  let fake_insn = match (!opt_arch, 
                                  (Int64.logand eip 1L), thunk ()) with
-	    | (X86, _,_) -> [|'\xc3'|] (* ret *)
+	    | (X86, _,None) -> [|'\xc3'|] (* ret *)
 	    | (X64, _,None) -> [|'\xc3'|] (* ret *)
+	    | (X86, _,Some addr)
 	    | (X64, _,Some addr) ->  (* Jump to the inner function *)
 	      if addr <> eip then (
 		let in_addr = addr in

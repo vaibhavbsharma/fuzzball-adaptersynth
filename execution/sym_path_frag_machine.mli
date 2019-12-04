@@ -200,14 +200,17 @@ sig
     method make_f2_special_handlers_snap : unit
     method reset_f2_special_handlers_snap : unit
 
-    method save_arg_regs : int64 -> unit
+    method save_args : int64 -> unit
     method add_f1_store : int64 -> unit
     method add_f2_store : int64 -> unit
     method match_writes : unit -> bool
-    method get_saved_arg_regs : unit -> Vine.exp list
-    method reset_saved_arg_regs : unit
+    method get_saved_args : unit -> Vine.exp list
+    method reset_saved_args : unit
+    method add_adapted_addr: int64 -> unit
     method load_byte_symbolic  : int64 -> Vine.exp
+    method load_word_symbolic  : int64 -> Vine.exp
     method store_byte_symbolic  : int64 -> Vine.exp -> unit
+    method store_word_symbolic  : int64 -> Vine.exp -> unit
     method make_table_lookup : (Vine.exp list) -> Vine.exp -> int -> Vine.typ -> Vine.exp
     method set_word_reg_symbolic :
       Fragment_machine.register_name -> string -> unit

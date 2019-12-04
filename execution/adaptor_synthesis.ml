@@ -13,17 +13,22 @@ let adaptor_score = ref 0
  
 (*** general helper code used in multiple adaptors ***)
 
+let rec load_reg_list fm reg_list idx =
+    if idx < (List.length reg_list) then
+      [fm#get_reg_symbolic (List.nth reg_list idx)] @ (load_reg_list fm reg_list (idx+1))
+    else []
+  
 let get_ite_expr arg op const_type const then_val else_val = 
   V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
         then_val,
         else_val)
 
-let rec get_ite_arg_expr fm arg_idx idx_type regs n =
+let rec get_ite_arg_expr fm arg_idx idx_type vals n =
   if n = 1L
-  then fm#get_reg_symbolic (List.nth regs 0) 
+  then (List.nth vals 0) 
   else get_ite_expr arg_idx V.EQ idx_type (Int64.sub n 1L) 
-         (fm#get_reg_symbolic (List.nth regs ((Int64.to_int n) - 1)))
-         (get_ite_arg_expr fm arg_idx idx_type regs (Int64.sub n 1L))
+         (List.nth vals ((Int64.to_int n) - 1))
+         (get_ite_arg_expr fm arg_idx idx_type vals (Int64.sub n 1L))
     
 let constify value size = 
   V.Constant(V.Int(size, value)) 
@@ -65,7 +70,7 @@ let restrict expr expr_type restricted_range restricted_list =
    type = 1 ----> argument at the position val
    type = 2 ----> operator at position val (in int_binops @ int_unops) applied
                   to the left and right subtrees *)
-let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
+let get_arithmetic_expr fm var arg_vals val_type out_nargs get_oper_expr depth
       apply_special_conditions =
   let rec build_tree d base =
     if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
@@ -83,7 +88,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
            else 
              get_ite_expr node_type V.EQ V.REG_8 0L 
                node_val 
-               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_vals out_nargs in
                 if val_type = V.REG_32 
                 then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
                 else reg_expr)
@@ -111,7 +116,7 @@ let get_arithmetic_expr fm var arg_regs val_type out_nargs get_oper_expr depth
           get_ite_expr node_type V.EQ V.REG_8 0L 
             node_val 
             (get_ite_expr node_type V.EQ V.REG_8 1L
-               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_regs out_nargs in
+               (let reg_expr = get_ite_arg_expr fm node_val val_type arg_vals out_nargs in
                 if val_type = V.REG_32 
                 then V.Cast(V.CAST_LOW, V.REG_32, reg_expr)
                 else reg_expr) 
@@ -273,16 +278,30 @@ let int_restrict_output_list = None
 (* creates symbolic variables representing the adaptor function and encodes
    the rules for applying the adaptor function; this function is called in 
    exec_runloop *)
-let arithmetic_int_adaptor fm out_nargs in_nargs =
-  let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64) in
-  (* argument registers -- assumes x86-64 *)
-  let arg_regs = 
+let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
+  let (arg_regs, int_val_type) = 
     match (!opt_arch, !opt_fragments) with
-    | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
-    | (ARM,false) -> [R0; R1; R2; R3; R4]
-    | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+    | (X64,false) -> ([R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9], V.REG_64)
+    | (ARM,false) -> ([R0; R1; R2; R3; R4], V.REG_32)
+    | (ARM,true) -> ([R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12], V.REG_32)
+    | (X86, false) -> ([], V.REG_32)
     | _ -> failwith "argregs unsupported for architecture"
   in
+  let arg_vals = 
+    match (!opt_arch, !opt_fragments) with
+    | (X64,false)
+    | (ARM,false)
+    | (ARM,true) -> load_reg_list fm arg_regs 0
+    | (X86, false) ->
+       (* arguments are loaded directly in saved_args from the stack *)
+       let vals = ref [] in
+       let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+       for i = 0 to (Int64.to_int out_nargs)-1 do
+	 vals := !vals @
+	   [fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))];
+       done;
+       !vals
+    | _ -> failwith "arg_vals unsupported for architecture" in
   (* operators that require special handling *)
   let div_ops = [V.DIVIDE; V.SDIVIDE; V.MOD; V.SMOD] in
   let shift_ops = [V.LSHIFT; V.RSHIFT; V.ARSHIFT] in
@@ -385,7 +404,7 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
   let rec get_exprs n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     symbolic_exprs :=
-      (get_arithmetic_expr fm var_name arg_regs int_val_type out_nargs 
+      (get_arithmetic_expr fm var_name arg_vals int_val_type out_nargs 
          get_oper_expr int_arith_depth None) 
       :: !symbolic_exprs;
     if n > 0 then get_exprs (n-1) else () in
@@ -394,25 +413,27 @@ let arithmetic_int_adaptor fm out_nargs in_nargs =
     (get_exprs ((Int64.to_int in_nargs) - 1);
      List.iteri
        (fun idx expr ->
-          (*let var_name = String.make 1 (Char.chr ((Char.code 'a') + idx)) in 
-          let root_sym = fm#get_fresh_symbolic (var_name ^ "_subtree_R") 
-                           (if int_val_type = V.REG_32 then 32 else 64) in
-          fm#check_adaptor_condition (V.BinOp(V.EQ, root_sym, expr));
-          fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
-          fm#check_adaptor_condition 
-            (restrict root_sym int_val_type int_restrict_output_range 
-            int_restrict_output_list)*)
-	 (
-	if !opt_trace_adaptor then
-     Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
+         (*let var_name = String.make 1 (Char.chr ((Char.code 'a') + idx)) in 
+           let root_sym = fm#get_fresh_symbolic (var_name ^ "_subtree_R") 
+           (if int_val_type = V.REG_32 then 32 else 64) in
+           fm#check_adaptor_condition (V.BinOp(V.EQ, root_sym, expr));
+           fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
+           fm#check_adaptor_condition 
+           (restrict root_sym int_val_type int_restrict_output_range 
+           int_restrict_output_list)*)
+	 (if !opt_trace_adaptor then
+	     Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
 	  flush stdout);
-          fm#set_reg_symbolic (List.nth arg_regs idx) expr;
-          fm#check_adaptor_condition 
-            (restrict expr int_val_type int_restrict_output_range 
-               int_restrict_output_list))
-       !symbolic_exprs)
+	 (match !opt_arch with
+	 | X64 | ARM -> (fm#set_reg_symbolic (List.nth arg_regs idx) expr);
+	 | X86 ->
+	    let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	    (fm#store_word_symbolic (Int64.add args_base_addr (Int64.of_int (idx*4))) expr););
+	 fm#check_adaptor_condition 
+	   (restrict expr int_val_type int_restrict_output_range 
+              int_restrict_output_list)) !symbolic_exprs)
   else ()
-   
+ 
 let arithmetic_int_init_sym_vars fm in_nargs =
   let int_val_size = if !opt_arch = ARM then 32 else 64 in
   let rec create_arith_int_sym_vars prev_type_str prev_val_str d =
@@ -500,6 +521,10 @@ let float_restrict_counterexample_list = None
 let arithmetic_float_adaptor fm out_nargs in_nargs =
   (* argument registers -- assumes SSE floating point *)
   let arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0; R_YMM4_0; R_YMM5_0] in
+  let arg_vals = 
+    match (!opt_arch, !opt_fragments) with
+    | (X64,false) -> load_reg_list fm arg_regs 0
+    | _ -> failwith "arg_vals unsupported for architecture" in
   (* operators that require special handling *)
   let special_type = [V.FDIVIDE] in
   (* builds an expression that applies some operator to apply to l and r *)
@@ -536,7 +561,7 @@ let arithmetic_float_adaptor fm out_nargs in_nargs =
   let rec get_exprs n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
     symbolic_exprs :=
-      (get_arithmetic_expr fm var_name arg_regs float_val_type out_nargs 
+      (get_arithmetic_expr fm var_name arg_vals float_val_type out_nargs 
          get_oper_expr float_arith_depth None) :: !symbolic_exprs;
     if n > 0 then get_exprs (n-1) else () in
   (get_exprs ((Int64.to_int in_nargs) - 1);
@@ -621,19 +646,33 @@ let simple_adaptor fm out_nargs in_nargs =
   if !opt_trace_adaptor then
     Printf.printf "Starting simple adaptor (%Ld,%Ld)\n" out_nargs in_nargs;
   if in_nargs > 0L then (
-    let arg_regs = 
+    let arg_regs =
       match (!opt_arch, !opt_fragments) with
-      | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
+      | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9]
       | (ARM,false) -> [R0; R1; R2; R3; R4]
-      | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-      | _ -> failwith "argregs unsupported for architecture"
-    in
+      | (ARM,true) ->  [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
+      | (X86,false) -> []
+      | _ -> failwith "argregs unsupported for architecture" in
+    let arg_vals = 
+      match (!opt_arch, !opt_fragments) with
+      | (X64,false)
+      | (ARM,false)
+      | (ARM,true) -> load_reg_list fm arg_regs 0
+      | (X86, false) ->
+	 (* arguments are loaded directly in saved_args from the stack *)
+	 let vals = ref [] in
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	   for i = 0 to (Int64.to_int out_nargs)-1 do
+	     vals := !vals @
+	       [(fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4))))];
+	   done;
+	  !vals
+      | _ -> failwith "arg_vals unsupported for architecture" in
     let symbolic_args = ref [] in
     let (size, vine_size) = 
       match !opt_arch with 
       | X64 -> (64, V.REG_64)
-      | ARM -> (32, V.REG_32)
-      | _ -> failwith "argregs unsupported for architecture"
+      | ARM | X86 -> (32, V.REG_32)
     in
     let rec main_loop n =
       let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
@@ -658,12 +697,12 @@ let simple_adaptor fm out_nargs in_nargs =
 	       match var_val_val with
 	       | V.Constant(V.Int(vine_size, n)) ->
 		  let r = if n >= out_nargs then (Int64.pred out_nargs) else n in
-		  (fm#get_reg_symbolic (List.nth arg_regs (Int64.to_int r) ))
+		  (List.nth arg_vals (Int64.to_int r) )
 	       | _ -> failwith (Printf.sprintf "failed to get value of %s_val" var_name)
 	     ) else var_val_val
 	   ) else 
 	     get_ite_expr var_is_const V.NEQ V.REG_1 0L  
-	       var_val (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) 
+	       var_val (get_ite_arg_expr fm var_val vine_size arg_vals out_nargs) 
        (*opt_extra_conditions :=  
 	 V.BinOp(
          V.BITOR,
@@ -703,9 +742,16 @@ let simple_adaptor fm out_nargs in_nargs =
 	       Printf.printf "%s does not have unique value\n" 
 	         (V.exp_to_string _expr);
 	    _expr
-	)
-      in
-      fm#set_reg_symbolic (List.nth arg_regs index) expr;
+	) in
+      (match !opt_arch with
+      | X64 | ARM -> fm#set_reg_symbolic (List.nth arg_regs index) expr
+      | X86 ->
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
+	 if !opt_trace_adaptor then
+	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
+	 fm#add_adapted_addr arg_addr;
+	 fm#store_word_symbolic arg_addr expr);
     ) !symbolic_args;
   ) else ()
 
@@ -714,10 +760,10 @@ let simple_adaptor fm out_nargs in_nargs =
 
 (* Type conversion adaptor *)
 
-let get_ite_typeconv_expr fm arg_idx idx_type regs n =
+let get_ite_typeconv_expr fm arg_idx idx_type vals n =
   V.Cast(V.CAST_SIGNED, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, 
-		(get_ite_arg_expr fm arg_idx idx_type regs n)
+		(get_ite_arg_expr fm arg_idx idx_type vals n)
 	 )
   ) 
 
@@ -725,8 +771,7 @@ let get_typeconv_expr src_operand src_type extend_op =
   V.Cast( extend_op, 
 	 (match !opt_arch with
 	 | X64 -> V.REG_64
-	 | ARM -> V.REG_32
-	 | _ -> failwith "unsupported return register for architecture"), 
+	 | ARM | X86 -> V.REG_32), 
 	 (V.Cast(V.CAST_LOW, src_type, src_operand)) )
 
 (* 
@@ -753,13 +798,26 @@ let typeconv_adaptor fm out_nargs in_nargs =
       | (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
       | (ARM,false) -> [R0; R1; R2; R3; R4]
       | (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-      | _ -> failwith "argregs unsupported for architecture"
+      | (X86,false) -> []
+      | _ -> failwith "argregs unsupported for architecture" in
+    let arg_vals = 
+      match (!opt_arch, !opt_fragments) with
+      | (X64,false) | (ARM,false) | (ARM,true) -> load_reg_list fm arg_regs 0
+      | (X86, false) ->
+	 (* arguments are loaded directly in saved_args from the stack *)
+	 let vals = ref [] in
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	   for i = 0 to (Int64.to_int out_nargs)-1 do
+	     vals := !vals @
+	       [(fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4))))];
+	   done;
+	  !vals
+      | _ -> failwith "arg_vals unsupported for architecture"
     in
     let (size, vine_size) = 
       match !opt_arch with 
       | X64 -> (64, V.REG_64)
-      | ARM -> (32, V.REG_32)
-      | _ -> failwith "argregs unsupported for architecture"
+      | ARM | X86 -> (32, V.REG_32)
     in
   (* argument registers -- assumes SSE floating point *)
   (*let f_arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in*)
@@ -783,7 +841,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 				var_val
 	 ) 
 	 else ( 
-	   let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_regs out_nargs) in
+	   let ite_arg_expr = (get_ite_arg_expr fm var_val vine_size arg_vals out_nargs) in
 	   let type_11_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_SIGNED) in
 	   let type_12_expr = (get_typeconv_expr ite_arg_expr V.REG_32 V.CAST_UNSIGNED) in
 	   let type_21_expr = (get_typeconv_expr ite_arg_expr V.REG_16 V.CAST_SIGNED) in
@@ -842,7 +900,15 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	    _expr
 	)
       in
-      fm#set_reg_symbolic (List.nth arg_regs index) expr;
+      (match !opt_arch with
+      | X64 | ARM -> fm#set_reg_symbolic (List.nth arg_regs index) expr
+      | X86 ->
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
+	 if !opt_trace_adaptor then
+	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
+	 fm#add_adapted_addr arg_addr;
+	 fm#store_word_symbolic arg_addr expr);
     ) !symbolic_args;
   ) else ()
 
@@ -857,12 +923,13 @@ let get_ite_ftypeconv_expr ite_arg_expr =
   V.FCast(V.CAST_FWIDEN, Vine_util.ROUND_NEAREST, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, ite_arg_expr) ) 
 
-let float_typeconv_adaptor fm out_nargs_1 in_nargs_1 =
+let float_typeconv_adaptor (fm:fragment_machine) out_nargs_1 in_nargs_1 =
   Printf.printf "Starting float-typeconv adaptor\n";
   let out_nargs = (if out_nargs_1 > 4L then 4L else out_nargs_1) in
   let in_nargs = (if in_nargs_1 > 4L then 4L else in_nargs_1) in
   (* argument registers -- assumes SSE floating point *)
   let arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0] in
+  let arg_vals = load_reg_list fm arg_regs 0 in
   let symbolic_args = ref [] in
     let rec main_loop n =
     let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
@@ -876,7 +943,7 @@ let float_typeconv_adaptor fm out_nargs_1 in_nargs_1 =
 	var_val
        ) 
        else ( 
-	 let ite_arg_expr = (get_ite_arg_expr fm var_val V.REG_64 arg_regs out_nargs) in
+	 let ite_arg_expr = (get_ite_arg_expr fm var_val V.REG_64 arg_vals out_nargs) in
 	 opt_extra_conditions :=  
 	   V.BinOp(
              V.BITOR,
@@ -954,22 +1021,21 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
    type = 82 -> 1-to-64 bit zero extension on return_arg, ret_val ignored
 *)
 
-let ret_typeconv_adaptor fm in_nargs =
+let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
   let return_arg = fm#get_reg_symbolic 
     (match !opt_arch with
     | X64 -> R_RAX
     | ARM -> R0
-    | _ -> failwith "unsupported return register for architecture") in
+    | X86 -> R_EAX) in
   if !opt_trace_adaptor then
     Printf.printf "Starting return-typeconv adaptor with return_arg = %s\n"
   (V.exp_to_string return_arg);
   let (size, vine_size) = 
     match !opt_arch with 
     | X64 -> (64, V.REG_64)
-    | ARM -> (32, V.REG_32)
-    | _ -> failwith "argregs unsupported for architecture"
+    | ARM | X86 -> (32, V.REG_32)
   in
-  let saved_args_list = fm#get_saved_arg_regs () in
+  let saved_args_list = fm#get_saved_args () in
   assert((List.length saved_args_list) = (Int64.to_int in_nargs));
   let ret_type = (fm#get_fresh_symbolic ("ret_type") 8) in
   let ret_val = (fm#get_fresh_symbolic ("ret_val") size) in
@@ -1057,11 +1123,11 @@ let ret_typeconv_adaptor fm in_nargs =
   in
   if !opt_trace_adaptor then
     Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
-  fm#reset_saved_arg_regs;
+  fm#reset_saved_args;
   fm#set_reg_symbolic ( match !opt_arch with
   | X64 -> R_RAX
-  | ARM -> R0
-  | _ -> failwith "unsupported architecture for ret_typeconv adaptor") 
+  | X86 -> R_EAX
+  | ARM -> R0) 
 (* (V.Cast(V.CAST_LOW, vine_size, arg)) not very well-tested change *)
     arg
   
@@ -1079,7 +1145,7 @@ let ret_typeconv_adaptor fm in_nargs =
 let ret_simplelen_adaptor fm in_nargs =
   (*Printf.printf "Starting return-simplelen adaptor\n";*)
   assert(in_nargs <> 0L);
-  let saved_args_list = fm#get_saved_arg_regs () in
+  let saved_args_list = fm#get_saved_args () in
     assert((List.length saved_args_list) = (Int64.to_int in_nargs));
     let ret_val = fm#get_fresh_symbolic "ret_val" 64 in
     let ret_type = fm#get_fresh_symbolic "ret_type" 8 in
@@ -1110,7 +1176,7 @@ let ret_simplelen_adaptor fm in_nargs =
 	V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
 	V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
     :: !opt_extra_conditions;
-    fm#reset_saved_arg_regs;
+    fm#reset_saved_args;
     (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
     fm#set_reg_symbolic R_RAX arg
 

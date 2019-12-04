@@ -125,7 +125,9 @@ class virtual fragment_machine : object
   
   method virtual load_byte_concolic  : int64 -> int
   method virtual load_byte_symbolic  : int64 -> Vine.exp
+  method virtual load_word_symbolic  : int64 -> Vine.exp
   method virtual store_byte_symbolic  : int64 -> Vine.exp -> unit
+  method virtual store_word_symbolic  : int64 -> Vine.exp -> unit
   method virtual load_short_concolic : int64 -> int
   method virtual load_word_concolic  : int64 -> int64
   method virtual load_long_concolic  : int64 -> int64
@@ -178,9 +180,10 @@ class virtual fragment_machine : object
   method virtual get_reg_symbolic : register_name -> Vine.exp
   method virtual query_exp : Vine.exp -> Vine.exp -> unit
   method virtual simplify_exp : Vine.exp -> Vine.exp
-  method virtual save_arg_regs : int64 -> unit
-  method virtual get_saved_arg_regs : unit -> Vine.exp list
-  method virtual reset_saved_arg_regs : unit 
+  method virtual save_args : int64 -> unit
+  method virtual get_saved_args : unit -> Vine.exp list
+  method virtual reset_saved_args : unit 
+  method virtual add_adapted_addr: int64 -> unit
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
 
   method virtual make_f1_sym_snap : unit 
@@ -397,7 +400,7 @@ sig
     val mutable f1_syscalls_args: Vine.exp list
     val mutable f2_syscalls_num: int 
     val mutable f2_syscalls_arg_num: int 
-    val mutable saved_arg_regs: Vine.exp list
+    val mutable saved_args: Vine.exp list
     method get_in_f1_range: unit -> bool
     method get_in_f2_range: unit -> bool
     method add_f1_syscall_with_args: int -> Vine.exp list -> unit
@@ -424,7 +427,9 @@ sig
 
     method load_byte_concolic  : int64 -> int
     method load_byte_symbolic  : int64 -> Vine.exp
+    method load_word_symbolic  : int64 -> Vine.exp
     method store_byte_symbolic  : int64 -> Vine.exp -> unit
+    method store_word_symbolic  : int64 -> Vine.exp -> unit
     method load_short_concolic : int64 -> int
     method load_word_concolic  : int64 -> int64
     method load_long_concolic  : int64 -> int64
@@ -487,12 +492,13 @@ sig
     method get_reg_symbolic : register_name -> Vine.exp
     method query_exp : Vine.exp -> Vine.exp -> unit
     method simplify_exp : Vine.exp -> Vine.exp
-    method save_arg_regs : int64 -> unit
+    method save_args : int64 -> unit
     method add_f1_store : int64 -> unit
     method add_f2_store : int64 -> unit
     method match_writes : unit -> bool
-    method get_saved_arg_regs : unit -> Vine.exp list
-    method reset_saved_arg_regs : unit
+    method get_saved_args : unit -> Vine.exp list
+    method reset_saved_args : unit
+    method add_adapted_addr: int64 -> unit
     method set_reg_symbolic : register_name -> Vine.exp -> unit
 
     method make_f1_sym_snap : unit 

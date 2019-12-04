@@ -356,7 +356,9 @@ class virtual fragment_machine = object
 
   method virtual load_byte_concolic  : int64 -> int
   method virtual load_byte_symbolic  : int64 -> Vine.exp
+  method virtual load_word_symbolic  : int64 -> Vine.exp
   method virtual store_byte_symbolic  : int64 -> Vine.exp -> unit
+  method virtual store_word_symbolic  : int64 -> Vine.exp -> unit
   method virtual load_short_concolic : int64 -> int
   method virtual load_word_concolic  : int64 -> int64
   method virtual load_long_concolic  : int64 -> int64
@@ -409,9 +411,10 @@ class virtual fragment_machine = object
   method virtual get_reg_symbolic : register_name -> Vine.exp
   method virtual query_exp : Vine.exp -> Vine.exp -> unit
   method virtual simplify_exp : Vine.exp -> Vine.exp
-  method virtual save_arg_regs : int64 -> unit
-  method virtual get_saved_arg_regs : unit -> Vine.exp list
-  method virtual reset_saved_arg_regs : unit
+  method virtual save_args : int64 -> unit
+  method virtual get_saved_args : unit -> Vine.exp list
+  method virtual reset_saved_args : unit
+  method virtual add_adapted_addr: int64 -> unit
   method virtual set_reg_symbolic : register_name -> Vine.exp -> unit
   method virtual make_f1_sym_snap : unit 
   method virtual make_f1_conc_snap : unit 
@@ -651,7 +654,8 @@ struct
     val mutable f1_syscalls_args:(Vine.exp list) = []
     val mutable f2_syscalls_arg_num = 0
  
-    val mutable saved_arg_regs:(Vine.exp list) = []
+    val mutable saved_args:(Vine.exp list) = []
+    val mutable adapted_arg_addrs:(int64 list) = []
 
     val mutable saved_f1_rsp = 0L
     val mutable saved_f2_rsp = 0L
@@ -665,6 +669,9 @@ struct
     val mutable e_o_f1_count = ref 0
     val mutable f2_init_count = ref 0
 
+    method add_adapted_addr addr =
+      adapted_arg_addrs <- adapted_arg_addrs @ [addr]
+	
     method add_f1_store addr = 
       if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
 	( if !opt_trace_stores then
@@ -673,11 +680,13 @@ struct
 	  f1_write_addr_l <- f1_write_addr_l @ [addr] ;
 	);
       ()
-   
+
     method private is_nonlocal_addr rsp addr =
+      if List.mem addr adapted_arg_addrs then false
+	else (
       if (rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) then
 	true 
-      else false
+      else false)
 	
     method add_f2_store addr = 
       if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
@@ -696,25 +705,30 @@ struct
     method match_writes () = 
       (List.length f1_write_addr_l) = (List.length f2_write_addr_l)
 
-    method save_arg_regs nargs = 
-      (* Only works for X64 *)
-      let arg_regs = match (!opt_arch,!opt_fragments) with
+    method save_args nargs = 
+      let args = match (!opt_arch,!opt_fragments) with
 	| (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
 	| (ARM,false) -> [R0; R1; R2; R3;]
 	| (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-	| _ -> failwith "unsupported architecture for save_arg_regs";
+	| (X86,false) -> (* arguments are loaded directly in saved_args from the stack *)
+	   let args_base_addr = Int64.add (self#get_word_var R_EBP) 8L in
+	   for i = 0 to (Int64.to_int nargs)-1 do
+	     saved_args <- saved_args @
+	       [(D.to_symbolic_64 (mem#load_word (Int64.add args_base_addr (Int64.of_int (i*4)))))];
+	   done;
+	  []
+	| _ -> failwith "unsupported architecture for save_args";
       in
-      if (List.length saved_arg_regs) = 0 then (
+      if (List.length saved_args) = 0 then (
 	for i = 0 to (Int64.to_int nargs)-1 do
-	  saved_arg_regs <- saved_arg_regs@
-	    [(self#get_reg_symbolic (List.nth arg_regs i))];
+	  saved_args <- saved_args @ [(self#get_reg_symbolic (List.nth args i))];
 	done
       );
    
-    method get_saved_arg_regs () = saved_arg_regs
+    method get_saved_args () = saved_args
 
-    method reset_saved_arg_regs = 
-      saved_arg_regs <- [];
+    method reset_saved_args = 
+      saved_args <- [];
 
     method get_in_f1_range () = in_f1_range 
     
@@ -806,11 +820,11 @@ struct
     val mutable frag = ([], [])
     val mutable insns = []
 
-    method restrict_symbolic_expr arg_regs i restriction =
-      let expr = self#get_reg_symbolic (List.nth arg_regs i)
+    method restrict_symbolic_expr args i restriction =
+      let expr = self#get_reg_symbolic (List.nth args i)
                  (*D.to_symbolic_64 
                    (form_man#simplify64 
-                     (D.from_symbolic (List.nth arg_regs i)))*) in
+                     (D.from_symbolic (List.nth args i)))*) in
       let (b, choices) = self#query_condition (restriction expr) (Some true) (0x6d00+i*10) in
       (let str = match choices with
 		         | Some true -> "is true"
@@ -1000,8 +1014,12 @@ struct
         | _ -> failwith "Bad size in on_missing_symbol"
     
     method load_byte_symbolic  addr = D.to_symbolic_8 (mem#load_byte addr)
+
+    method load_word_symbolic  addr = D.to_symbolic_32 (mem#load_word addr)
   
     method store_byte_symbolic  addr b = mem#store_byte addr (D.from_symbolic b) 
+
+    method store_word_symbolic  addr w = mem#store_word addr (D.from_symbolic w) 
 
     method make_table_lookup table_vexp idx_exp idx_wd ty =
       let rec map_vexp_dt_list fn l =
@@ -1087,7 +1105,7 @@ struct
 	    saved_f1_rsp <- (match !opt_arch with
 	    | ARM -> 0L
 	    | X64 -> self#get_long_var R_RSP
-	    | _ -> failwith "unsupported architecture for adaptor synthesis");
+	    | X86 -> self#get_word_var R_ESP);
 	    in_f1_range <- true;
 	    self#make_f1_sym_snap ; 
 	    self#make_f1_conc_snap ;  
@@ -1103,7 +1121,7 @@ struct
 	    saved_f2_rsp <- (match !opt_arch with
 	    | ARM -> 0L
 	    | X64 -> self#get_long_var R_RSP
-	    | _ -> failwith "unsupported architecture for adaptor synthesis");
+	    | X86 -> self#get_word_var R_ESP);
 	    in_f2_range <- true;
 	    self#make_f2_sym_snap ;
 	    self#make_f2_conc_snap ;
@@ -2308,6 +2326,7 @@ struct
       disqualified <- false;
       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 	self#reset_syscalls ;
+      adapted_arg_addrs <- [];
       List.iter (fun h -> h#reset) special_handler_list
 
   method sym_region_struct_adaptor = 
