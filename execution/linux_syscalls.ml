@@ -774,11 +774,13 @@ object(self)
 
   method private save_sym_fd_positions = 
     Hashtbl.iter
-      (fun fd _ -> 
+      (fun fd _ ->
+	try 
 	(*fd_info.(fd).snap_pos <- 
-	 Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)*)
-	Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) 
-	  fd_info.(fd).snap_pos;
+	  Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)*)
+	  Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) 
+	    fd_info.(fd).snap_pos;
+	with Unix.Unix_error(Unix.ESPIPE, "lseek", "") -> ()
       )
       symbolic_fds
 
