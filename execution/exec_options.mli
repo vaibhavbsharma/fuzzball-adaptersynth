@@ -96,6 +96,8 @@ val opt_trace_struct_adaptor : bool ref
 val opt_trace_mem_snapshots : bool ref
 val opt_trace_adaptor : bool ref
 val opt_fragments  : bool ref
+val opt_repair_frag_start : int64 ref
+val opt_repair_frag_end : int64 ref
 val opt_dont_compare_mem_se : bool ref
 val opt_dont_compare_syscalls : bool ref
 val opt_check_store_sequence : bool ref
@@ -109,7 +111,9 @@ val opt_redirect_stderr_to_stdout: bool ref
 val opt_extra_env : (string, string) Hashtbl.t
 val opt_skip_call_addr : (int64 * int64) list ref
 val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
+val opt_synth_repair_adaptor : (string * int64) option ref
 val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
+val opt_synth_repair_ret_adaptor : (string * int64) option ref
 val opt_synth_struct_adaptor : int64 list ref
 val opt_struct_adaptor_params : (int * int * int) ref
 val opt_adaptor_search_mode : bool ref
@@ -146,7 +150,8 @@ val opt_stop_on_symbolic_syscall_args : bool ref
 val opt_skip_output_concretize : bool ref
 val opt_chroot_path : string option ref
 val opt_finish_on_nonfalse_cond : bool ref
-val opt_stop_on_nonfalse_cond : bool ref
+val opt_finish_immediately : bool ref
+val opt_disqualify_path_on_nonfalse_cond : bool ref
 val opt_finish_immediately : bool ref
 val opt_finish_reasons_needed : int ref
 val opt_total_timeout : float option ref

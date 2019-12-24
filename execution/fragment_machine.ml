@@ -61,6 +61,7 @@ let comment_is_insn s =
   (not (Hashtbl.mem skip_strings s))
   && ((String.length s < 13) || (String.sub s 0 13) <> "eflags thunk:")
 
+    
 class virtual special_handler = object(self)
   method virtual handle_special : string -> V.stmt list option
   method virtual make_snap : unit
@@ -811,8 +812,6 @@ struct
     method reset_syscalls = 
       f1_syscalls <- [];
       f2_syscalls_num <- 0;
-      in_f1_range <- false;
-      in_f2_range <- false;
       f1_syscalls_args <- [];
       f2_syscalls_arg_num <- 0;
       f1_write_addr_l <- [];
@@ -1153,6 +1152,22 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
+      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range) with
+      | (false, false, _, _) -> ()
+      | (true, _, false, false) ->
+	 Printf.printf "Setting in_f1_range to true\n";
+	flush(stdout);
+	in_f1_range <- true
+      | (_, true, true, false) ->
+	 Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
+	flush(stdout);
+	 in_f1_range <- false; in_f2_range <- true
+      | (_, true, false, true) ->
+	 Printf.printf "Setting in_f2_range to false\n";
+	flush(stdout);
+	in_f2_range <- false
+      | _ -> ());
+	
       let control_range_opts opts_list range_val other_val =
 	List.iter (
 	  fun (opt_str, eip1, eip2) ->
@@ -2306,8 +2321,9 @@ struct
 	 if !opt_finish_immediately then
 	   (Printf.eprintf "Finishing (immediately), %s\n" s;
 	    raise FinishNow);
-	 if !opt_trace_stopping then
-	   Printf.printf "Final iteration, %s\n" s)
+	 if !opt_trace_stopping then (
+	   Printf.printf "Final iteration, %s\n" s;
+	   flush(stdout););)
 
     method unfinish_fuzz s =
       fuzz_finish_reasons <- [];
@@ -2333,6 +2349,8 @@ struct
       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 	self#reset_syscalls ;
       adapted_arg_addrs <- [];
+      in_f1_range <- false;
+      in_f2_range <- false;
       List.iter (fun h -> h#reset) special_handler_list
 
   method sym_region_struct_adaptor = 
@@ -2986,6 +3004,7 @@ struct
 	function
 	  | [] -> "fallthrough"
 	  | st :: rest ->
+	     
 	      if !opt_trace_stmts then
 		(Printf.printf "  %08Lx."
 		   (try self#get_eip with NotConcrete(_) -> 0L);

@@ -62,6 +62,8 @@ let call_replacements fm last_eip eip =
 	else ret)
       None l
   in
+  let lookup_single_addr addr1 addr2 =
+    if addr1 = addr2 then Some addr1 else None in
   let my_eip = match !opt_arch with
     (* not a function of the architecture, just how we're doing things *)
     | X64 | X86 -> last_eip
@@ -76,25 +78,26 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_region),
 	   (lookup_info my_eip !opt_synth_adaptor),
 	   (lookup_ret_info eip !opt_synth_ret_adaptor),
-	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor))
+	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor),
+	   (lookup_single_addr eip !opt_repair_frag_end))
     with
-      | (None, None, None, None, None, None, None, None, None, None) -> None
-      | (Some sfa_val, None, None, None, None, None, None, None, None, None) ->
+      | (None, None, None, None, None, None, None, None, None, None, None) -> None
+      | (Some sfa_val, None, None, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> set_reg_conc ret_reg sfa_val; None)
-      | (None, Some sfas_sym, None, None, None, None, None, None, None, None) ->
+      | (None, Some sfas_sym, None, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> ignore(set_reg_fresh ret_reg sfas_sym); None)
-      | (None, None, Some sfar_sym, None, None, None, None, None, None, None) ->
+      | (None, None, Some sfar_sym, None, None, None, None, None, None, None, None) ->
 	  Some (fun () -> fm#set_reg_fresh_region ret_reg sfar_sym; None)
-      | (None, None, None, Some cfa_val, None, None, None, None, None, None) ->
+      | (None, None, None, Some cfa_val, None, None, None, None, None, None, None) ->
 	  Some (fun () -> set_reg_conc ret_reg cfa_val; None)
-      | (None, None, None, None, Some cfas_sym, None, None, None, None, None) ->
+      | (None, None, None, None, Some cfas_sym, None, None, None, None, None, None) ->
 	  Some (fun () -> ignore(set_reg_fresh ret_reg cfas_sym); None)
-      | (None, None, None, None, None, Some cfaso_sym, None, None, None, None) ->
+      | (None, None, None, None, None, Some cfaso_sym, None, None, None, None, None) ->
 	  Some (fun () -> set_reg_sym ret_reg cfaso_sym; None)
-      | (None, None, None, None, None, None, Some cfar_sym, None, None, None) ->
+      | (None, None, None, None, None, None, Some cfar_sym, None, None, None, None) ->
 	  Some (fun () -> fm#set_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
-          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None, None) ->
+          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None, None, None) ->
           (*** simple adaptor ***)
           if adaptor_mode = "simple" 
           then Some (fun () -> 
@@ -160,7 +163,7 @@ let call_replacements fm last_eip eip =
             Printf.printf "unsupported adaptor";
             (Some in_addr))
       | (None, None, None, None, None, None, None, None, 
-          Some (adaptor_mode, addr1, addr2, in_nargs), None) ->
+          Some (adaptor_mode, addr1, addr2, in_nargs), None, None) ->
 	if (adaptor_mode = "return-typeconv") && addr2 = eip then (
           Some (fun () ->
 	    Printf.printf "addr2 = 0x%Lx, eip = 0x%Lx\n" addr2 eip;
@@ -186,7 +189,7 @@ let call_replacements fm last_eip eip =
           Printf.printf "unsupported adaptor\n";
           (Some eip))
       | (None, None, None, None, None, None, None, None, None,
-	 Some (out_nargs, in_addr, in_nargs, max_depth)) ->
+	 Some (out_nargs, in_addr, in_nargs, max_depth), None) ->
 	  (* an adaptor that tries permutations of arguments as well as 
 	     permutations of length of other arguments
 	     var_type is used as follows:
@@ -297,6 +300,13 @@ let call_replacements fm last_eip eip =
 	   decision_loop ((Int64.to_int in_nargs)-1);
 	   Adaptor_synthesis.struct_adaptor fm;
            (Some in_addr))
+      | (None, None, None, None, None, None, None, None, None, None, Some addr) ->
+	 (* Reached end of target fragment to be repaired *)
+	 if (fm#get_in_f1_range ()) then Some (fun () ->
+           Printf.printf "jumping to repair-frag-start\n";
+	   flush(stdout);
+           (Some !opt_repair_frag_start))
+	 else Some (fun () -> (); (Some eip))
       | _ -> 
 	Printf.printf "eip = 0x%Lx\n" eip;
 	failwith "Contradictory replacement options"
@@ -390,6 +400,15 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       (Hashtbl.clear f2_loop_detect;);
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
+    if is_adapted_target_call_insn fm sl then (
+      if !opt_trace_adaptor then (
+	Printf.printf "applying simple repair adaptor\n";
+	flush(stdout););
+      match !opt_synth_repair_adaptor with
+      | Some (adaptor_name, nargs) when adaptor_name = "simple" -> 
+	 Adaptor_synthesis.simple_adaptor fm nargs nargs;
+      | _ -> failwith "unsupported repair adaptor"
+    );
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog
 	| Some thunk ->

@@ -154,8 +154,13 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        if in_nargs > 0L then
 	 simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
      in
-     (if ((List.length !opt_synth_adaptor) <> 0) then
-	 let (mode, _, out_nargs, _, in_nargs) = List.hd !opt_synth_adaptor in 
+     (if ((List.length !opt_synth_adaptor) <> 0) || (!opt_synth_repair_adaptor <> None) then
+	 let (mode, _, out_nargs, _, in_nargs) =
+	   if (List.length !opt_synth_adaptor) <> 0 then List.hd !opt_synth_adaptor
+	   else (match !opt_synth_repair_adaptor with
+	   | Some (mode, nargs) -> (mode, nargs, nargs, nargs, nargs)
+	   | _ -> ("", 0L, 0L, 0L, 0L) )
+	 in
        let rec chartrans_loop n = 
 	 let var_name = "tableX" ^ (Printf.sprintf "%02x" n) in
 	 ignore(fm#get_fresh_symbolic var_name 8);
@@ -361,45 +366,47 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	loop_w_stats !opt_num_paths
 	  (fun iter ->
 	     let old_tcs = Hashtbl.length trans_cache in
-	     let stop str = if !opt_trace_stopping then
+	     let stop str is_mismatch = if !opt_trace_stopping then
 	       let stop_eip = fm#get_eip in
-	         Printf.printf "Stopping %s at 0x%08Lx\n" str stop_eip
+	       Printf.printf "Stopping %s at 0x%08Lx\n" str stop_eip;
+	       if fm#get_in_f2_range () && is_mismatch then (
+		 Printf.printf "Mismatch\n"; flush(stdout););
 	     in
 	       fm#set_iter_seed (Int64.to_int iter);
 	       (try
 		  runloop fm !fuzz_start_eip asmir_gamma
 		    (fun a -> List.mem a end_eips);
 		with
-		  | SimulatedExit(_) -> stop "when program called exit()"
-		  | SimulatedAbort -> stop "when program called abort()"
-		  | KnownPath -> stop "on previously-explored path"
+		  | SimulatedExit(_) -> stop "when program called exit()" false
+		  | SimulatedAbort -> stop "when program called abort()" false
+		  | KnownPath -> stop "on previously-explored path" true
 		      (* KnownPath currently shouldn't happen *)
-		  | DeepPath -> stop "on too-deep path"
-		  | SymbolicJump -> stop "at symbolic jump"
-		  | NullDereference -> stop "at null deref"
-		  | UnsupportedAddress -> stop "at access to unsupported address"
+		  | DeepPath -> stop "on too-deep path" true
+		  | SymbolicJump -> stop "at symbolic jump" true
+		  | NullDereference -> stop "at null deref" true
+		  | UnsupportedAddress -> stop "at access to unsupported address" true
 		  | SimulatedSegfault(addr, is_store) -> stop
 		      ("at illegal " ^
 			 (if is_store then "store to" else "load from")
-		       ^ " address 0x" ^ (Printf.sprintf "%08Lx" addr))
-		  | JumpToNull -> stop "at jump to null"
-		  | DivideByZero -> stop "at division by zero"
-		  | TooManyIterations -> stop "after too many loop iterations"
-		  | UnhandledTrap -> stop "at trap"
-		  | IllegalInstruction -> stop "at bad instruction"
+		       ^ " address 0x" ^ (Printf.sprintf "%08Lx" addr)) true
+		  | JumpToNull -> stop "at jump to null" true
+		  | DivideByZero -> stop "at division by zero" true
+		  | TooManyIterations -> stop "after too many loop iterations" true
+		  | UnhandledTrap -> stop "at trap" true
+		  | IllegalInstruction -> stop "at bad instruction" true
 		  | UnhandledSysCall(s) ->
 		      Printf.printf "[trans_eval WARNING]: %s\n%!" s;
-		      stop "at unhandled system call"
-		  | SymbolicSyscall -> stop "at symbolic system call"
-		  | ReachedMeasurePoint -> stop "at measurement point"
-		  | ReachedInfluenceBound -> stop "at influence bound"
-		  | DisqualifiedPath -> stop "on disqualified path"
-		  | BranchLimit -> stop "on branch limit"
-		  | FinishNow -> stop "on finish immediately"
+		      stop "at unhandled system call" true
+		  | SymbolicSyscall -> stop "at symbolic system call" true
+		  | ReachedMeasurePoint -> stop "at measurement point" false
+		  | ReachedInfluenceBound -> stop "at influence bound" false
+		  | DisqualifiedPath -> stop "on disqualified path" true
+		  | BranchLimit -> stop "on branch limit" true
+		  | FinishNow -> stop "on finish immediately" true
 		  | SolverFailure when !opt_nonfatal_solver
-		      -> stop "on solver failure"
-		  | UnproductivePath -> stop "on unproductive path"
-		  | Signal("USR1") -> stop "on SIGUSR1"
+		      -> stop "on solver failure" true
+		  | UnproductivePath -> stop "on unproductive path" false
+		  | Signal("USR1") -> stop "on SIGUSR1" true
 		  (* | NotConcrete(_) -> () (* shouldn't happen *)
 		     | Simplify_failure(_) -> () (* shouldn't happen *)*)
 	       );

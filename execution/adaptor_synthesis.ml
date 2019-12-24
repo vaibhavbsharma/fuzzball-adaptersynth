@@ -662,11 +662,15 @@ let simple_adaptor fm out_nargs in_nargs =
 	 (* arguments are loaded directly in saved_args from the stack *)
 	 let vals = ref [] in
 	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
-	   for i = 0 to (Int64.to_int out_nargs)-1 do
-	     vals := !vals @
-	       [(fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4))))];
-	   done;
-	  !vals
+	 for i = 0 to (Int64.to_int out_nargs)-1 do
+	   let arg_exp = (fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))) in
+	   vals := !vals @ [arg_exp];
+	   if !opt_trace_adaptor then (
+	     Printf.printf "arg(%d) = %s\n" i (V.exp_to_string arg_exp);
+	     flush(stdout);
+	   );
+	 done;
+	 !vals
       | _ -> failwith "arg_vals unsupported for architecture" in
     let symbolic_args = ref [] in
     let (size, vine_size) = 

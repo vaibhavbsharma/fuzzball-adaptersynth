@@ -921,7 +921,11 @@ struct
 		     if choices <> Some false then
 		       self#finish_fuzz "supplied condition non-false"
 		     else
-		       self#unfinish_fuzz "supplied condition false"))
+		       self#unfinish_fuzz "supplied condition false");
+		  if !opt_disqualify_path_on_nonfalse_cond then
+		    if choices <> Some false then
+		      raise DisqualifiedPath else ()
+		  else ())
 	   !opt_check_condition_at);
       List.iter
 	(fun (_, t_eip) -> 

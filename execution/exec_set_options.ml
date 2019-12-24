@@ -228,8 +228,27 @@ let symbolic_state_cmdline_opts =
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
+    ("-synthesize-repair-adaptor", Arg.String
+      (fun s ->
+	let (s1,s2) = split_string ':' s in
+	opt_synth_repair_adaptor := Some (s1, Int64.of_string s2)),
+     "string:nargs Using adaptor of type 'string', "^
+       "replace any method calls in target fragment with nargs arguments"^
+       "with a method call with adapted nargs arguments");
+    ("-synthesize-repair-return-adaptor", Arg.String
+      (fun s ->
+	let (s1,s2) = split_string ':' s in
+	opt_synth_repair_ret_adaptor := Some (s1, Int64.of_string s2)),
+     "string:nargs Replace return value of any method calls in target fragment "^
+       "with an adapted return value using 'string' return value sub. adaptor");
     ("-fragments", Arg.Set(opt_fragments),
-    "run adaptor synthesis assuming the target function is a code fragment");
+     " Run adaptor synthesis assuming the target function is a code fragment");
+    ("-repair-frag-start", Arg.String
+       (fun s -> opt_repair_frag_start := Int64.of_string s),
+     " EIP where target fragment begins (target fragment is the one we want to repair)");
+    ("-repair-frag-end", Arg.String
+       (fun s -> opt_repair_frag_end := Int64.of_string s),
+     " EIP where target fragment ends (insn at this EIP is also part of target fragment)");
     ("-synthesize-simple+len-adaptor", Arg.String 
       (add_delimited_simplelen_info opt_synth_simplelen_adaptor ':'),
      "addr1:nargs1:addr2:nargs2:length Using the simple+length adaptor, "^
@@ -616,7 +635,7 @@ let cmdline_opts =
      "eip:expr Check boolean assertion at address");
     ("-finish-on-nonfalse-cond", Arg.Set(opt_finish_on_nonfalse_cond),
      " Finish exploration if -c-c-a condition could be true");
-    ("-stop-on-nonfalse-cond", Arg.Set(opt_stop_on_nonfalse_cond),
+    ("-disqualify-path-on-nonfalse-cond", Arg.Set(opt_disqualify_path_on_nonfalse_cond),
      " Terminate the execution path if -c-c-a condition could be true");
     ("-finish-reasons-needed", Arg.Set_int(opt_finish_reasons_needed),
      "n Require N finish reasons to finish");

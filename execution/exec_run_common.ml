@@ -160,8 +160,37 @@ let with_trans_cache (eip:int64) fn =
 	let (dl, sl) = (fn ()) in
 	  Hashtbl.add trans_cache eip
 	    (Frag_simplify.simplify_frag (noop_known_unknowns (dl, sl)));
-	  Hashtbl.find trans_cache eip
+	Hashtbl.find trans_cache eip
 
+let get_insn_string st =
+  let str = ref "" in
+  (match st with
+	 | V.Comment(s) ->
+	     if FM.comment_is_insn s then
+	       (str := Printf.sprintf "%s%s" !str s)
+	 | _ -> ());
+  !str
+
+(* checks if a statement in a statement list corresponds to a call insn inside the target fragment *)
+let is_adapted_target_call_insn fm sl =
+  let is_call = ref false in
+  let rec loop sl = 
+    match sl with
+    | st::rest ->
+       let str = get_insn_string st in
+       let contains_call = 
+	 try ignore (Str.search_forward (Str.regexp_string "call") str 0); true
+	 with Not_found -> false in
+       if contains_call && fm#get_in_f2_range () then (
+	 if !opt_trace_adaptor then (
+	   Printf.printf "found call in adapted target fragment\n";
+	   flush(stdout););
+	 is_call := true) else loop rest
+    | [] -> ()
+  in
+  loop sl;
+  !is_call
+    
 let print_insns start_eip (_, sl) insn_num endl =
   let eip = ref (Some start_eip) in
   let print_eip () = 
@@ -185,6 +214,7 @@ let print_insns start_eip (_, sl) insn_num endl =
       )
       sl
 
+     
 let run_one_insn fm gamma eip bytes =
   let (dl, sl) = with_trans_cache eip (fun () -> decode_insn gamma eip bytes)
   in
