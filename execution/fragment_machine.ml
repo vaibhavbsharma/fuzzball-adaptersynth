@@ -374,6 +374,9 @@ class virtual fragment_machine = object
 
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
+  method virtual read_repair_frag_inputs : unit
+  method virtual get_repair_tests_processed : int
+  method virtual inc_repair_tests_processed : int
   method virtual conc_mem_struct_adaptor: bool -> unit
   method virtual sym_region_struct_adaptor: unit
 
@@ -670,6 +673,11 @@ struct
     val mutable f1_hash : ( (int64, GM.gran64) Hashtbl.t) = Hashtbl.create 0
     val mutable f2_se = new GM.granular_hash_memory
 
+    (* return register value saved for f1, f2. Used only for repair *)
+    val mutable f1_ret_reg_val:(Vine.exp option ref) = ref None 
+    val mutable f2_ret_reg_val:(Vine.exp option ref) = ref None
+    val mutable num_repair_tests_processed:(int ref) = ref 0
+    val mutable repair_frag_inputs:(int list list) = []
     val mutable e_o_f1_count = ref 0
     val mutable f2_init_count = ref 0
 
@@ -858,6 +866,30 @@ struct
 	Printf.printf "FM#make_f1_sym_snap called\n";
       ()
 
+    method private save_f1_ret_reg =
+      f1_ret_reg_val := Some (self#get_reg_symbolic
+	(match !opt_arch with
+	| X64 -> R_RAX
+	| ARM -> R0
+	| X86 -> R_EAX))
+
+
+    method private save_f2_ret_reg =
+      f2_ret_reg_val := Some (self#get_reg_symbolic
+	(match !opt_arch with
+	| X64 -> R_RAX
+	| ARM -> R0
+	| X86 -> R_EAX))
+
+    method private compare_ret_reg_vals =
+      match (!f1_ret_reg_val, !f2_ret_reg_val) with
+      | (Some e1, Some e2) -> 
+	 let (b, _) = self#query_condition (V.BinOp(V.EQ, e1, e2)) (Some !opt_adaptor_search_mode) 0x6e00 in
+	 b
+      | (None, None) -> true
+      | _ -> false
+      
+	
     method save_f1_sym_se = 
       (* this method is implemented in SRFM *)
       if !opt_trace_mem_snapshots = true then
@@ -1155,17 +1187,42 @@ struct
       (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range) with
       | (false, false, _, _) -> ()
       | (true, _, false, false) ->
-	 Printf.printf "Setting in_f1_range to true\n";
-	flush(stdout);
-	in_f1_range <- true
+	 if !opt_trace_repair then (
+	   Printf.printf "Setting in_f1_range to true\n";
+	   flush(stdout););
+	in_f1_range <- true;
+	if !opt_adaptor_search_mode then (self#apply_target_frag_inputs;);
+	self#make_f1_sym_snap; 
+	self#make_f1_conc_snap;  
+	self#make_f1_special_handlers_snap ;
       | (_, true, true, false) ->
-	 Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
-	flush(stdout);
-	 in_f1_range <- false; in_f2_range <- true
+	 if !opt_trace_repair then (
+	   Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
+	   flush(stdout););
+	in_f1_range <- false; in_f2_range <- true;
+	self#save_f1_ret_reg ;
+	self#save_f1_sym_se ;
+	self#save_f1_conc_se ;
+	self#reset_f1_special_handlers_snap ;
+	self#make_f2_sym_snap ;
+	self#make_f2_conc_snap ;
+	self#make_f2_special_handlers_snap ;
       | (_, true, false, true) ->
-	 Printf.printf "Setting in_f2_range to false\n";
-	flush(stdout);
-	in_f2_range <- false
+	 if !opt_trace_repair then (
+	   Printf.printf "Setting in_f2_range to false\n";
+	   flush(stdout););
+	self#save_f2_ret_reg ;
+	if not self#compare_ret_reg_vals then (
+	  raise DisqualifiedPath;);
+	if !opt_dont_compare_mem_se = false then (
+	  self#compare_sym_se;
+	  self#compare_conc_se;
+	  self#reset_f2_special_handlers_snap;)
+	else (
+	  mem#reset4_3 ();
+	  saved_f1_rsp <- 0L;
+	  saved_f2_rsp <- 0L;);
+	in_f2_range <- false;
       | _ -> ());
 	
       let control_range_opts opts_list range_val other_val =
@@ -2351,6 +2408,7 @@ struct
       adapted_arg_addrs <- [];
       in_f1_range <- false;
       in_f2_range <- false;
+      num_repair_tests_processed := 0;
       List.iter (fun h -> h#reset) special_handler_list
 
   method sym_region_struct_adaptor = 
@@ -3510,6 +3568,58 @@ struct
       = self#load_long_conc addr
     method make_sink_region (s:string) (i:int64) = ()
 
+    method read_repair_frag_inputs =
+      let get_bytes_from_file filename len =
+	let ch = open_in filename in
+	let buf = Buffer.create len in
+	(try Buffer.add_channel buf ch len
+	 with End_of_file ->
+	   failwith (Printf.sprintf "failed to read %d bytes from %s file\n" len filename));
+	close_in ch;
+	Buffer.to_bytes buf
+      in
+      let (prefix, num_tests) = !opt_repair_tests_file in
+      let (_, input_size) = !opt_repair_frag_input in
+      if num_tests > 0 then (
+	for i = 0 to num_tests-1 do
+	  let file_name = prefix ^ (Printf.sprintf "%d" i) in
+	  let bytes = get_bytes_from_file file_name input_size in
+	  let rec bytes_to_ints bytes ind =
+	    if ind < Bytes.length bytes then
+	      (int_of_char (Bytes.get bytes ind)) :: (bytes_to_ints bytes (ind+1))
+	    else [] in
+	  let int_vals = bytes_to_ints bytes 0 in
+	  repair_frag_inputs <- repair_frag_inputs @ [int_vals];
+	  if !opt_trace_repair then (
+	    Printf.printf "file_name = %s, int_vals =  " file_name;
+	    for j = 0 to (List.length int_vals)-1 do
+	      Printf.printf "%d, " (List.nth int_vals j);
+	    done;
+	    Printf.printf "\n";
+	    flush(stdout););
+	done;
+      );
+
+    method private apply_target_frag_inputs =
+      let this_test_inputs = List.nth repair_frag_inputs !num_repair_tests_processed in
+      let (target_frag_input_addr, num_bytes) = !opt_repair_frag_input in
+      assert (num_bytes = List.length this_test_inputs);
+      for i = 0 to num_bytes-1 do
+	let addr = (Int64.add target_frag_input_addr (Int64.of_int i)) in
+	let value = (List.nth this_test_inputs i) in
+	self#store_byte_conc addr value;
+	if !opt_trace_repair then (
+	  Printf.printf "Wrote %d byte value to address 0x%08Lx\n" value addr;
+	  flush(stdout););
+      done;
+      ()
+	
+    method get_repair_tests_processed = !num_repair_tests_processed
+
+    method inc_repair_tests_processed =
+      num_repair_tests_processed := !num_repair_tests_processed + 1;
+      !num_repair_tests_processed
+      
      method conc_mem_struct_adaptor end_of_f1 =
       let get_ite_expr arg op const_type const then_val else_val = 
 	V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),

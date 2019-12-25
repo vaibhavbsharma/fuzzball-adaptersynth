@@ -803,8 +803,8 @@ struct
 	 adaptor_score := !adaptor_score + 1;
 	)
       else (
-	(* let q_exp = V.BinOp(V.EQ, exp1, exp2) in *)
-	let (b,_) = (false, None) (* (self#query_condition q_exp (Some true) 0x6df0)*) in
+	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
+	let (b, _) = self#query_condition q_exp (Some true) 0x6df0 in
 	if b = false then (
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "inequivalent symbolic region side-effects %s!=\n%s\n" 

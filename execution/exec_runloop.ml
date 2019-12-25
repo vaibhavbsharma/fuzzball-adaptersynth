@@ -223,7 +223,7 @@ let call_replacements fm last_eip eip =
 	     let base_addr = fm#get_long_var 
 	       (List.nth arg_regs (Int64.to_int n_arg)) in
              (*Printf.printf 
-	       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n" 
+e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n" 
 		n_arg pos base_addr;*)
 	     let b = (fm#load_byte_symbolic (Int64.add base_addr pos)) in
 	     if pos < max_depth then
@@ -302,9 +302,19 @@ let call_replacements fm last_eip eip =
            (Some in_addr))
       | (None, None, None, None, None, None, None, None, None, None, Some addr) ->
 	 (* Reached end of target fragment to be repaired *)
+	 let (_, num_total_tests) = !opt_repair_tests_file in
+	 let num_tests_processed = fm#get_repair_tests_processed in
 	 if (fm#get_in_f1_range ()) then Some (fun () ->
-           Printf.printf "jumping to repair-frag-start\n";
-	   flush(stdout);
+	   if !opt_trace_repair then (
+	     Printf.printf "jumping to repair-frag-start\n";
+	     flush(stdout););
+           (Some !opt_repair_frag_start))
+	 else if num_tests_processed < num_total_tests then Some (fun () -> 
+	   ignore(fm#inc_repair_tests_processed);
+	   if !opt_trace_repair then (
+	     Printf.printf "%d of %d tests processed, jumping to repair-frag-start\n"
+	     num_tests_processed num_total_tests;
+	     flush(stdout););
            (Some !opt_repair_frag_start))
 	 else Some (fun () -> (); (Some eip))
       | _ -> 
@@ -401,7 +411,7 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
     if is_adapted_target_call_insn fm sl then (
-      if !opt_trace_adaptor then (
+      if !opt_trace_adaptor || !opt_trace_repair then (
 	Printf.printf "applying simple repair adaptor\n";
 	flush(stdout););
       match !opt_synth_repair_adaptor with

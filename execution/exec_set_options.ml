@@ -228,6 +228,18 @@ let symbolic_state_cmdline_opts =
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
+    ("-repair-tests-file", Arg.String
+      (fun s ->
+	let (s1,s2) = split_string ':' s in
+	opt_repair_tests_file := (s1, int_of_string s2)),
+     "string:numtests Use 'string' file as prefix to 'numtests' "^
+       "test input files starting from 'string'0");
+    ("-repair-frag-input", Arg.String
+      (fun s ->
+	let (s1,s2) = split_string '+' s in
+	opt_repair_frag_input := (Int64.of_string s1, int_of_string s2)),
+     "addr:numbytes input to the repair fragment is numbytes long at address addr. "^
+       " Use this option to specify counterexample inputs during adaptor search");
     ("-synthesize-repair-adaptor", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
@@ -590,6 +602,8 @@ let cmdline_opts =
      " Print memory snapshot/reset operations");
     ("-trace-adaptor", Arg.Set(opt_trace_adaptor),
      " Print adaptor debugging statements");
+    ("-trace-repair", Arg.Set(opt_trace_repair),
+     " Print repair debugging statements");
     ("-dont-compare-memory-sideeffects", Arg.Set(opt_dont_compare_mem_se),
      " Dont compare side-effects on concrete memory and symbolic regions");
     ("-dont-compare-linux-syscalls", Arg.Set(opt_dont_compare_syscalls),
@@ -938,6 +952,7 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
        List.iter (fun (varname, size) ->
 		    fm#make_sink_region varname size)
 	 !opt_sink_regions;
+       fm#read_repair_frag_inputs;
        opt_target_region_formulas :=
 	 List.map (fun s -> fm#parse_symbolic_expr s)
 	   !opt_target_region_formula_strings;

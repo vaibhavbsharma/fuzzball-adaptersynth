@@ -523,6 +523,7 @@ struct
        0x6byy Binop concretize
        0x6cyy Adaptor expression concretize, yy is argnum*10+(type!=0 && type!=1)
        0x6dyy Syscall argument expr added by SPFM#query_condition, yy is argnum*10
+       0x6eyy Adaptor side-effect equivalence query
        0x7100 on_missing_random
        0x81yy SRFM load, base choice
        0x82yy SRFM load, offset concretize, yy is bit or 0x80 + try

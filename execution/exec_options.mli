@@ -96,8 +96,11 @@ val opt_trace_struct_adaptor : bool ref
 val opt_trace_mem_snapshots : bool ref
 val opt_trace_adaptor : bool ref
 val opt_fragments  : bool ref
+val opt_repair_frag_input : (int64 * int) ref
+val opt_trace_repair : bool ref
 val opt_repair_frag_start : int64 ref
 val opt_repair_frag_end : int64 ref
+val opt_repair_tests_file : (string * int) ref
 val opt_dont_compare_mem_se : bool ref
 val opt_dont_compare_syscalls : bool ref
 val opt_check_store_sequence : bool ref
