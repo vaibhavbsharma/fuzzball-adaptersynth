@@ -66,6 +66,7 @@ sig
     method simplify16 : D.t -> D.t
     method simplify32 : D.t -> D.t
     method simplify64 : D.t -> D.t
+    method expand_temps_1level : Vine.exp -> Vine.exp
 
     method simplify_with_callback :
       (Vine.exp -> Vine.typ -> Vine.exp option) -> D.t -> Vine.typ -> D.t

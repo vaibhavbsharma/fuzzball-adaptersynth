@@ -295,7 +295,8 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
     | (X86, false) ->
        (* arguments are loaded directly in saved_args from the stack *)
        let vals = ref [] in
-       let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+       let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	 (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
        for i = 0 to (Int64.to_int out_nargs)-1 do
 	 vals := !vals @
 	   [fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))];
@@ -427,7 +428,8 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
 	 (match !opt_arch with
 	 | X64 | ARM -> (fm#set_reg_symbolic (List.nth arg_regs idx) expr);
 	 | X86 ->
-	    let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	    let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	      (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	    (fm#store_word_symbolic (Int64.add args_base_addr (Int64.of_int (idx*4))) expr););
 	 fm#check_adaptor_condition 
 	   (restrict expr int_val_type int_restrict_output_range 
@@ -661,7 +663,8 @@ let simple_adaptor fm out_nargs in_nargs =
       | (X86, false) ->
 	 (* arguments are loaded directly in saved_args from the stack *)
 	 let vals = ref [] in
-	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 for i = 0 to (Int64.to_int out_nargs)-1 do
 	   let arg_exp = (fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))) in
 	   vals := !vals @ [arg_exp];
@@ -750,7 +753,8 @@ let simple_adaptor fm out_nargs in_nargs =
       (match !opt_arch with
       | X64 | ARM -> fm#set_reg_symbolic (List.nth arg_regs index) expr
       | X86 ->
-	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
 	 if !opt_trace_adaptor then
 	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
@@ -810,12 +814,13 @@ let typeconv_adaptor fm out_nargs in_nargs =
       | (X86, false) ->
 	 (* arguments are loaded directly in saved_args from the stack *)
 	 let vals = ref [] in
-	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
-	   for i = 0 to (Int64.to_int out_nargs)-1 do
-	     vals := !vals @
-	       [(fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4))))];
-	   done;
-	  !vals
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
+	 for i = 0 to (Int64.to_int out_nargs)-1 do
+	   vals := !vals @
+	     [(fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4))))];
+	 done;
+	 !vals
       | _ -> failwith "arg_vals unsupported for architecture"
     in
     let (size, vine_size) = 
@@ -907,7 +912,8 @@ let typeconv_adaptor fm out_nargs in_nargs =
       (match !opt_arch with
       | X64 | ARM -> fm#set_reg_symbolic (List.nth arg_regs index) expr
       | X86 ->
-	 let args_base_addr = Int64.add (fm#get_word_var R_ESP) 4L in
+	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
+	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
 	 if !opt_trace_adaptor then
 	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
@@ -1033,7 +1039,7 @@ let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
     | X86 -> R_EAX) in
   if !opt_trace_adaptor then
     Printf.printf "Starting return-typeconv adaptor with return_arg = %s\n"
-  (V.exp_to_string return_arg);
+  (V.exp_to_string return_arg); flush(stdout);
   let (size, vine_size) = 
     match !opt_arch with 
     | X64 -> (64, V.REG_64)

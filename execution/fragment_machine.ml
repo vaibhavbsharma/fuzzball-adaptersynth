@@ -375,6 +375,7 @@ class virtual fragment_machine = object
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
   method virtual read_repair_frag_inputs : unit
+  method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
   method virtual inc_repair_tests_processed : int
   method virtual conc_mem_struct_adaptor: bool -> unit
@@ -717,13 +718,15 @@ struct
     method match_writes () = 
       (List.length f1_write_addr_l) = (List.length f2_write_addr_l)
 
-    method save_args nargs = 
+    method save_args nargs =
+      if !opt_trace_repair || !opt_trace_adaptor then (Printf.printf "saving %Ld args\n" nargs; flush(stdout););
       let args = match (!opt_arch,!opt_fragments) with
 	| (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
 	| (ARM,false) -> [R0; R1; R2; R3;]
 	| (ARM,true) -> [R0; R1; R2; R3; R4; R5; R6; R7; R8; R9; R10; R11; R12]
-	| (X86,false) -> (* arguments are loaded directly in saved_args from the stack *)
-	   let args_base_addr = Int64.add (self#get_word_var R_EBP) 8L in
+	| (X86,false) -> (* arguments are loaded from the stack *)
+	   let args_base_addr = Int64.add (self#get_word_var R_ESP)
+	     (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L)  in
 	   for i = 0 to (Int64.to_int nargs)-1 do
 	     saved_args <- saved_args @
 	       [(D.to_symbolic_64 (mem#load_word (Int64.add args_base_addr (Int64.of_int (i*4)))))];
@@ -736,6 +739,7 @@ struct
 	  saved_args <- saved_args @ [(self#get_reg_symbolic (List.nth args i))];
 	done
       );
+      if !opt_trace_repair || !opt_trace_adaptor then (Printf.printf "saved %d args\n" (List.length saved_args); flush(stdout););
    
     method get_saved_args () = saved_args
 
@@ -882,10 +886,15 @@ struct
 	| X86 -> R_EAX))
 
     method private compare_ret_reg_vals =
+      assert(not !opt_verify_adaptor);
       match (!f1_ret_reg_val, !f2_ret_reg_val) with
-      | (Some e1, Some e2) -> 
-	 let (b, _) = self#query_condition (V.BinOp(V.EQ, e1, e2)) (Some !opt_adaptor_search_mode) 0x6e00 in
-	 b
+      | (Some e1, Some e2) ->
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: f1_ret_reg_val = %s, f2_ret_reg_val = %s\n"
+	     (V.exp_to_string e1) (V.exp_to_string e2);
+	   flush(stdout););
+	let (b, _) = self#query_condition (V.BinOp(V.EQ, e1, e2)) (Some !opt_adaptor_search_mode) 0x6e00 in
+	b
       | (None, None) -> true
       | _ -> false
       
@@ -1184,9 +1193,14 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
-      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range) with
-      | (false, false, _, _) -> ()
-      | (true, _, false, false) ->
+      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range, !opt_verify_adaptor) with
+      | (false, false, _, _, _) -> ()
+      | (true, _, false, false, true) ->
+	 if !opt_trace_repair then (
+	   Printf.printf "Setting in_f2_range = true because verify_adapter=true\n";
+	   flush(stdout););
+	in_f1_range <- false; in_f2_range <- true;
+      | (true, _, false, false, false) ->
 	 if !opt_trace_repair then (
 	   Printf.printf "Setting in_f1_range to true\n";
 	   flush(stdout););
@@ -1195,7 +1209,7 @@ struct
 	self#make_f1_sym_snap; 
 	self#make_f1_conc_snap;  
 	self#make_f1_special_handlers_snap ;
-      | (_, true, true, false) ->
+      | (_, true, true, false, false) ->
 	 if !opt_trace_repair then (
 	   Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
 	   flush(stdout););
@@ -1207,7 +1221,7 @@ struct
 	self#make_f2_sym_snap ;
 	self#make_f2_conc_snap ;
 	self#make_f2_special_handlers_snap ;
-      | (_, true, false, true) ->
+      | (_, true, false, true, false) ->
 	 if !opt_trace_repair then (
 	   Printf.printf "Setting in_f2_range to false\n";
 	   flush(stdout););
@@ -1223,6 +1237,10 @@ struct
 	  saved_f1_rsp <- 0L;
 	  saved_f2_rsp <- 0L;);
 	in_f2_range <- false;
+	Printf.printf "Match\n"; flush(stdout);
+	let (_, num_total_tests) = !opt_repair_tests_file in
+	if self#get_repair_tests_processed = num_total_tests then (
+	  Printf.printf "All tests succeeded!\n"; flush(stdout);)
       | _ -> ());
 	
       let control_range_opts opts_list range_val other_val =
@@ -3568,6 +3586,54 @@ struct
       = self#load_long_conc addr
     method make_sink_region (s:string) (i:int64) = ()
 
+    method read_wrong_adapters =
+      (* taken from https://stackoverflow.com/questions/5774934/how-do-i-read-in-lines-from-a-text-file-in-ocaml *)
+      let read_file filename =
+	let lines = ref [] in
+	let chan = open_in filename in
+	try
+	  while true; do
+	    lines := input_line chan :: !lines
+	  done; !lines
+	with End_of_file ->
+	  close_in chan;
+	  List.rev !lines
+      in
+      let wrong_argsub_adapters = ref [] in
+      if !opt_wrong_argsub_adapters_file <> "" && !opt_adaptor_search_mode then (
+	let lines = read_file !opt_wrong_argsub_adapters_file in
+	for i = 0 to (List.length lines) - 1 do
+	  let line = List.nth lines i in
+	  let adapter_str_list = String.split_on_char ',' line in
+	  let adapter_int64_list = List.map (fun s -> Int64.of_string s) adapter_str_list in
+	  wrong_argsub_adapters := !wrong_argsub_adapters @ [adapter_int64_list];
+	done;
+      );
+      let wrong_ret_adapters = ref [] in
+      if !opt_wrong_ret_adapters_file <> "" && !opt_adaptor_search_mode then (
+	let lines = read_file !opt_wrong_ret_adapters_file in
+	for i = 0 to (List.length lines) - 1 do
+	  let line = List.nth lines i in
+	  let adapter_str_list = String.split_on_char ',' line in
+	  let adapter_int64_list = List.map (fun s -> Printf.printf "convert %s to int64\n" s; flush(stdout); Int64.of_string s) adapter_str_list in
+	  wrong_ret_adapters := !wrong_ret_adapters @ [adapter_int64_list];
+	done;
+      );
+      assert ((List.length !wrong_argsub_adapters) = (List.length !wrong_ret_adapters));
+      assert ((List.length !wrong_argsub_adapters) = 0 || !opt_adaptor_search_mode); 
+      if !opt_trace_repair then (
+	Printf.printf "wrong adapters: ";
+	for i = 0 to (List.length !wrong_argsub_adapters)-1 do
+	  let wrong_argsub_adapter = List.nth !wrong_argsub_adapters i in
+	  let wrong_ret_adapter = List.nth !wrong_ret_adapters i in
+	  Printf.printf "argsub: ";
+	  List.iter (fun i -> Printf.printf "%Ld," i) wrong_argsub_adapter;
+	  Printf.printf "\nretvalsub: ";
+	  List.iter (fun i -> Printf.printf "%Ld," i) wrong_ret_adapter;
+	  Printf.printf "\n";
+	  flush(stdout);
+	done;);
+      
     method read_repair_frag_inputs =
       let get_bytes_from_file filename len =
 	let ch = open_in filename in

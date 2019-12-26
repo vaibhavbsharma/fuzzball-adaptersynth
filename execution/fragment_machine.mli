@@ -143,6 +143,7 @@ class virtual fragment_machine : object
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
   method virtual read_repair_frag_inputs : unit
+  method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
   method virtual inc_repair_tests_processed : int
   method virtual conc_mem_struct_adaptor: bool -> unit
@@ -451,6 +452,7 @@ sig
     method make_snap : unit -> unit
     method reset : unit -> unit
     method read_repair_frag_inputs : unit
+    method read_wrong_adapters: unit
     method get_repair_tests_processed : int
     method inc_repair_tests_processed : int
     method conc_mem_struct_adaptor: bool -> unit

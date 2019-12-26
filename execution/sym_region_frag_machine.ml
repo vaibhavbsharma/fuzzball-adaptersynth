@@ -841,17 +841,16 @@ struct
       (* We dont allow a region-creating expression to be set to NULL 
 	 on this execution path while limiting this query to only once
 	 per execution path *)
+      let vine_size = match !opt_arch with
+	| X86 
+	| ARM -> V.REG_32
+	| X64 -> V.REG_64 in
       (try 
 	 let _ = Hashtbl.find region_val_queried e in
 	 if !opt_trace_regions then
 	   Printf.printf "SRFM#region_for found in region_val_queried expr = %s\n"
 	     (V.exp_to_string e);
        with Not_found ->
-	 let vine_size = match !opt_arch with
-	   | X86 
-	   | ARM -> V.REG_32
-	   | X64 -> V.REG_64
-	 in
 	 let (b_is_regexp_null,_) = self#query_condition 
 	   (V.BinOp(V.NEQ, e, V.Constant(V.Int(vine_size, 0L))))
 	   (Some true) 0x6d01 in
@@ -871,11 +870,20 @@ struct
       with Not_found ->
 	(* Try to eagerly concretize this address expression if it is a ITE expression *)
 	let const = ref [] in
+	let add_const _const =
+	  (* if a concrete address has already been used for eager
+	     concretization of region R, then add to the tail of const
+	     so that it does not force this region to be equal to region R *)
+	  if Hashtbl.length conc_addr_region_h = 0 || 
+	    Hashtbl.mem conc_addr_region_h _const then
+	    const := !const @ [_const] 
+	  else const := _const :: !const in
 	let rec loop e =
 	  match e with
 	  | V.BinOp(op, e1, e2) -> V.BinOp(op, e1, e2)
-	  | V.Constant(V.Int(V.REG_64, _const)) ->
-	     let starting_sane_addr = 0x42420000L in (* assuming this value is used in synth-argsub.pl, synth-typeconv.pl, synth-arithmetic.ml *)
+	  | V.Constant(V.Int(vine_size, _const)) ->
+	     if !opt_repair_frag_start = Int64.minus_one then (
+	       let starting_sane_addr = 0x42420000L in (* assuming this value is used in synth-argsub.pl, synth-typeconv.pl, synth-arithmetic.ml *)
 	     let max_steps = 10000L in (* assuming we would never run more than 10K CE searches *)
 	     let const_val = (Int64.abs (fix_s32 _const)) in
 	     if (const_val >= starting_sane_addr) &&
@@ -884,22 +892,24 @@ struct
 				  (match !opt_region_limit with
 				  | Some region_limit -> region_limit
 				  | None -> 0L)))) then (
-	      (* if a concrete address has already been used for eager
-		 concretization of region R, then add to the tail of const
-		 so that it does not force this region to be equal to region R *)
-	       if Hashtbl.length conc_addr_region_h = 0 || 
-		 Hashtbl.mem conc_addr_region_h _const then
-		 const := !const @ [_const] 
-	       else const := _const :: !const );
-	    V.Constant(V.Int(V.REG_64, _const))
+	      add_const _const );)
+	     else if _const >= 4096L then (
+	       if !opt_trace_repair then (
+		 Printf.printf "repair: adding 0x%08Lx as const\n" _const; flush(stdout););
+	       add_const _const);
+	    V.Constant(V.Int(vine_size, _const))
 	  | V.Ite(ce, te, fe) ->
 	     V.Ite((loop ce), (loop te), (loop fe))
+	  (*| V.Lval(V.Temp((i,s,ty))) ->
+	     Printf.printf "SRFM#expanding %s\n" (V.exp_to_string (V.Lval(V.Temp((i,s,ty)))));
+	    flush(stdout);
+	    loop (form_man#expand_temps_1level (V.Lval(V.Temp((i,s,ty)))))*)
 	  | _ -> e
 	in
 	let conc_addr = ref 0L in
 	let _ = loop e in
 	List.iter ( fun _conc_addr -> 
-	  let exp = V.BinOp(V.EQ, e, V.Constant(V.Int(V.REG_64, _conc_addr))) in
+	  let exp = V.BinOp(V.EQ, e, V.Constant(V.Int(vine_size, _conc_addr))) in
 	  let (b,_) = self#query_condition exp (Some true) 0x6dfe in
 	  if b = true then ( (* save this region's concrete value *)
 	    if !opt_trace_regions then
@@ -944,7 +954,7 @@ struct
 	   new_region := rnum';
 	   if !opt_trace_regions then
 	     Printf.printf "made fresh region when conc_addr = 0x%Lx\n" !conc_addr;);
-	if !opt_adaptor_search_mode = false then (
+	if !opt_adaptor_search_mode = false && not !opt_verify_adaptor then (
 	  match e with
 	  | V.Lval(V.Temp((i,s,ty))) when 
 	      (((String.length s) = 1) && ((Char.code s.[0]) - (Char.code 'a') < 6)) -> 

@@ -304,19 +304,25 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	 (* Reached end of target fragment to be repaired *)
 	 let (_, num_total_tests) = !opt_repair_tests_file in
 	 let num_tests_processed = fm#get_repair_tests_processed in
+	 if !opt_trace_repair then (
+	   Printf.printf "%d of %d tests processed\n"
+	     num_tests_processed num_total_tests;
+	   flush(stdout););
 	 if (fm#get_in_f1_range ()) then Some (fun () ->
 	   if !opt_trace_repair then (
 	     Printf.printf "jumping to repair-frag-start\n";
 	     flush(stdout););
            (Some !opt_repair_frag_start))
-	 else if num_tests_processed < num_total_tests then Some (fun () -> 
+	 else (
+	   assert (fm#get_in_f2_range ());
 	   ignore(fm#inc_repair_tests_processed);
-	   if !opt_trace_repair then (
-	     Printf.printf "%d of %d tests processed, jumping to repair-frag-start\n"
-	     num_tests_processed num_total_tests;
-	     flush(stdout););
-           (Some !opt_repair_frag_start))
-	 else Some (fun () -> (); (Some eip))
+	   if fm#get_repair_tests_processed < num_total_tests then Some (fun () -> 
+	     if !opt_trace_repair then (
+	       Printf.printf "%d of %d tests processed, jumping to repair-frag-start\n"
+		 num_tests_processed num_total_tests;
+	       flush(stdout););
+             (Some !opt_repair_frag_start))
+	   else Some (fun () -> (); (Some eip)));
       | _ -> 
 	Printf.printf "eip = 0x%Lx\n" eip;
 	failwith "Contradictory replacement options"
@@ -410,14 +416,21 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       (Hashtbl.clear f2_loop_detect;);
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
+    let nargs = ref 0L in
     if is_adapted_target_call_insn fm sl then (
       if !opt_trace_adaptor || !opt_trace_repair then (
 	Printf.printf "applying simple repair adaptor\n";
 	flush(stdout););
       match !opt_synth_repair_adaptor with
-      | Some (adaptor_name, nargs) when adaptor_name = "simple" -> 
-	 Adaptor_synthesis.simple_adaptor fm nargs nargs;
+      | Some (adaptor_name, _nargs) when adaptor_name = "simple" ->
+	 nargs := _nargs;
+	 Adaptor_synthesis.simple_adaptor fm !nargs !nargs;
+      (* if !opt_synth_repair_ret_adaptor <> None then (fm#save_args !nargs); *)
       | _ -> failwith "unsupported repair adaptor"
+    );
+    if eip = !opt_repair_frag_end && fm#get_in_f2_range () then (
+      (* turning off return adaptor that also tries to plug in an argument as the return value *)
+      Adaptor_synthesis.ret_typeconv_adaptor fm 0L; 
     );
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog

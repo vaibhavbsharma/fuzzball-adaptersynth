@@ -774,7 +774,7 @@ when special_ec_vars\n"; *)
        t3 will be expanded, but t1 will not be expanded. The motivation
        for this is to expand just enough to let simplification rules
        consistently apply. *)
-    method private expand_temps_1level e =
+    method expand_temps_1level e =
       let to_expand = V.VarHash.create 21 in
       let rec collect e = match e with
 	| V.BinOp(_, e1, e2) -> collect e1; collect e2

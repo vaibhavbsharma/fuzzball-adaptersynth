@@ -422,7 +422,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		 fm#reset_struct_counts;
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
-	       if (List.length !opt_synth_ret_adaptor) <> 0 then
+	       if (List.length !opt_synth_ret_adaptor) <> 0 || !opt_synth_repair_ret_adaptor <> None then
 		 fm#reset_saved_args ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then

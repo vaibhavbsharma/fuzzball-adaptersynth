@@ -228,12 +228,20 @@ let symbolic_state_cmdline_opts =
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
+    ("-verify-adaptor", Arg.Set(opt_verify_adaptor),
+     " Verifies an adapter provided using -synthesize-adaptor and/or -synthesize-ret-adaptor");
     ("-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
 	opt_repair_tests_file := (s1, int_of_string s2)),
      "string:numtests Use 'string' file as prefix to 'numtests' "^
        "test input files starting from 'string'0");
+    ("-wrong-argsub-adapters-file", Arg.String
+      (fun s -> opt_wrong_argsub_adapters_file := s),
+     "string wrong argsub adapters are in a file named 'string'");
+    ("-wrong-ret-adapters-file", Arg.String
+      (fun s -> opt_wrong_ret_adapters_file := s),
+     "string wrong retvalsub adapters are in a file named 'string'");
     ("-repair-frag-input", Arg.String
       (fun s ->
 	let (s1,s2) = split_string '+' s in
@@ -953,6 +961,7 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
 		    fm#make_sink_region varname size)
 	 !opt_sink_regions;
        fm#read_repair_frag_inputs;
+       fm#read_wrong_adapters;
        opt_target_region_formulas :=
 	 List.map (fun s -> fm#parse_symbolic_expr s)
 	   !opt_target_region_formula_strings;
