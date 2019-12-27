@@ -15,7 +15,7 @@ open Sym_region_frag_machine;;
 open Exec_run_common;;
 open Exec_runloop;;
 open Exec_stats;;
-open Adaptor_synthesis;;
+open Adapter_synthesis;;
 
 let loop_w_stats count fn =
   let iter = ref 0L and
@@ -149,15 +149,15 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 (List.length !opt_extra_conditions) n out_nargs (V.exp_to_string tmp_cond);*)
        if n > 0 then simple_loop (n-1) out_nargs type_name type_size; 
      in
-     let _ = (if (List.length !opt_synth_simplelen_adaptor) <> 0 then
-      (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adaptor in
+     let _ = (if (List.length !opt_synth_simplelen_adapter) <> 0 then
+      (let (_,out_nargs,_,in_nargs,_) = List.hd !opt_synth_simplelen_adapter in
        if in_nargs > 0L then
 	 simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8)) 
      in
-     (if ((List.length !opt_synth_adaptor) <> 0) || (!opt_synth_repair_adaptor <> None) then
+     (if ((List.length !opt_synth_adapter) <> 0) || (!opt_synth_repair_adapter <> None) then
 	 let (mode, _, out_nargs, _, in_nargs) =
-	   if (List.length !opt_synth_adaptor) <> 0 then List.hd !opt_synth_adaptor
-	   else (match !opt_synth_repair_adaptor with
+	   if (List.length !opt_synth_adapter) <> 0 then List.hd !opt_synth_adapter
+	   else (match !opt_synth_repair_adapter with
 	   | Some (mode, nargs) -> (mode, nargs, nargs, nargs, nargs)
 	   | _ -> ("", 0L, 0L, 0L, 0L) )
 	 in
@@ -172,18 +172,18 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
        else if (mode = "arithmetic_int") && in_nargs > 0L
        then (
 	 (* if (in_nargs <> 0L) then
-	   Adaptor_synthesis.arithmetic_int_extra_conditions
+	   Adapter_synthesis.arithmetic_int_extra_conditions
 	     fm out_nargs ((Int64.to_int in_nargs)-1);) *)
-	 Adaptor_synthesis.arithmetic_int_init_sym_vars fm (Int64.to_int in_nargs);
+	 Adapter_synthesis.arithmetic_int_init_sym_vars fm (Int64.to_int in_nargs);
 	 )
        else if mode = "arithmetic_float" && in_nargs > 0L
-       then Adaptor_synthesis.arithmetic_float_extra_conditions
+       then Adapter_synthesis.arithmetic_float_extra_conditions
          fm out_nargs ((Int64.to_int in_nargs)-1)
        else if mode = "chartrans"
        then chartrans_loop 255
-       else (Printf.printf "Unsupported adaptor mode\n"; flush stdout));
+       else (Printf.printf "Unsupported adapter mode\n"; flush stdout));
      
-     let (_, i_n_fields, _) = !opt_struct_adaptor_params in 
+     let (_, i_n_fields, _) = !opt_struct_adapter_params in 
      for i = 1 to i_n_fields do
        ignore(fm#get_fresh_symbolic (Printf.sprintf "m%d_arith" i) 64);
        ignore(fm#get_fresh_symbolic (Printf.sprintf "c%d_arith" i) 64);
@@ -230,7 +230,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 				  V.BinOp(V.LE, j_start_b, i_end_b), 
 				  V.BinOp(V.LE, i_end_b,   j_end_b)) in
 	   let tmp_cond2 = V.UnOp(V.NOT, V.BinOp(V.BITOR, expr_s_b, expr_e_b)) in
-	   if !opt_trace_adaptor then
+	   if !opt_trace_adapter then
 	     Printf.printf "exec_fuzzloop adding tmp_cond2 = %s\n"
 	       (V.exp_to_string tmp_cond2);
 	   opt_extra_conditions := tmp_cond2 :: !opt_extra_conditions; 
@@ -249,7 +249,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 			       V.BinOp(V.MOD, i_bytes, 
 				       V.Cast(V.CAST_UNSIGNED, V.REG_64, field_n)), 
 			       V.Constant(V.Int(V.REG_64, 0L))) in
-       if !opt_trace_adaptor then
+       if !opt_trace_adapter then
 	 Printf.printf "exec_fuzzloop adding tmp_cond3 = %s\n"
 	   (V.exp_to_string tmp_cond3);
        opt_extra_conditions := tmp_cond3 :: !opt_extra_conditions; 
@@ -280,8 +280,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      
        ignore(fm#get_fresh_symbolic ("ret_type") 8);
        ignore(fm#get_fresh_symbolic ("ret_val") size);
-     (* if (List.length !opt_synth_ret_adaptor) <> 0 then (
-       let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adaptor in
+     (* if (List.length !opt_synth_ret_adapter) <> 0 then (
+       let (_, _, _, in_nargs) = List.hd !opt_synth_ret_adapter in
        if in_nargs > 0L then
 	 ( let tmp_cond = 
 	     V.BinOp(
@@ -302,10 +302,10 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
      if !opt_trace_setup then
        (Printf.printf "Took snapshot\n"; flush stdout);
 
-     (* Populate hashtable of adaptor vars *)
+     (* Populate hashtable of adapter vars *)
      let _ =
-       if !opt_trace_adaptor then
-	 Printf.printf "adaptor_vals: Iterating through %d extra conditions\n" 
+       if !opt_trace_adapter then
+	 Printf.printf "adapter_vals: Iterating through %d extra conditions\n" 
 	   (List.length !opt_extra_conditions);
        List.iter ( fun cond ->
 	 (match cond with
@@ -313,31 +313,31 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   V.Constant(V.Int(ty,value))) 
 	 | V.BinOp(V.EQ,V.Constant(V.Int(ty,value)),
 		   V.Lval(V.Temp((_, s, _)))) ->
-	   if !opt_trace_adaptor then (
-	     if Hashtbl.mem Adaptor_vars.adaptor_vals s then 
-	       Printf.printf "adaptor_vals already had value for %s, panic!\n" s
-	     else Printf.printf "adding %s to adaptor_vals\n" s;);
-	   Hashtbl.replace Adaptor_vars.adaptor_vals s
+	   if !opt_trace_adapter then (
+	     if Hashtbl.mem Adapter_vars.adapter_vals s then 
+	       Printf.printf "adapter_vals already had value for %s, panic!\n" s
+	     else Printf.printf "adding %s to adapter_vals\n" s;);
+	   Hashtbl.replace Adapter_vars.adapter_vals s
 	     (V.Constant(V.Int(ty,value)))
 	 | _ -> ());
        ) !opt_extra_conditions; 
      in
      
      let (mode, _, out_nargs, _, in_nargs) = 
-       if ((List.length !opt_synth_adaptor) <> 0) then
-	 List.hd !opt_synth_adaptor else ("", 0L, 0L, 0L, 0L) 
+       if ((List.length !opt_synth_adapter) <> 0) then
+	 List.hd !opt_synth_adapter else ("", 0L, 0L, 0L, 0L) 
      in 
      if (mode = "arithmetic_int")   
      then (
        if (in_nargs <> 0L) then (
-	 Adaptor_synthesis.arithmetic_int_extra_conditions
+	 Adapter_synthesis.arithmetic_int_extra_conditions
 	   fm out_nargs ((Int64.to_int in_nargs)-1);
 	 opt_extra_conditions := !opt_extra_conditions @ !synth_extra_conditions;
        ); 
      );
      if i_n_fields <> 0 then 
-       Adaptor_synthesis.create_field_ranges_l fm ;
-     let field_ranges = Adaptor_synthesis.ranges_by_field_num in
+       Adapter_synthesis.create_field_ranges_l fm ;
+     let field_ranges = Adapter_synthesis.ranges_by_field_num in
      let ranges = ref [] in
      for i = 1 to i_n_fields do
        ranges := !ranges @ !((!field_ranges).(i));
@@ -357,7 +357,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ) (V.BinOp(V.EQ, f_type_sym, (constify e))) r
        in
        let this_cond = (or_list !ranges) in
-       if !opt_trace_struct_adaptor then
+       if !opt_trace_struct_adapter then
 	 Printf.printf "list of valid values = %s\n" (V.exp_to_string this_cond);
        opt_extra_conditions := this_cond :: !opt_extra_conditions;
      done;
@@ -418,11 +418,11 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   ((* too late to raise DisqualifiedPath *)
 		   let stop_eip = fm#get_eip in
 		   Printf.printf "Disqualified path at 0x%08Lx\n" stop_eip;);
-	       if (List.length !opt_synth_struct_adaptor) <> 0 then
+	       if (List.length !opt_synth_struct_adapter) <> 0 then
 		 fm#reset_struct_counts;
 	       if (List.length !opt_match_syscalls_addr_range) <> 0 then
 		 fm#reset_syscalls ;
-	       if (List.length !opt_synth_ret_adaptor) <> 0 || !opt_synth_repair_ret_adaptor <> None then
+	       if (List.length !opt_synth_ret_adapter) <> 0 || !opt_synth_repair_ret_adapter <> None then
 		 fm#reset_saved_args ;
 	       if !opt_coverage_stats && 
 		 (Hashtbl.length trans_cache - old_tcs > 0) then
@@ -444,7 +444,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		 opt_concrete_path_simulate := false; (* First iter. only *)
 	       reset_cb ();
 	       fm#reset ();
-	       adaptor_score := 0;
+	       adapter_score := 0;
 	  );
       with
 	| LastIteration -> ()

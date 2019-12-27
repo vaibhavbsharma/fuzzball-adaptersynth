@@ -182,7 +182,7 @@ let is_adapted_target_call_insn fm sl =
 	 try ignore (Str.search_forward (Str.regexp_string "call") str 0); true
 	 with Not_found -> false in
        if contains_call && fm#get_in_f2_range () then (
-	 if !opt_trace_adaptor then (
+	 if !opt_trace_adapter then (
 	   Printf.printf "found call in adapted target fragment\n";
 	   flush(stdout););
 	 is_call := true) else loop rest

@@ -761,7 +761,7 @@ struct
       (ret :> granular_hash_memory)
 end
   
-  class concrete_adaptor_memory (mem:Concrete_memory.concrete_memory) =
+  class concrete_adapter_memory (mem:Concrete_memory.concrete_memory) =
   object(self)
     method on_missing (m:int -> int64 -> D.t) = ()
 
@@ -789,7 +789,7 @@ end
     method clear () = mem#clear ()
   end
 
-  class concrete_maybe_adaptor_memory
+  class concrete_maybe_adapter_memory
     (mem:Concrete_memory.concrete_memory) = object(self)
       val mutable missing : (int -> int64 -> D.t) =
 	(fun _ -> failwith "Must call on_missing")

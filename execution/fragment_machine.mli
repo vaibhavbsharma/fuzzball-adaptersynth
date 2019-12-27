@@ -146,8 +146,8 @@ class virtual fragment_machine : object
   method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
   method virtual inc_repair_tests_processed : int
-  method virtual conc_mem_struct_adaptor: bool -> unit
-  method virtual sym_region_struct_adaptor: unit
+  method virtual conc_mem_struct_adapter: bool -> unit
+  method virtual sym_region_struct_adapter: unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -342,7 +342,7 @@ class virtual fragment_machine : object
   method virtual reset_struct_counts: unit 
   
   method virtual restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
-  method virtual check_adaptor_condition : Vine.exp -> unit
+  method virtual check_adapter_condition : Vine.exp -> unit
   
 end
 
@@ -420,7 +420,7 @@ sig
     val mutable f2_write_addr_l:int64 list
     
     method restrict_symbolic_expr : register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
-    method check_adaptor_condition : Vine.exp -> unit
+    method check_adapter_condition : Vine.exp -> unit
     
     method private load_byte  : int64 -> D.t
     method private load_short : int64 -> D.t
@@ -455,8 +455,8 @@ sig
     method read_wrong_adapters: unit
     method get_repair_tests_processed : int
     method inc_repair_tests_processed : int
-    method conc_mem_struct_adaptor: bool -> unit
-    method sym_region_struct_adaptor: unit
+    method conc_mem_struct_adapter: bool -> unit
+    method sym_region_struct_adapter: unit
 
     method add_special_handler : special_handler -> unit
 

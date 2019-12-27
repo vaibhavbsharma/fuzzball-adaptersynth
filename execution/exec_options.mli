@@ -92,11 +92,11 @@ val opt_concolic_prob : float option ref
 val opt_solve_path_conditions : bool ref
 val opt_no_sym_regions : bool ref
 val opt_trace_regions : bool ref
-val opt_trace_struct_adaptor : bool ref
+val opt_trace_struct_adapter : bool ref
 val opt_trace_mem_snapshots : bool ref
-val opt_trace_adaptor : bool ref
+val opt_trace_adapter : bool ref
 val opt_fragments  : bool ref
-val opt_verify_adaptor : bool ref
+val opt_verify_adapter : bool ref
 val opt_repair_frag_input : (int64 * int) ref
 val opt_trace_repair : bool ref
 val opt_repair_frag_start : int64 ref
@@ -116,16 +116,16 @@ val opt_trace_setup : bool ref
 val opt_redirect_stderr_to_stdout: bool ref
 val opt_extra_env : (string, string) Hashtbl.t
 val opt_skip_call_addr : (int64 * int64) list ref
-val opt_synth_adaptor : (string * int64 * int64 * int64 * int64) list ref
-val opt_synth_repair_adaptor : (string * int64) option ref
-val opt_synth_ret_adaptor : (string * int64 * int64 * int64) list ref
-val opt_synth_repair_ret_adaptor : (string * int64) option ref
-val opt_synth_struct_adaptor : int64 list ref
-val opt_struct_adaptor_params : (int * int * int) ref
-val opt_adaptor_search_mode : bool ref
-val opt_adaptor_ivc : bool ref
+val opt_synth_adapter : (string * int64 * int64 * int64 * int64) list ref
+val opt_synth_repair_adapter : (string * int64) option ref
+val opt_synth_ret_adapter : (string * int64 * int64 * int64) list ref
+val opt_synth_repair_ret_adapter : (string * int64) option ref
+val opt_synth_struct_adapter : int64 list ref
+val opt_struct_adapter_params : (int * int * int) ref
+val opt_adapter_search_mode : bool ref
+val opt_adapter_ivc : bool ref
 val opt_split_target_formulas : bool ref
-val opt_synth_simplelen_adaptor : (int64 * int64 * int64 * int64 * int64) list ref
+val opt_synth_simplelen_adapter : (int64 * int64 * int64 * int64 * int64) list ref
 val synth_extra_conditions : Vine.exp list ref
 val opt_skip_func_addr : (int64 * int64) list ref
 val opt_skip_call_addr_symbol : (int64 * string) list ref

@@ -378,8 +378,8 @@ class virtual fragment_machine = object
   method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
   method virtual inc_repair_tests_processed : int
-  method virtual conc_mem_struct_adaptor: bool -> unit
-  method virtual sym_region_struct_adaptor: unit
+  method virtual conc_mem_struct_adapter: bool -> unit
+  method virtual sym_region_struct_adapter: unit
 
   method virtual add_special_handler : special_handler -> unit
 
@@ -572,7 +572,7 @@ class virtual fragment_machine = object
   method virtual restrict_symbolic_expr : 
     register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
   
-  method virtual check_adaptor_condition : Vine.exp -> unit
+  method virtual check_adapter_condition : Vine.exp -> unit
 
 end
 
@@ -642,7 +642,7 @@ struct
       
     val mem = (new GM.granular_second_snapshot_memory
 		 (new GM.granular_snapshot_memory
-		    (new GM.concrete_maybe_adaptor_memory
+		    (new GM.concrete_maybe_adapter_memory
 		       (new string_maybe_memory))
 		    (new GM.granular_hash_memory))
 		 (new GM.granular_snapshot_memory
@@ -719,7 +719,7 @@ struct
       (List.length f1_write_addr_l) = (List.length f2_write_addr_l)
 
     method save_args nargs =
-      if !opt_trace_repair || !opt_trace_adaptor then (Printf.printf "saving %Ld args\n" nargs; flush(stdout););
+      if !opt_trace_repair || !opt_trace_adapter then (Printf.printf "repair: saving %Ld args\n" nargs; flush(stdout););
       let args = match (!opt_arch,!opt_fragments) with
 	| (X64,false) -> [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] 
 	| (ARM,false) -> [R0; R1; R2; R3;]
@@ -739,7 +739,8 @@ struct
 	  saved_args <- saved_args @ [(self#get_reg_symbolic (List.nth args i))];
 	done
       );
-      if !opt_trace_repair || !opt_trace_adaptor then (Printf.printf "saved %d args\n" (List.length saved_args); flush(stdout););
+      if !opt_trace_repair || !opt_trace_adapter then (
+	Printf.printf "repair: saved %d args\n" (List.length saved_args); flush(stdout););
    
     method get_saved_args () = saved_args
 
@@ -788,7 +789,7 @@ struct
 			  V.Cast(V.CAST_SIGNED, V.REG_64, V.Cast(V.CAST_LOW, V.REG_32, arg2_exp)))) 
 		else ( V.BinOp(V.NEQ, arg1_exp, arg2_exp))
 	      in
-	      let preferred_dir = not !opt_adaptor_search_mode in
+	      let preferred_dir = not !opt_adapter_search_mode in
 	      let (b,choices) = (self#query_condition exp (Some preferred_dir) (0x6d00+i*10)) in
 	      let choices_str = 
 		(match choices with
@@ -812,7 +813,7 @@ struct
 	) 
       in
       f2_syscalls_arg_num <- f2_syscalls_arg_num + (List.length arg_list);
-      (* if ret = false then adaptor_score := !adaptor_score + 1; *)
+      (* if ret = false then adapter_score := !adapter_score + 1; *)
       ret
 
     method match_syscalls () =
@@ -848,7 +849,7 @@ struct
        if b then () 
        else (raise DisqualifiedPath))
 	
-    method check_adaptor_condition expr =
+    method check_adapter_condition expr =
       (* TODO this function is still in progress *)
       let (b, choices) = self#query_condition expr (Some true) (0x6d00) in 
       ((*let str = match choices with
@@ -857,7 +858,7 @@ struct
 		         | None -> "can be true or false)"
 	   in Printf.printf "chose branch %B (with choice: %s\n" b str;*)
        if b then () 
-       else (Printf.printf "fragment_machine: adaptor violates restriction, raising DisqualifiedPath\n";
+       else (Printf.printf "fragment_machine: adapter violates restriction, raising DisqualifiedPath\n";
              raise DisqualifiedPath)) 
     
     method set_reg_symbolic reg symb_var =
@@ -886,14 +887,14 @@ struct
 	| X86 -> R_EAX))
 
     method private compare_ret_reg_vals =
-      assert(not !opt_verify_adaptor);
+      assert(not !opt_verify_adapter);
       match (!f1_ret_reg_val, !f2_ret_reg_val) with
       | (Some e1, Some e2) ->
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: f1_ret_reg_val = %s, f2_ret_reg_val = %s\n"
 	     (V.exp_to_string e1) (V.exp_to_string e2);
 	   flush(stdout););
-	let (b, _) = self#query_condition (V.BinOp(V.EQ, e1, e2)) (Some !opt_adaptor_search_mode) 0x6e00 in
+	let (b, _) = self#query_condition (V.BinOp(V.EQ, e1, e2)) (Some !opt_adapter_search_mode) 0x6e00 in
 	b
       | (None, None) -> true
       | _ -> false
@@ -926,7 +927,7 @@ struct
     method save_f1_conc_se = 
       if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#save_f1_conc_se called\n";
-      self#conc_mem_struct_adaptor true;
+      self#conc_mem_struct_adapter true;
       f1_se <- mem#get_level4;
       f1_hash <- Hashtbl.copy f1_se#get_mem;
       mem#reset4_3 ();
@@ -1014,7 +1015,7 @@ struct
 	    Printf.printf "equal side-effects %s = %s\n"
 	      (V.exp_to_string exp1) 
 	      (V.exp_to_string exp2);
-	 (* adaptor_score := !adaptor_score + 1; *)
+	 (* adapter_score := !adapter_score + 1; *)
 	)
       else (
 	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
@@ -1029,7 +1030,7 @@ struct
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equivalent side-effects %s=\n%s"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
-	  (* adaptor_score := !adaptor_score + 1; *)
+	  (* adapter_score := !adapter_score + 1; *)
 	)
       );
 	flush(stdout);
@@ -1172,8 +1173,8 @@ struct
 	  )
 	  else if eip = end2 then (
 	    in_f2_range <- false;
-	    (* use this snippet to disable SE eq chk when using the memsub adaptor *)
-	    (* let (n_fields, _) = !opt_struct_adaptor_params in
+	    (* use this snippet to disable SE eq chk when using the memsub adapter *)
+	    (* let (n_fields, _) = !opt_struct_adapter_params in
 	    if n_fields = 0 then (
 	      self#compare_sym_se ;
 	      self#compare_conc_se ;
@@ -1193,19 +1194,19 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
-      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range, !opt_verify_adaptor) with
+      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range, !opt_verify_adapter) with
       | (false, false, _, _, _) -> ()
       | (true, _, false, false, true) ->
 	 if !opt_trace_repair then (
-	   Printf.printf "Setting in_f2_range = true because verify_adapter=true\n";
+	   Printf.printf "repair: Setting in_f2_range = true because verify_adapter=true\n";
 	   flush(stdout););
 	in_f1_range <- false; in_f2_range <- true;
       | (true, _, false, false, false) ->
 	 if !opt_trace_repair then (
-	   Printf.printf "Setting in_f1_range to true\n";
+	   Printf.printf "repair: Setting in_f1_range to true\n";
 	   flush(stdout););
 	in_f1_range <- true;
-	if !opt_adaptor_search_mode then (self#apply_target_frag_inputs;);
+	if !opt_adapter_search_mode then (self#apply_target_frag_inputs;);
 	self#make_f1_sym_snap; 
 	self#make_f1_conc_snap;  
 	self#make_f1_special_handlers_snap ;
@@ -1221,21 +1222,22 @@ struct
 	self#make_f2_sym_snap ;
 	self#make_f2_conc_snap ;
 	self#make_f2_special_handlers_snap ;
-      | (_, true, false, true, false) ->
+      | (_, true, false, true, _) ->
 	 if !opt_trace_repair then (
-	   Printf.printf "Setting in_f2_range to false\n";
+	   Printf.printf "repair: Setting in_f2_range to false\n";
 	   flush(stdout););
-	self#save_f2_ret_reg ;
-	if not self#compare_ret_reg_vals then (
-	  raise DisqualifiedPath;);
-	if !opt_dont_compare_mem_se = false then (
-	  self#compare_sym_se;
-	  self#compare_conc_se;
-	  self#reset_f2_special_handlers_snap;)
-	else (
-	  mem#reset4_3 ();
-	  saved_f1_rsp <- 0L;
-	  saved_f2_rsp <- 0L;);
+	if not !opt_verify_adapter then (
+	  self#save_f2_ret_reg ;
+	  if not self#compare_ret_reg_vals then (
+	    raise DisqualifiedPath;);
+	  if !opt_dont_compare_mem_se = false then (
+	    self#compare_sym_se;
+	    self#compare_conc_se;
+	    self#reset_f2_special_handlers_snap;)
+	  else (
+	    mem#reset4_3 ();
+	    saved_f1_rsp <- 0L;
+	    saved_f2_rsp <- 0L;););
 	in_f2_range <- false;
 	Printf.printf "Match\n"; flush(stdout);
 	let (_, num_total_tests) = !opt_repair_tests_file in
@@ -2429,8 +2431,8 @@ struct
       num_repair_tests_processed := 0;
       List.iter (fun h -> h#reset) special_handler_list
 
-  method sym_region_struct_adaptor = 
-    Printf.printf "FM#sym_region_struct_adaptor should not have been called\n";
+  method sym_region_struct_adapter = 
+    Printf.printf "FM#sym_region_struct_adapter should not have been called\n";
   
   method add_special_handler (h:special_handler) =
       special_handler_list <- h :: special_handler_list
@@ -3600,7 +3602,7 @@ struct
 	  List.rev !lines
       in
       let wrong_argsub_adapters = ref [] in
-      if !opt_wrong_argsub_adapters_file <> "" && !opt_adaptor_search_mode then (
+      if !opt_wrong_argsub_adapters_file <> "" && !opt_adapter_search_mode then (
 	let lines = read_file !opt_wrong_argsub_adapters_file in
 	for i = 0 to (List.length lines) - 1 do
 	  let line = List.nth lines i in
@@ -3610,7 +3612,7 @@ struct
 	done;
       );
       let wrong_ret_adapters = ref [] in
-      if !opt_wrong_ret_adapters_file <> "" && !opt_adaptor_search_mode then (
+      if !opt_wrong_ret_adapters_file <> "" && !opt_adapter_search_mode then (
 	let lines = read_file !opt_wrong_ret_adapters_file in
 	for i = 0 to (List.length lines) - 1 do
 	  let line = List.nth lines i in
@@ -3619,20 +3621,61 @@ struct
 	  wrong_ret_adapters := !wrong_ret_adapters @ [adapter_int64_list];
 	done;
       );
-      assert ((List.length !wrong_argsub_adapters) = (List.length !wrong_ret_adapters));
-      assert ((List.length !wrong_argsub_adapters) = 0 || !opt_adaptor_search_mode); 
-      if !opt_trace_repair then (
-	Printf.printf "wrong adapters: ";
-	for i = 0 to (List.length !wrong_argsub_adapters)-1 do
-	  let wrong_argsub_adapter = List.nth !wrong_argsub_adapters i in
-	  let wrong_ret_adapter = List.nth !wrong_ret_adapters i in
-	  Printf.printf "argsub: ";
+      assert ((List.length !wrong_argsub_adapters) = (List.length !wrong_ret_adapters)
+	     || (List.length !wrong_ret_adapters = 0));
+      assert ((List.length !wrong_argsub_adapters) = 0 || !opt_adapter_search_mode); 
+      if !opt_trace_repair then (Printf.printf "repair: wrong adapters: "; flush(stdout););
+      for i = 0 to (List.length !wrong_argsub_adapters)-1 do
+	let wrong_argsub_adapter = List.nth !wrong_argsub_adapters i in
+	let wrong_ret_adapter =
+	  if (List.length !wrong_ret_adapters) > 0 then
+	    List.nth !wrong_ret_adapters i else [] in
+	if !opt_trace_repair then (
+	  Printf.printf "repair: argsub: ";
 	  List.iter (fun i -> Printf.printf "%Ld," i) wrong_argsub_adapter;
 	  Printf.printf "\nretvalsub: ";
 	  List.iter (fun i -> Printf.printf "%Ld," i) wrong_ret_adapter;
 	  Printf.printf "\n";
-	  flush(stdout);
-	done;);
+	  flush(stdout););
+	opt_extra_conditions :=
+	  V.UnOp(V.NOT, (self#generate_adapter_constraint wrong_argsub_adapter wrong_ret_adapter))
+	  :: !opt_extra_conditions;
+      done;
+
+    method private generate_adapter_constraint argsub retsub =
+      let nargs = match !opt_synth_repair_adapter with
+	| Some (_, nargs) -> Int64.to_int nargs
+	| None -> 0 in
+      let (size, vine_size) = 
+	match !opt_arch with 
+	| X64 -> (64, V.REG_64)
+	| ARM | X86 -> (32, V.REG_32) in
+      let rec loop n =
+	if n < nargs then (
+	let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
+	let var_val = self#get_fresh_symbolic (var_name^"_val") size in
+	let var_is_const = self#get_fresh_symbolic (var_name^"_is_const") 1 in
+	let var_is_const_value = List.nth argsub (2*n) in
+	let var_val_value = List.nth argsub (2*n+1) in
+	[V.BinOp(V.EQ, var_is_const, V.Constant(V.Int(V.REG_1, var_is_const_value)))]
+	@ [V.BinOp(V.EQ, var_val, V.Constant(V.Int(vine_size, var_val_value)))]
+	@ loop (n+1)) else [] in
+      let argsub_cons = loop 0 in
+      let true_cons = (V.Constant(V.Int(V.REG_1, 1L))) in
+      let retsub_cons =
+	if (List.length retsub) > 0 then (
+	  let ret_type = (self#get_fresh_symbolic ("ret_type") 8) in
+	  let ret_val = (self#get_fresh_symbolic ("ret_val") size) in
+	  let ret_type_value = List.nth retsub 0 in
+	  let ret_val_value = List.nth retsub 1 in
+	  [V.BinOp(V.EQ, ret_type, V.Constant(V.Int(V.REG_8, ret_type_value)))]
+	  @ [V.BinOp(V.EQ, ret_val, V.Constant(V.Int(vine_size, ret_val_value)))])
+	else [true_cons] in
+      if !opt_trace_repair then (
+	Printf.printf "repair: generated %d argsub constraints\n" (List.length argsub_cons);
+	Printf.printf "repair: generated %d retsub constraints\n" (List.length retsub_cons); flush(stdout));
+      List.fold_left (fun a b -> V.BinOp(V.BITAND, a, b)) true_cons
+	(argsub_cons @ retsub_cons)
       
     method read_repair_frag_inputs =
       let get_bytes_from_file filename len =
@@ -3657,7 +3700,7 @@ struct
 	  let int_vals = bytes_to_ints bytes 0 in
 	  repair_frag_inputs <- repair_frag_inputs @ [int_vals];
 	  if !opt_trace_repair then (
-	    Printf.printf "file_name = %s, int_vals =  " file_name;
+	    Printf.printf "repair: file_name = %s, int_vals =  " file_name;
 	    for j = 0 to (List.length int_vals)-1 do
 	      Printf.printf "%d, " (List.nth int_vals j);
 	    done;
@@ -3675,7 +3718,7 @@ struct
 	let value = (List.nth this_test_inputs i) in
 	self#store_byte_conc addr value;
 	if !opt_trace_repair then (
-	  Printf.printf "Wrote %d byte value to address 0x%08Lx\n" value addr;
+	  Printf.printf "repair: Wrote %d byte value to address 0x%08Lx\n" value addr;
 	  flush(stdout););
       done;
       ()
@@ -3686,7 +3729,7 @@ struct
       num_repair_tests_processed := !num_repair_tests_processed + 1;
       !num_repair_tests_processed
       
-     method conc_mem_struct_adaptor end_of_f1 =
+     method conc_mem_struct_adapter end_of_f1 =
       let get_ite_expr arg op const_type const then_val else_val = 
 	V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
               then_val,
@@ -3726,20 +3769,20 @@ struct
 
       let start_time = Sys.time () in
       let step_str = if end_of_f1 then "eof1" else "sof2" in
-      if (List.length !opt_synth_struct_adaptor) <> 0 then (
-	if !opt_trace_struct_adaptor = true then
-	  Printf.printf "Starting structure adaptor %s\n" step_str;
+      if (List.length !opt_synth_struct_adapter) <> 0 then (
+	if !opt_trace_struct_adapter = true then
+	  Printf.printf "Starting structure adapter %s\n" step_str;
 	if !opt_time_stats then
-	  (Printf.printf "Generating structure adaptor formulas...";
+	  (Printf.printf "Generating structure adapter formulas...";
 	   flush stdout);
 	let addr_list_ind = if end_of_f1 then !e_o_f1_count else !f2_init_count in
-	let addr = List.nth !opt_synth_struct_adaptor addr_list_ind in
-	let adaptor_vals = Hashtbl.copy Adaptor_vars.adaptor_vals in
+	let addr = List.nth !opt_synth_struct_adapter addr_list_ind in
+	let adapter_vals = Hashtbl.copy Adapter_vars.adapter_vals in
 	  if !opt_time_stats then
 	    (Printf.printf "(0x%08Lx)..." addr;
 	     flush stdout);
 	  if (Int64.abs (fix_s32 addr)) > 4096L then (
-	    let (_, _, max_size) = !opt_struct_adaptor_params in
+	    let (_, _, max_size) = !opt_struct_adapter_params in
 	    let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
 		ai_byte ai_f_sz ai_n =
 		(* Assume ai_n equals target_n for now *)
@@ -3774,14 +3817,14 @@ struct
 		let start_addr = (Int64.add addr (Int64.of_int start_byte)) in
 		let base_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		let base_expr_unsigned  = get_ai_byte_expr n f_sz start_addr 0 in
-		if !opt_trace_struct_adaptor then (
+		if !opt_trace_struct_adapter then (
 		  Printf.printf "base case for get_arr_t_field_expr (%d, %d, %d, %d) ai_byte = %d\n"
 		    start_byte end_byte n f_sz ai_byte;
 		  flush(stdout); );
 		let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		let f_type = 
-		  if not !opt_adaptor_search_mode then 
-		    Hashtbl.find adaptor_vals f_type_str
+		  if not !opt_adapter_search_mode then 
+		    Hashtbl.find adapter_vals f_type_str
 		  else self#get_fresh_symbolic f_type_str 64 in
 		let sign_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+1) in 
 		let zero_extend_val = Int64.of_int ((start_byte lsl 32)+(end_byte lsl 16)+0) in 
@@ -3799,8 +3842,8 @@ struct
 		  if (n = ai_n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = 
-		      if not !opt_adaptor_search_mode then 
-			Hashtbl.find adaptor_vals f_type_str
+		      if not !opt_adapter_search_mode then 
+			Hashtbl.find adapter_vals f_type_str
 		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 		    let zero_extend_expr = get_ai_byte_expr n f_sz start_addr 0 in
@@ -3821,8 +3864,8 @@ struct
 		  if (ai_n = n) then (
 		    let f_type_str = "f"^(Printf.sprintf "%d" field_num)^"_type" in
 		    let f_type = 
-		      if not !opt_adaptor_search_mode then 
-			Hashtbl.find adaptor_vals f_type_str
+		      if not !opt_adapter_search_mode then 
+			Hashtbl.find adapter_vals f_type_str
 		      else self#get_fresh_symbolic f_type_str 64 in
 		    let sign_extend_expr = get_ai_byte_expr n f_sz start_addr 1 in
 
@@ -3840,8 +3883,8 @@ struct
 	    in
 	    let field_exprs = Hashtbl.create 1001 in
 	    let t_field_h = Hashtbl.create 1000 in
-	    let i_n_arr = !Adaptor_vars.i_n_arr' in
-	    let i_byte_arr = !Adaptor_vars.i_byte_arr' in
+	    let i_n_arr = !Adapter_vars.i_n_arr' in
+	    let i_byte_arr = !Adapter_vars.i_byte_arr' in
 	    let unique_str = if end_of_f1 then "_f1_" else "" in
 	    let rec get_arr_ite_ai_byte_expr this_array_field_ranges_l i_byte = 
 		(* i_byte = interesting_byte *)
@@ -3870,7 +3913,7 @@ struct
 		       new_q_exp)
 		  in
 
-		  if !opt_trace_struct_adaptor = true then
+		  if !opt_trace_struct_adapter = true then
 		    Hashtbl.replace t_field_h field_size_temp q_exp;
 		  
 		  V.Ite(cond, field_size_temp, 
@@ -3909,15 +3952,15 @@ struct
 		     V.BinOp(V.RSHIFT, expr, (from_concrete (pos*8) 8)))
 	    in
 	    let byte_ce_expr_l = ref [] in
-	    let get_byte_from_adaptor f_num =
+	    let get_byte_from_adapter f_num =
 	      let str_gen i s = Printf.sprintf "f%d%s" i s in
-	      let f_type = match Hashtbl.find adaptor_vals (str_gen f_num "_type") with 
+	      let f_type = match Hashtbl.find adapter_vals (str_gen f_num "_type") with 
 		| V.Constant(V.Int(V.REG_64, n)) -> (Int64.to_int n)
 		| _ -> 0 in
-	      let f_n = match Hashtbl.find adaptor_vals (str_gen f_num "_n") with
+	      let f_n = match Hashtbl.find adapter_vals (str_gen f_num "_n") with
 		| V.Constant(V.Int(V.REG_16, n)) -> (Int64.to_int n)
 		| _ -> 0 in
-	      let f_size = match Hashtbl.find adaptor_vals (str_gen f_num "_size") with 
+	      let f_size = match Hashtbl.find adapter_vals (str_gen f_num "_size") with 
 		| V.Constant(V.Int(V.REG_16, n)) -> (Int64.to_int n)
 		| _ -> 0 in
 	      let t_s_b = f_type lsr 32 in (* target_start_byte *)
@@ -3927,8 +3970,8 @@ struct
 		else if (f_type mod 2) = 1 then (Some V.CAST_SIGNED) 
 		else if (f_type mod 2) = 0 then (Some V.CAST_UNSIGNED)
 		else None in
-	      if !opt_trace_struct_adaptor then
-		Printf.printf "parsing adaptor in FM: type=%x n=%d sz=%d t_s=%d t_e=%d\n"
+	      if !opt_trace_struct_adapter then
+		Printf.printf "parsing adapter in FM: type=%x n=%d sz=%d t_s=%d t_e=%d\n"
 		  f_type f_n f_size t_s_b t_e_b;
 	      for byte = 0 to (f_n*f_size)-1 do
 		let i_this_entry = byte/f_size in
@@ -3938,14 +3981,14 @@ struct
 		let i_this_entry_val = 
 		  upcast (self#load_sym t_load_addr (t_size*8)) cast_op (f_size*8) in
 		let byte_val = get_byte i_this_entry_val i_this_byte_within_entry in
-		if !opt_trace_struct_adaptor then
+		if !opt_trace_struct_adapter then
 		  Printf.printf "byte_val = %s\n" (V.exp_to_string byte_val);
 		byte_ce_expr_l := byte_val :: !byte_ce_expr_l;
 	      done;
 	    in
-	    if not !opt_adaptor_search_mode then (
+	    if not !opt_adapter_search_mode then (
 	      for i = 1 to n_fields do
-		get_byte_from_adaptor i;
+		get_byte_from_adapter i;
 	      done;
 	      let sz = List.length !byte_ce_expr_l in
 	      for i = sz to (max_size-1) do
@@ -3956,7 +3999,7 @@ struct
 	      byte_ce_expr_l := (List.rev !byte_ce_expr_l)); *)
 	    let byte_expr_l = ref [] in 
 	    for i=0 to (max_size-1) do 
-	      let byte_expr = (* if !opt_adaptor_search_mode then *)
+	      let byte_expr = (* if !opt_adapter_search_mode then *)
 		(get_arr_ite_ai_byte_expr (List.rev !((i_byte_arr).(i))) i) 
 		(* else (List.nth !byte_ce_expr_l i) *)
 	      in
@@ -3964,13 +4007,13 @@ struct
 		"arr_ai_byte_"^(Printf.sprintf "%s%d_%d" unique_str i addr_list_ind) in
 	      let byte_expr_sym = self#get_fresh_symbolic byte_expr_sym_str 8 in
 	      let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
-	      if !opt_trace_struct_adaptor = true then
+	      if !opt_trace_struct_adapter = true then
 		Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		  (V.exp_to_string q_exp);
 	      self#add_to_path_cond q_exp;
 		(* if this is CE search, check if byte_expr has unique value *)
 	      let final_byte_val = 
-		if not !opt_adaptor_ivc || !opt_adaptor_search_mode then
+		if not !opt_adapter_ivc || !opt_adapter_search_mode then
 		  byte_expr_sym 
 		else (
 		  match self#query_unique_value byte_expr_sym V.REG_8 with
@@ -3987,9 +4030,9 @@ struct
 	    done;
 	    byte_expr_l := (List.rev !byte_expr_l);
 
-	    if !opt_trace_struct_adaptor = true then
+	    if !opt_trace_struct_adapter = true then
 	      Hashtbl.iter (fun key value ->
-		Printf.printf "AS#apply_struct_adaptor t_field_h[%s] = %s\n" 
+		Printf.printf "AS#apply_struct_adapter t_field_h[%s] = %s\n" 
 		  (V.exp_to_string key) (V.exp_to_string value);
 	      ) t_field_h; 
 	    

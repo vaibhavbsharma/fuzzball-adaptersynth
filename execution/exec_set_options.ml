@@ -222,14 +222,14 @@ let symbolic_state_cmdline_opts =
     ("-skip-call-ret-symbol-once", Arg.String
        (add_delimited_num_str_pair opt_skip_call_addr_symbol_once '='),
      "addr=symname Like -s-c-r-s, but always the same variable");
-    ("-synthesize-adaptor", Arg.String
-      (add_delimited_info opt_synth_adaptor ':'),
-     "string:addr1:nargs1:addr2:nargs2 Using adaptor of type 'string', "^
+    ("-synthesize-adapter", Arg.String
+      (add_delimited_info opt_synth_adapter ':'),
+     "string:addr1:nargs1:addr2:nargs2 Using adapter of type 'string', "^
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which uses 'nargs2' arguments");
-    ("-verify-adaptor", Arg.Set(opt_verify_adaptor),
-     " Verifies an adapter provided using -synthesize-adaptor and/or -synthesize-ret-adaptor");
+    ("-verify-adapter", Arg.Set(opt_verify_adapter),
+     " Verifies an adapter provided using -synthesize-adapter and/or -synthesize-ret-adapter");
     ("-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
@@ -247,47 +247,47 @@ let symbolic_state_cmdline_opts =
 	let (s1,s2) = split_string '+' s in
 	opt_repair_frag_input := (Int64.of_string s1, int_of_string s2)),
      "addr:numbytes input to the repair fragment is numbytes long at address addr. "^
-       " Use this option to specify counterexample inputs during adaptor search");
-    ("-synthesize-repair-adaptor", Arg.String
+       " Use this option to specify counterexample inputs during adapter search");
+    ("-synthesize-repair-adapter", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
-	opt_synth_repair_adaptor := Some (s1, Int64.of_string s2)),
-     "string:nargs Using adaptor of type 'string', "^
+	opt_synth_repair_adapter := Some (s1, Int64.of_string s2)),
+     "string:nargs Using adapter of type 'string', "^
        "replace any method calls in target fragment with nargs arguments"^
        "with a method call with adapted nargs arguments");
-    ("-synthesize-repair-return-adaptor", Arg.String
+    ("-synthesize-repair-return-adapter", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
-	opt_synth_repair_ret_adaptor := Some (s1, Int64.of_string s2)),
+	opt_synth_repair_ret_adapter := Some (s1, Int64.of_string s2)),
      "string:nargs Replace return value of any method calls in target fragment "^
-       "with an adapted return value using 'string' return value sub. adaptor");
+       "with an adapted return value using 'string' return value sub. adapter");
     ("-fragments", Arg.Set(opt_fragments),
-     " Run adaptor synthesis assuming the target function is a code fragment");
+     " Run adapter synthesis assuming the target function is a code fragment");
     ("-repair-frag-start", Arg.String
        (fun s -> opt_repair_frag_start := Int64.of_string s),
      " EIP where target fragment begins (target fragment is the one we want to repair)");
     ("-repair-frag-end", Arg.String
        (fun s -> opt_repair_frag_end := Int64.of_string s),
      " EIP where target fragment ends (insn at this EIP is also part of target fragment)");
-    ("-synthesize-simple+len-adaptor", Arg.String 
-      (add_delimited_simplelen_info opt_synth_simplelen_adaptor ':'),
-     "addr1:nargs1:addr2:nargs2:length Using the simple+length adaptor, "^
+    ("-synthesize-simple+len-adapter", Arg.String 
+      (add_delimited_simplelen_info opt_synth_simplelen_adapter ':'),
+     "addr1:nargs1:addr2:nargs2:length Using the simple+length adapter, "^
        "replace the outer function call at 'addr1' "^
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which users 'nargs2' arguments");
-    ("-synthesize-return-adaptor", Arg.String
-      (add_delimited_info_s_i_i_i opt_synth_ret_adaptor ':'),
-     "string:addr1:addr2:N Using adaptor of type 'string', "^
+    ("-synthesize-return-adapter", Arg.String
+      (add_delimited_info_s_i_i_i opt_synth_ret_adapter ':'),
+     "string:addr1:addr2:N Using adapter of type 'string', "^
        "save N argument registers at addr1, " ^
        "replace the return value at instruction with address 'addr2' "^
-       "with an adaptor symbolic formula ");
-    ("-synthesize-struct-adaptor", Arg.String
-      (fun s -> opt_synth_struct_adaptor := !opt_synth_struct_adaptor @ [(Int64.of_string s)];),
-     "addr Using structure adaptor grammar, "^
+       "with an adapter symbolic formula ");
+    ("-synthesize-struct-adapter", Arg.String
+      (fun s -> opt_synth_struct_adapter := !opt_synth_struct_adapter @ [(Int64.of_string s)];),
+     "addr Using structure adapter grammar, "^
        "write formulae at upto size bytes at addr");
-    ("-struct-adaptor-params", Arg.String
-      (add_delimited_int_triple opt_struct_adaptor_params ':'),
-     "N1:N2:size  Structure adaptor will try to map upto N1 fields in target and "^
+    ("-struct-adapter-params", Arg.String
+      (add_delimited_int_triple opt_struct_adapter_params ':'),
+     "N1:N2:size  Structure adapter will try to map upto N1 fields in target and "^
        "N2 fields in inner structures at upto size bytes");
     ("-turn-opt-off-range", Arg.String
       (add_delimited_triple opt_turn_opt_off_range ':'),
@@ -360,7 +360,7 @@ let explore_cmdline_opts =
      "N Stop path if a loop iterates more than N times");
     ("-iteration-f2-limit", Arg.String
        (fun s -> opt_f2_iteration_limit := Int64.of_string s),
-     "N Stop path if a loop iterates more than N times inside f2 when doing adaptor synthesis");
+     "N Stop path if a loop iterates more than N times inside f2 when doing adapter synthesis");
     ("-insn-limit", Arg.String
        (fun s -> opt_insn_limit := Int64.of_string s),
      "N Stop path after N instructions");
@@ -564,11 +564,11 @@ let cmdline_opts =
     ("-split-target-formulas", Arg.Set(opt_split_target_formulas),
      " Split large formulas when generating formulas for target structure fields, "^
        "will be false if left unspecified");
-    ("-adaptor-search-mode", Arg.Set(opt_adaptor_search_mode),
-     " Run in adaptor search mode, FuzzBALL will run in counter example mode"^
+    ("-adapter-search-mode", Arg.Set(opt_adapter_search_mode),
+     " Run in adapter search mode, FuzzBALL will run in counter example mode"^
        " if left unspecified");
-    ("-adaptor-ivc", Arg.Set(opt_adaptor_ivc),
-     " Run implied value concretization on adaptor formulas");
+    ("-adapter-ivc", Arg.Set(opt_adapter_ivc),
+     " Run implied value concretization on adapter formulas");
     ("-trace-detailed",
      (Arg.Unit (fun () ->
 	  List.iter (fun (opt, _) -> opt := true) trace_detailed_opts;)),
@@ -602,14 +602,14 @@ let cmdline_opts =
      " Print calls and returns");
     ("-trace-regions", Arg.Set(opt_trace_regions),
      " Print symbolic memory regions");
-    ("-trace-struct-adaptor", Arg.Set(opt_trace_struct_adaptor),
-     " Print formulae created by the structure adaptor");
+    ("-trace-struct-adapter", Arg.Set(opt_trace_struct_adapter),
+     " Print formulae created by the structure adapter");
     ("-redirect-stderr-to-stdout", Arg.Set(opt_redirect_stderr_to_stdout),
      " Redirect stderr to stdout");
     ("-trace-memory-snapshots", Arg.Set(opt_trace_mem_snapshots),
      " Print memory snapshot/reset operations");
-    ("-trace-adaptor", Arg.Set(opt_trace_adaptor),
-     " Print adaptor debugging statements");
+    ("-trace-adapter", Arg.Set(opt_trace_adapter),
+     " Print adapter debugging statements");
     ("-trace-repair", Arg.Set(opt_trace_repair),
      " Print repair debugging statements");
     ("-dont-compare-memory-sideeffects", Arg.Set(opt_dont_compare_mem_se),
@@ -901,7 +901,7 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
 	 max (!max_input_string_length) (Int64.to_int i)
      in
        (* Dont set opt_extra_conditions here because it may contain 
-	  adaptor conditions *)
+	  adapter conditions *)
        (* opt_extra_conditions := []; *)
        List.iter (fun (base, len) ->
 		    new_max len;

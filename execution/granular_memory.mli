@@ -242,7 +242,7 @@ sig
     method get_missing : (int -> int64 -> D.t)
   end
  
-  class concrete_adaptor_memory : Concrete_memory.concrete_memory -> object
+  class concrete_adapter_memory : Concrete_memory.concrete_memory -> object
     method on_missing : missing_t -> unit
     method maybe_load_byte  : int64 -> D.t option
     method maybe_load_short : int64 -> D.t option
@@ -260,7 +260,7 @@ sig
     method measure_size : int * int * int
   end
 
-  class concrete_maybe_adaptor_memory :
+  class concrete_maybe_adapter_memory :
     Concrete_memory.concrete_memory ->
   object
     method on_missing : missing_t -> unit

@@ -17,8 +17,8 @@ open Fragment_machine;;
 open Decision_tree;;
 open Sym_path_frag_machine;;
 open Vine_util;;
-open Adaptor_synthesis;;
-open Adaptor_vars;;
+open Adapter_synthesis;;
+open Adapter_vars;;
 
 module SymRegionFragMachineFunctor =
   functor (D : DOMAIN) ->
@@ -800,7 +800,7 @@ struct
 	    Printf.printf "equal side-effects %s = %s\n"
 	      (V.exp_to_string exp1) 
 	      (V.exp_to_string exp2);
-	 adaptor_score := !adaptor_score + 1;
+	 adapter_score := !adapter_score + 1;
 	)
       else (
 	let q_exp = V.BinOp(V.EQ, exp1, exp2) in
@@ -815,7 +815,7 @@ struct
 	  if !opt_trace_mem_snapshots = true then
 	    Printf.printf "equivalent side-effects %s=\n%s"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
-	  adaptor_score := !adaptor_score + 1;
+	  adapter_score := !adapter_score + 1;
 	)
       )
 
@@ -923,7 +923,7 @@ struct
 	  )
 	) !const;
 
-	(* adaptor symbolic formula fix: equivalent adaptor formulae should use 
+	(* adapter symbolic formula fix: equivalent adapter formulae should use 
 	   same region, if e is equivalent to an expression already in 
 	   seen in this execution path then reuse that region *)
 	let new_rnum = ref 0 in
@@ -954,7 +954,7 @@ struct
 	   new_region := rnum';
 	   if !opt_trace_regions then
 	     Printf.printf "made fresh region when conc_addr = 0x%Lx\n" !conc_addr;);
-	if !opt_adaptor_search_mode = false && not !opt_verify_adaptor then (
+	if !opt_adapter_search_mode = false && not !opt_verify_adapter then (
 	  match e with
 	  | V.Lval(V.Temp((i,s,ty))) when 
 	      (((String.length s) = 1) && ((Char.code s.[0]) - (Char.code 'a') < 6)) -> 
@@ -967,8 +967,8 @@ struct
 	  Hashtbl.replace conc_addr_region_h !conc_addr !new_region;)
 	else (
 	  (* dont allow purely symbolic regions (ones that dont correspond to concrete memory pointed to by conc_addr) to be used during adapter search *)
-	  if !opt_adaptor_search_mode then
-	    (if (!opt_trace_adaptor = true) || (!opt_trace_regions = true) then
+	  if !opt_adapter_search_mode then
+	    (if (!opt_trace_adapter = true) || (!opt_trace_regions = true) then
 		(Printf.printf "disqualifying path because we dont want to use a purely symbolic region during adapter search\n";
 		flush stdout;);
 	  raise DisqualifiedPath) );
@@ -1161,7 +1161,7 @@ struct
 	    flush(stdout);
 	    (Some 0, None, [])
 	    (* raise NullDereference *)
-	  (* adaptor expressions are classified as AmbiguousExpr, but they can
+	  (* adapter expressions are classified as AmbiguousExpr, but they can
 	     still be region expressions *)
 	  (* The following two cases are applicable when applying
 	     table treatment for symbolic regions *)
@@ -2363,7 +2363,7 @@ struct
       );
       Hashtbl.clear concrete_cache
 
-    method sym_region_struct_adaptor = 
+    method sym_region_struct_adapter = 
       let upcast expr _extend_op end_sz =
 	match _extend_op with 
 	| (Some extend_op) ->  
@@ -2391,7 +2391,7 @@ struct
 	| 16 -> ( D.to_symbolic_16 exp) 
 	| 32 -> ( D.to_symbolic_32 exp) 
 	| 64 -> ( D.to_symbolic_64 exp) 
-	| _ -> failwith "unhandled target size in SRFM#apply_struct_adaptor"
+	| _ -> failwith "unhandled target size in SRFM#apply_struct_adapter"
       in
       let get_byte expr pos =
 	V.Cast(V.CAST_LOW, V.REG_8, 
@@ -2406,12 +2406,12 @@ struct
 	if !opt_split_target_formulas = true then spfm#simplify_exp e else e in
       (* let simplify e = e in *)
 
-      if !opt_trace_struct_adaptor = true then
-	Printf.printf "SRFM#apply_struct_adaptor starting...\n";
+      if !opt_trace_struct_adapter = true then
+	Printf.printf "SRFM#apply_struct_adapter starting...\n";
       if !opt_time_stats then
-	(Printf.printf "SRFM#Generating structure adaptor formulas...";
+	(Printf.printf "SRFM#Generating structure adapter formulas...";
 	 flush stdout);
-      if !opt_adaptor_search_mode = false then	
+      if !opt_adapter_search_mode = false then	
 	let get_ite_expr arg op const_type const then_val else_val = 
 	  V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),
 		then_val,
@@ -2419,7 +2419,7 @@ struct
 	in
 	let start_time = Sys.time () in
 	List.iteri ( fun sym_input_region_l_ind rnum ->
-	  let (_, _, max_size) = !opt_struct_adaptor_params in
+	  let (_, _, max_size) = !opt_struct_adapter_params in
 
 	  if !opt_time_stats then
 	    (Printf.printf "(%d)..." rnum;
@@ -2428,8 +2428,8 @@ struct
 	  (* Moving array_field_ranges_l, i_byte_arr, i_n_arr computation 
 	     from here to AS.ml *)	
 
-	  let i_byte_arr = Adaptor_vars.i_byte_arr' in
-	  let i_n_arr = Adaptor_vars.i_n_arr' in
+	  let i_byte_arr = Adapter_vars.i_byte_arr' in
+	  let i_n_arr = Adapter_vars.i_n_arr' in
 	  
 	  
 	  let rec get_arr_t_field_expr field_num this_array_field_ranges_l 
@@ -2525,7 +2525,7 @@ struct
 		     new_q_exp)
 		in
 		
-		if !opt_trace_struct_adaptor = true then 
+		if !opt_trace_struct_adapter = true then 
 		  Hashtbl.replace t_field_h field_size_temp q_exp;
 		
 		V.Ite(cond, field_size_temp, (get_arr_ite_ai_byte_expr tail i_byte))
@@ -2544,7 +2544,7 @@ struct
 	    let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i sym_input_region_l_ind) in
 	    let byte_expr_sym = spfm#get_fresh_symbolic byte_expr_sym_str 8 in
 	    let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
-	    if !opt_trace_struct_adaptor = true then 
+	    if !opt_trace_struct_adapter = true then 
 	      Printf.printf "SRFM#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 		(V.exp_to_string q_exp);
 	    spfm#add_to_path_cond q_exp; 
@@ -2556,9 +2556,9 @@ struct
 
 	  byte_expr_l := (List.rev !byte_expr_l);
 
-	  if !opt_trace_struct_adaptor = true then 
+	  if !opt_trace_struct_adapter = true then 
 	    Hashtbl.iter (fun key value ->
-	      Printf.printf "SRFM#apply_struct_adaptor t_field_h[%s] = %s\n" 
+	      Printf.printf "SRFM#apply_struct_adapter t_field_h[%s] = %s\n" 
 		(V.exp_to_string key) (V.exp_to_string value);
 	    ) t_field_h; 
 	

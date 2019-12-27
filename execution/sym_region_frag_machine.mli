@@ -64,8 +64,8 @@ sig
     method read_wrong_adapters: unit
     method get_repair_tests_processed : int
     method inc_repair_tests_processed : int
-    method conc_mem_struct_adaptor: bool -> unit
-    method sym_region_struct_adaptor: unit
+    method conc_mem_struct_adapter: bool -> unit
+    method sym_region_struct_adapter: unit
 
     method after_exploration : unit
 
@@ -318,7 +318,7 @@ sig
     method reset_struct_counts: unit 
     
     method restrict_symbolic_expr : Fragment_machine.register_name list -> int -> (Vine.exp -> Vine.exp) -> unit
-    method check_adaptor_condition : Vine.exp -> unit
+    method check_adapter_condition : Vine.exp -> unit
     
     val mem :
       Granular_memory.GranularMemoryFunctor(D).granular_second_snapshot_memory

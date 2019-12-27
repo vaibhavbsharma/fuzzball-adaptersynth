@@ -76,9 +76,9 @@ let call_replacements fm last_eip eip =
 	   (lookup last_eip !opt_skip_call_addr_symbol),
 	   (lookup last_eip !opt_skip_call_addr_symbol_once),
 	   (lookup last_eip !opt_skip_call_addr_region),
-	   (lookup_info my_eip !opt_synth_adaptor),
-	   (lookup_ret_info eip !opt_synth_ret_adaptor),
-	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adaptor),
+	   (lookup_info my_eip !opt_synth_adapter),
+	   (lookup_ret_info eip !opt_synth_ret_adapter),
+	   (lookup_simple_len_info last_eip !opt_synth_simplelen_adapter),
 	   (lookup_single_addr eip !opt_repair_frag_end))
     with
       | (None, None, None, None, None, None, None, None, None, None, None) -> None
@@ -97,37 +97,37 @@ let call_replacements fm last_eip eip =
       | (None, None, None, None, None, None, Some cfar_sym, None, None, None, None) ->
 	  Some (fun () -> fm#set_reg_fresh_region ret_reg cfar_sym; None)
       | (None, None, None, None, None, None, None, 
-          Some (adaptor_mode,out_nargs,in_addr,in_nargs), None, None, None) ->
-          (*** simple adaptor ***)
-          if adaptor_mode = "simple" 
+          Some (adapter_mode,out_nargs,in_addr,in_nargs), None, None, None) ->
+          (*** simple adapter ***)
+          if adapter_mode = "simple" 
           then Some (fun () -> 
-	    Adaptor_synthesis.simple_adaptor fm out_nargs in_nargs;
-	    fm#conc_mem_struct_adaptor false;
-	    fm#sym_region_struct_adaptor;
+	    Adapter_synthesis.simple_adapter fm out_nargs in_nargs;
+	    fm#conc_mem_struct_adapter false;
+	    fm#sym_region_struct_adapter;
             (Some in_addr))
-	  else if adaptor_mode = "typeconv"
+	  else if adapter_mode = "typeconv"
 	  then Some (fun () -> 
-	    Adaptor_synthesis.typeconv_adaptor fm out_nargs in_nargs;
-	    fm#conc_mem_struct_adaptor false;
-	    fm#sym_region_struct_adaptor;
-	    (*Adaptor_synthesis.float_typeconv_adaptor fm out_nargs in_nargs;*)
+	    Adapter_synthesis.typeconv_adapter fm out_nargs in_nargs;
+	    fm#conc_mem_struct_adapter false;
+	    fm#sym_region_struct_adapter;
+	    (*Adapter_synthesis.float_typeconv_adapter fm out_nargs in_nargs;*)
             (Some in_addr))
-	  (*** adaptor using trees of arithmetic (integer) expressions ***)
-          else if adaptor_mode = "arithmetic_int" 
+	  (*** adapter using trees of arithmetic (integer) expressions ***)
+          else if adapter_mode = "arithmetic_int" 
             then Some (fun () -> 
-              Adaptor_synthesis.arithmetic_int_adaptor fm out_nargs in_nargs;
-	      Adaptor_synthesis.struct_adaptor fm;
+              Adapter_synthesis.arithmetic_int_adapter fm out_nargs in_nargs;
+	      Adapter_synthesis.struct_adapter fm;
               (Some in_addr))
-          (*** adaptor using trees of arithmetic (SSE floating point) expressions ***)
-          else if adaptor_mode = "arithmetic_float" 
+          (*** adapter using trees of arithmetic (SSE floating point) expressions ***)
+          else if adapter_mode = "arithmetic_float" 
             then Some (fun () -> 
-              Adaptor_synthesis.arithmetic_float_adaptor fm out_nargs in_nargs;
-	      Adaptor_synthesis.struct_adaptor fm;
+              Adapter_synthesis.arithmetic_float_adapter fm out_nargs in_nargs;
+	      Adapter_synthesis.struct_adapter fm;
               (Some in_addr))
-          (*** character translation adaptor ***)
-          else if adaptor_mode = "chartrans"
+          (*** character translation adapter ***)
+          else if adapter_mode = "chartrans"
 	  then Some (fun () ->
-	    Printf.printf "running adaptor chartrans\n";
+	    Printf.printf "running adapter chartrans\n";
 	    let map_n fn n =
 	      let l = ref [] in
 	      for i = (n-1) downto 0 do
@@ -135,11 +135,11 @@ let call_replacements fm last_eip eip =
 	      done;
 	      !l
 	    in
-	    let get_adaptor_var index = 
+	    let get_adapter_var index = 
               let var_name = "tableX" ^ (Printf.sprintf "%02x" index) in
               fm#get_fresh_symbolic var_name 8
 	    in
-	    let table = map_n (fun i -> get_adaptor_var i) 256
+	    let table = map_n (fun i -> get_adapter_var i) 256
 	    in
 	    Printf.printf "table length = %d\n" (List.length table);
 	    let rec translate_bytes base_addr index =
@@ -154,43 +154,43 @@ let call_replacements fm last_eip eip =
             let base_addr = fm#get_long_var R_RDI in
             translate_bytes base_addr (Int64.pred in_nargs);
 	    (Some in_addr))
-            (*** other adaptors ***)
-          else if adaptor_mode = "string" 
+            (*** other adapters ***)
+          else if adapter_mode = "string" 
           then Some (fun () ->
-            Printf.printf "string adaptor not supported yet";
+            Printf.printf "string adapter not supported yet";
             (Some in_addr))
 	  else Some (fun () ->
-            Printf.printf "unsupported adaptor";
+            Printf.printf "unsupported adapter";
             (Some in_addr))
       | (None, None, None, None, None, None, None, None, 
-          Some (adaptor_mode, addr1, addr2, in_nargs), None, None) ->
-	if (adaptor_mode = "return-typeconv") && addr2 = eip then (
+          Some (adapter_mode, addr1, addr2, in_nargs), None, None) ->
+	if (adapter_mode = "return-typeconv") && addr2 = eip then (
           Some (fun () ->
 	    Printf.printf "addr2 = 0x%Lx, eip = 0x%Lx\n" addr2 eip;
 	    flush(stdout);
-	    Adaptor_synthesis.ret_typeconv_adaptor fm in_nargs;
+	    Adapter_synthesis.ret_typeconv_adapter fm in_nargs;
             (Some addr2))
 	)
-	else if (adaptor_mode = "return-typeconv") && addr1 = eip then
+	else if (adapter_mode = "return-typeconv") && addr1 = eip then
         Some (fun () -> 
-	  if !opt_trace_adaptor then
+	  if !opt_trace_adapter then
 	    Printf.printf "exec_runloop#thunk() should save arg regs here\n";
 	  fm#save_args in_nargs;
           (Some addr1))
-	else if (adaptor_mode = "return-simple+len") && addr2 = eip then
+	else if (adapter_mode = "return-simple+len") && addr2 = eip then
           Some (fun () ->
-		  Adaptor_synthesis.ret_simplelen_adaptor fm in_nargs;
+		  Adapter_synthesis.ret_simplelen_adapter fm in_nargs;
 		  (Some addr2))
-	else if (adaptor_mode = "return-simple+len") && addr1 = eip then
+	else if (adapter_mode = "return-simple+len") && addr1 = eip then
           Some (fun () ->
 		  fm#save_args in_nargs;
 		  (Some addr1))
 	else Some (fun () ->
-          Printf.printf "unsupported adaptor\n";
+          Printf.printf "unsupported adapter\n";
           (Some eip))
       | (None, None, None, None, None, None, None, None, None,
 	 Some (out_nargs, in_addr, in_nargs, max_depth), None) ->
-	  (* an adaptor that tries permutations of arguments as well as 
+	  (* an adapter that tries permutations of arguments as well as 
 	     permutations of length of other arguments
 	     var_type is used as follows:
 	     1: a constant value in var_val is used
@@ -198,7 +198,7 @@ let call_replacements fm last_eip eip =
 	     any other value: the length of the argument corresponding 
 	     to var_val is plugged in*)
          Some (fun () -> 
-	   Printf.printf "Running simple+len adaptor in call_replacements\n";
+	   Printf.printf "Running simple+len adapter in call_replacements\n";
 	   (* Assuming we are running on X86_64 *)
            let arg_regs = [R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9] in
 	   (*let lower_bound = 0L in
@@ -298,19 +298,19 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	     if n > 0 then decision_loop (n-1);
 	   in
 	   decision_loop ((Int64.to_int in_nargs)-1);
-	   Adaptor_synthesis.struct_adaptor fm;
+	   Adapter_synthesis.struct_adapter fm;
            (Some in_addr))
       | (None, None, None, None, None, None, None, None, None, None, Some addr) ->
 	 (* Reached end of target fragment to be repaired *)
 	 let (_, num_total_tests) = !opt_repair_tests_file in
 	 let num_tests_processed = fm#get_repair_tests_processed in
 	 if !opt_trace_repair then (
-	   Printf.printf "%d of %d tests processed\n"
+	   Printf.printf "repair: %d of %d tests processed\n"
 	     num_tests_processed num_total_tests;
 	   flush(stdout););
 	 if (fm#get_in_f1_range ()) then Some (fun () ->
 	   if !opt_trace_repair then (
-	     Printf.printf "jumping to repair-frag-start\n";
+	     Printf.printf "repair: jumping to repair-frag-start\n";
 	     flush(stdout););
            (Some !opt_repair_frag_start))
 	 else (
@@ -318,7 +318,7 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	   ignore(fm#inc_repair_tests_processed);
 	   if fm#get_repair_tests_processed < num_total_tests then Some (fun () -> 
 	     if !opt_trace_repair then (
-	       Printf.printf "%d of %d tests processed, jumping to repair-frag-start\n"
+	       Printf.printf "repair: %d of %d tests processed, jumping to repair-frag-start\n"
 		 num_tests_processed num_total_tests;
 	       flush(stdout););
              (Some !opt_repair_frag_start))
@@ -418,19 +418,20 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
     let prog = (dl, sl) in
     let nargs = ref 0L in
     if is_adapted_target_call_insn fm sl then (
-      if !opt_trace_adaptor || !opt_trace_repair then (
-	Printf.printf "applying simple repair adaptor\n";
+      if !opt_trace_adapter || !opt_trace_repair then (
+	Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;
 	flush(stdout););
-      match !opt_synth_repair_adaptor with
-      | Some (adaptor_name, _nargs) when adaptor_name = "simple" ->
+      match !opt_synth_repair_adapter with
+      | Some (adapter_name, _nargs) when adapter_name = "simple" ->
 	 nargs := _nargs;
-	 Adaptor_synthesis.simple_adaptor fm !nargs !nargs;
-      (* if !opt_synth_repair_ret_adaptor <> None then (fm#save_args !nargs); *)
-      | _ -> failwith "unsupported repair adaptor"
+	 Adapter_synthesis.simple_adapter fm !nargs !nargs;
+      (* if !opt_synth_repair_ret_adapter <> None then (fm#save_args !nargs); *)
+      | _ -> failwith "unsupported repair adapter"
     );
-    if eip = !opt_repair_frag_end && fm#get_in_f2_range () then (
-      (* turning off return adaptor that also tries to plug in an argument as the return value *)
-      Adaptor_synthesis.ret_typeconv_adaptor fm 0L; 
+    if eip = !opt_repair_frag_end && fm#get_in_f2_range ()
+    && !opt_synth_repair_ret_adapter <> None then (
+      (* turning off return adapter that also tries to plug in an argument as the return value *)
+      Adapter_synthesis.ret_typeconv_adapter fm 0L; 
     );
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog
@@ -464,14 +465,14 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 		(*Array.iter 
                   ( function ele -> Printf.printf "%Lx\n" (Int64.of_int (Char.code ele))) offset_char_arr;*)
 		Array.append [|'\xe9'|] offset_char_arr)
-	      else (* noop because this was a return value adaptor *)
+	      else (* noop because this was a return value adapter *)
 		(
 		  (* Printf.printf "nooping because no call replacement required\n"; *)
 		  [||]
 		)
 	    | (ARM, 0L,_) -> 
-	      if !opt_trace_adaptor then 
-		Printf.printf "no adaptor synth. call replacement to be done\n";
+	      if !opt_trace_adapter then 
+		Printf.printf "no adapter synth. call replacement to be done\n";
 	      flush(stdout);
 	      [||] (* nop *)
 	      (* [|'\x1e'; '\xff'; '\x2f'; '\xe1'|] *) (* bx lr *)

@@ -17,7 +17,7 @@ open Exec_no_influence;;
 open Granular_memory;;
 open Fragment_machine;;
 open Decision_tree;;
-open Adaptor_synthesis;;
+open Adapter_synthesis;;
 
 let solver_sats = ref 0L
 let solver_unsats = ref 0L
@@ -521,9 +521,9 @@ struct
        0x68yy Memory long concretize
        0x6ayy Misc. concretize
        0x6byy Binop concretize
-       0x6cyy Adaptor expression concretize, yy is argnum*10+(type!=0 && type!=1)
+       0x6cyy Adapter expression concretize, yy is argnum*10+(type!=0 && type!=1)
        0x6dyy Syscall argument expr added by SPFM#query_condition, yy is argnum*10
-       0x6eyy Adaptor side-effect equivalence query
+       0x6eyy Adapter side-effect equivalence query
        0x7100 on_missing_random
        0x81yy SRFM load, base choice
        0x82yy SRFM load, offset concretize, yy is bit or 0x80 + try
@@ -948,8 +948,8 @@ struct
       infl_man#finish_path;
       let d = dt#get_depth_bracketed in
       
-      Printf.printf "adaptor_score = %d(%d)\n" 
-	(d*(!adaptor_score) + d) !adaptor_score;
+      Printf.printf "adapter_score = %d(%d)\n" 
+	(d*(!adapter_score) + d) !adapter_score;
       if !opt_trace_binary_paths then
 	Printf.printf "Path: %s\n" dt#get_hist_str;
       if !opt_trace_binary_paths_delimited then

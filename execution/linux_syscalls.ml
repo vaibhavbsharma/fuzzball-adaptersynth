@@ -3173,7 +3173,7 @@ object(self)
      in
      if (fm#get_in_f1_range ()) && (not !opt_dont_compare_syscalls) then (
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       if !opt_trace_syscalls || !opt_trace_adaptor then
+       if !opt_trace_syscalls || !opt_trace_adapter then
 	 (Printf.printf "f1:syscall(%d)\n" syscall_num;
 	  Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
 	    syscall_num name num_args;);
@@ -3205,7 +3205,7 @@ object(self)
      );
      if (fm#get_in_f2_range ()) && (not !opt_dont_compare_syscalls) then (
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
-       if !opt_trace_syscalls || !opt_trace_adaptor then
+       if !opt_trace_syscalls || !opt_trace_adapter then
 	 (Printf.printf "f2:syscall(%d)\n" syscall_num;
 	  Printf.printf "Recording Linux/x86-64 system call %d %s(%d)\n" 
 	    syscall_num name num_args;);

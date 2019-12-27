@@ -1,4 +1,4 @@
-(* Extra file with helper code for adaptor synthesis. The functions 
+(* Extra file with helper code for adapter synthesis. The functions 
    defined here are used in exec_fuzzloop.ml and exec_runloop.ml *)
 
 module V = Vine;;
@@ -7,11 +7,11 @@ open Fragment_machine;;
 open Exec_options;;
 open Exec_exceptions;;
 open Exec_utils;;
-open Adaptor_vars;;
+open Adapter_vars;;
 
-let adaptor_score = ref 0
+let adapter_score = ref 0
  
-(*** general helper code used in multiple adaptors ***)
+(*** general helper code used in multiple adapters ***)
 
 let rec load_reg_list fm reg_list idx =
     if idx < (List.length reg_list) then
@@ -45,7 +45,7 @@ let restrict_range v v_type lower upper =
 (* build an expression that restricts v to be one of a specified list *)
 let rec specify_vals v v_type vals =
 match vals with
-| [] -> failwith "Bad value list for arithmetic adaptor"
+| [] -> failwith "Bad value list for arithmetic adapter"
 | v'::[] -> V.BinOp(V.EQ, v, V.Constant(V.Int(v_type, v')))
 | v'::t -> 
     V.BinOp(V.BITOR, 
@@ -64,7 +64,7 @@ let restrict expr expr_type restricted_range restricted_list =
 
 (* build an arithmetic expression tree; this function is a little messy because 
    it takes so many arguments, but it's useful to reuse code between the integer 
-   and floating point adaptor code
+   and floating point adapter code
    
    type = 0 ----> constant value
    type = 1 ----> argument at the position val
@@ -73,13 +73,13 @@ let restrict expr expr_type restricted_range restricted_list =
 let get_arithmetic_expr fm var arg_vals val_type out_nargs get_oper_expr depth
       apply_special_conditions =
   let rec build_tree d base =
-    if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
+    if d <= 0 then failwith "Bad tree depth for arithmetic adapter"
     else 
-      let node_type = if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals (var ^ "_type_" ^ base)
+      let node_type = if not !opt_adapter_search_mode then 
+	  Hashtbl.find adapter_vals (var ^ "_type_" ^ base)
 	else fm#get_fresh_symbolic (var ^ "_type_" ^ base) 8 in
-      let node_val = if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals (var ^ "_val_" ^ base)
+      let node_val = if not !opt_adapter_search_mode then 
+	  Hashtbl.find adapter_vals (var ^ "_val_" ^ base)
 	else fm#get_fresh_symbolic (var ^ "_val_" ^ base) 
                        (if val_type = V.REG_32 then 32 else 64) in
       if d = 1 
@@ -100,9 +100,9 @@ let get_arithmetic_expr fm var arg_vals val_type out_nargs get_oper_expr depth
                               (if val_type = V.REG_32 then 32 else 64) in
         let right_expr_sym = fm#get_fresh_symbolic (var ^ "_subtree_" ^ base ^ "1") 
                               (if val_type = V.REG_32 then 32 else 64) in
-        let _ = fm#check_adaptor_condition 
+        let _ = fm#check_adapter_condition 
                   (V.BinOp(V.EQ, left_expr_sym, left_expr)) in
-        let _ = fm#check_adaptor_condition 
+        let _ = fm#check_adapter_condition 
                   (V.BinOp(V.EQ, right_expr_sym, right_expr)) in*)
         let _ = match apply_special_conditions with
                 | None -> ()
@@ -123,18 +123,18 @@ let get_arithmetic_expr fm var arg_vals val_type out_nargs get_oper_expr depth
                (get_oper_expr node_val left_expr right_expr)) in
   build_tree depth "R"
 
-(* add extra conditions on the structure of the int/float arithmetic adaptors' 
+(* add extra conditions on the structure of the int/float arithmetic adapters' 
    expression trees; there are a lot of arguments here too, but this saves
    some copying & pasting later *)
 let add_arithmetic_tree_conditions fm var_name val_type out_nargs 
       restrict_const_node binops unops depth =
   (* zeros-out nodes in an arithmetic expression subtree *)
   let rec zero_lower d base =
-    let node_type = if not !opt_adaptor_search_mode then 
-	Hashtbl.find adaptor_vals (var_name ^ "_type_" ^ base)
+    let node_type = if not !opt_adapter_search_mode then 
+	Hashtbl.find adapter_vals (var_name ^ "_type_" ^ base)
       else fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-    let node_val = if not !opt_adaptor_search_mode then 
-	Hashtbl.find adaptor_vals (var_name ^ "_val_" ^ base)
+    let node_val = if not !opt_adapter_search_mode then 
+	Hashtbl.find adapter_vals (var_name ^ "_val_" ^ base)
       else fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
                      (if val_type = V.REG_32 then 32 else 64) in
     if d = 1 
@@ -154,13 +154,13 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
                 zero_lower (d-1) (base ^ "1"))) in
   (* adds various conditions for every node in a tree *)
   let rec traverse_tree d base = 
-    if d <= 0 then failwith "Bad tree depth for arithmetic adaptor"
+    if d <= 0 then failwith "Bad tree depth for arithmetic adapter"
     else 
-      let node_type = if not !opt_adaptor_search_mode then 
-	Hashtbl.find adaptor_vals (var_name ^ "_type_" ^ base)
+      let node_type = if not !opt_adapter_search_mode then 
+	Hashtbl.find adapter_vals (var_name ^ "_type_" ^ base)
 	else fm#get_fresh_symbolic (var_name ^ "_type_" ^ base) 8 in
-      let node_val = if not !opt_adaptor_search_mode then 
-	Hashtbl.find adaptor_vals (var_name ^ "_val_" ^ base)
+      let node_val = if not !opt_adapter_search_mode then 
+	Hashtbl.find adapter_vals (var_name ^ "_val_" ^ base)
 	else fm#get_fresh_symbolic (var_name ^ "_val_" ^ base)
                        (if val_type = V.REG_32 then 32 else 64) in
         if d = 1
@@ -237,11 +237,11 @@ let add_arithmetic_tree_conditions fm var_name val_type out_nargs
             traverse_tree (d-1) (base ^ "1")) in
   traverse_tree depth "R"
 
-(*** integer arithmetic adaptor ***)
+(*** integer arithmetic adapter ***)
 
-(* use the variables below to specify the kinds of adaptors and 
+(* use the variables below to specify the kinds of adapters and 
    counterexamples that can be synthesized; these variables will be used
-   in arithmetic_int_adaptor and arithmetic_int_extra_conditions *)
+   in arithmetic_int_adapter and arithmetic_int_extra_conditions *)
 (* tree depth *)
 let int_arith_depth = 2
 (* 32 or 64-bit values (int vs. long int) defined for each use below *)
@@ -265,7 +265,7 @@ let int_restrict_constant_range = None (* Some (0L, 16L) used for killpg <- kill
 let rec buildList i n = let x = (Int64.succ i) in if i <= n then i::(buildList x n) else []
 (* NOTE: Done only for the reverse engineering experiment with ARM32 code fragments *)
 let int_restrict_constant_list = Some (List.append (buildList Int64.minus_one 255L) [511L; 1023L; 2047L; 4095L; 8191L; 16383L; 32767L; 65535L; 131071L; 262143L; 524287L; 1048575L; 2097151L; 4194303L; 8388607L; 16777215L; 33554431L; 67108863L; 134217727L; 268435455L; 536870911L; 1073741823L; 2147483647L])
-(* restrict the input and output of the adaptor (input restrictions reflect
+(* restrict the input and output of the adapter (input restrictions reflect
    f1 preconditions and output restrictions reflect f2 preconditions)
    int_restrict_X_range should be 'None' or 'Some (lower, upper)' and 
    int_restrict_X_list should be 'None' or 'Some [v1; v2; ...; vn]' (NOTE:
@@ -275,10 +275,10 @@ let int_restrict_input_list = None
 let int_restrict_output_range = None
 let int_restrict_output_list = None
 
-(* creates symbolic variables representing the adaptor function and encodes
-   the rules for applying the adaptor function; this function is called in 
+(* creates symbolic variables representing the adapter function and encodes
+   the rules for applying the adapter function; this function is called in 
    exec_runloop *)
-let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
+let arithmetic_int_adapter (fm:fragment_machine) out_nargs in_nargs =
   let (arg_regs, int_val_type) = 
     match (!opt_arch, !opt_fragments) with
     | (X64,false) -> ([R_RDI;R_RSI;R_RDX;R_RCX;R_R8;R_R9], V.REG_64)
@@ -310,7 +310,7 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
   let get_oper_expr node_value l r =
     let rec unop_expr ops n =
       match ops with 
-      | [] -> failwith "Missing operators for the arithmetic adaptor"
+      | [] -> failwith "Missing operators for the arithmetic adapter"
       | unop::[] -> V.UnOp(unop, l)
       | unop::tl -> 
           get_ite_expr node_value V.EQ int_val_type n
@@ -380,7 +380,7 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
                  V.Constant(
                    V.Int(int_val_type, 
                          if int_val_type = V.REG_32 then 32L else 64L))))) in
-         fm#check_adaptor_condition expr;
+         fm#check_adapter_condition expr;
      match div_indices with
      | [] -> ()
      | l -> (* if the current node corresponds to a division/mod operation, 
@@ -398,8 +398,8 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
                V.NEQ,
                right_expr,
                V.Constant(V.Int(int_val_type, 0L)))) in
-         fm#check_adaptor_condition expr) in*)
-  (* we store symbolic expressions representing adaptors in a list and then 
+         fm#check_adapter_condition expr) in*)
+  (* we store symbolic expressions representing adapters in a list and then 
      later call set_reg_symbolic on each expression in that list *)
   let symbolic_exprs = ref [] in
   let rec get_exprs n =
@@ -417,12 +417,12 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
          (*let var_name = String.make 1 (Char.chr ((Char.code 'a') + idx)) in 
            let root_sym = fm#get_fresh_symbolic (var_name ^ "_subtree_R") 
            (if int_val_type = V.REG_32 then 32 else 64) in
-           fm#check_adaptor_condition (V.BinOp(V.EQ, root_sym, expr));
+           fm#check_adapter_condition (V.BinOp(V.EQ, root_sym, expr));
            fm#set_reg_symbolic (List.nth arg_regs idx) root_sym;
-           fm#check_adaptor_condition 
+           fm#check_adapter_condition 
            (restrict root_sym int_val_type int_restrict_output_range 
            int_restrict_output_list)*)
-	 (if !opt_trace_adaptor then
+	 (if !opt_trace_adapter then
 	     Printf.printf "AS#setting %s as arg\n" (V.exp_to_string expr);
 	  flush stdout);
 	 (match !opt_arch with
@@ -431,7 +431,7 @@ let arithmetic_int_adaptor (fm:fragment_machine) out_nargs in_nargs =
 	    let args_base_addr = Int64.add (fm#get_word_var R_ESP)
 	      (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	    (fm#store_word_symbolic (Int64.add args_base_addr (Int64.of_int (idx*4))) expr););
-	 fm#check_adaptor_condition 
+	 fm#check_adapter_condition 
 	   (restrict expr int_val_type int_restrict_output_range 
               int_restrict_output_list)) !symbolic_exprs)
   else ()
@@ -458,7 +458,7 @@ let arithmetic_int_init_sym_vars fm in_nargs =
  ()
  
 (* adds extra conditions on the input variables and associated 
-   adaptor variables; this function is called in exec_fuzzloop *)
+   adapter variables; this function is called in exec_fuzzloop *)
 let rec arithmetic_int_extra_conditions fm out_nargs n = 
   let int_val_type = (if !opt_arch = ARM then V.REG_32 else V.REG_64) in
   let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
@@ -489,11 +489,11 @@ let rec arithmetic_int_extra_conditions fm out_nargs n =
     restrict_const_node int_binops int_unops int_arith_depth;
   if n > 0 then arithmetic_int_extra_conditions fm out_nargs (n-1) else ()
 
-(*** floating point arithmetic adaptor ***)
+(*** floating point arithmetic adapter ***)
 
-(* use the variables below to specify the kinds of adaptors and 
+(* use the variables below to specify the kinds of adapters and 
    counterexamples that can be synthesized; these variables will be used
-   in arithmetic_float_adaptor and arithmetic_float_extra_conditions *)
+   in arithmetic_float_adapter and arithmetic_float_extra_conditions *)
 (* tree depth *)
 let float_arith_depth = 2
 (* 32 or 64-bit values (float vs. double) *)
@@ -517,10 +517,10 @@ let float_restrict_constant_list = None
 let float_restrict_counterexample_range = Some (0.0, 0.5)
 let float_restrict_counterexample_list = None
 
-(* creates symbolic variables representing the adaptor function and encodes
-   the rules for applying the adaptor function; this function is called in 
+(* creates symbolic variables representing the adapter function and encodes
+   the rules for applying the adapter function; this function is called in 
    exec_runloop *)
-let arithmetic_float_adaptor fm out_nargs in_nargs =
+let arithmetic_float_adapter fm out_nargs in_nargs =
   (* argument registers -- assumes SSE floating point *)
   let arg_regs = [R_YMM0_0; R_YMM1_0; R_YMM2_0; R_YMM3_0; R_YMM4_0; R_YMM5_0] in
   let arg_vals = 
@@ -533,7 +533,7 @@ let arithmetic_float_adaptor fm out_nargs in_nargs =
   let get_oper_expr node_value l r =
     let rec unop_expr ops n =
       match ops with 
-      | [] -> failwith "Missing operators for the arithmetic adaptor"
+      | [] -> failwith "Missing operators for the arithmetic adapter"
       | unop::[] -> V.FUnOp(unop, float_rm, l)
       | unop::tl -> 
           get_ite_expr node_value V.EQ float_val_type n
@@ -557,7 +557,7 @@ let arithmetic_float_adaptor fm out_nargs in_nargs =
           else get_ite_expr node_value V.EQ float_val_type n
                  expr (binop_expr tl (Int64.add n 1L)) in
     binop_expr float_binops 0L in
-  (* we store symbolic expressions representing adaptors in a list and then 
+  (* we store symbolic expressions representing adapters in a list and then 
      later call set_reg_symbolic on each expression in that list *)
   let symbolic_exprs = ref [] in
   let rec get_exprs n =
@@ -571,7 +571,7 @@ let arithmetic_float_adaptor fm out_nargs in_nargs =
      (fun idx expr ->
         fm#set_reg_symbolic (List.nth arg_regs idx) expr) !symbolic_exprs)
   
-(* adds extra conditions on the input variables and associated adaptor 
+(* adds extra conditions on the input variables and associated adapter 
    variables; this function is called in exec_fuzzloop; note that we use 
    integer comparisons (instead of floating point comparisons) in some of 
    our extra conditions, we can do this because the symbolic variables 
@@ -599,7 +599,7 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
            possible values *)
   let rec specify_vals v vals =
     match vals with
-    | [] -> failwith "Bad value list for arithmetic adaptor"
+    | [] -> failwith "Bad value list for arithmetic adapter"
     | v'::[] -> 
         V.BinOp(V.BITOR, 
                 V.BinOp(V.EQ, v, V.Constant(V.Int(float_val_type, get_bits v'))),
@@ -642,11 +642,11 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
     restrict_const_node float_binops float_unops float_arith_depth;
   if n > 0 then arithmetic_float_extra_conditions fm out_nargs (n-1) else ()  
   
-(*** simple adaptor ***)
+(*** simple adapter ***)
 
-let simple_adaptor fm out_nargs in_nargs =
-  if !opt_trace_adaptor then
-    Printf.printf "Starting simple adaptor (%Ld,%Ld)\n" out_nargs in_nargs;
+let simple_adapter fm out_nargs in_nargs =
+  if !opt_trace_adapter then
+    Printf.printf "Starting simple adapter (%Ld,%Ld)\n" out_nargs in_nargs;
   if in_nargs > 0L then (
     let arg_regs =
       match (!opt_arch, !opt_fragments) with
@@ -668,7 +668,7 @@ let simple_adaptor fm out_nargs in_nargs =
 	 for i = 0 to (Int64.to_int out_nargs)-1 do
 	   let arg_exp = (fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))) in
 	   vals := !vals @ [arg_exp];
-	   if !opt_trace_adaptor then (
+	   if !opt_trace_adapter then (
 	     Printf.printf "arg(%d) = %s\n" i (V.exp_to_string arg_exp);
 	     flush(stdout);
 	   );
@@ -695,11 +695,11 @@ let simple_adaptor fm out_nargs in_nargs =
 				var_val
 	 ) 
 	 else ( 
-	 (* Assuming adaptor_vals maps strings to Vine expressions
-	    where each string is the name of an adaptor variable *)
-	   if not !opt_adaptor_search_mode then (
-	     let var_is_const_val = Hashtbl.find adaptor_vals (var_name^"_is_const") in
-	     let var_val_val = Hashtbl.find adaptor_vals (var_name^"_val") in
+	 (* Assuming adapter_vals maps strings to Vine expressions
+	    where each string is the name of an adapter variable *)
+	   if not !opt_adapter_search_mode then (
+	     let var_is_const_val = Hashtbl.find adapter_vals (var_name^"_is_const") in
+	     let var_val_val = Hashtbl.find adapter_vals (var_name^"_val") in
 	     if var_is_const_val = V.Constant(V.Int(V.REG_1, 0L)) then (
 	       match var_val_val with
 	       | V.Constant(V.Int(vine_size, n)) ->
@@ -722,12 +722,12 @@ let simple_adaptor fm out_nargs in_nargs =
       let arg' = arg
     (* (V.Cast(V.CAST_LOW, vine_size, (match arg with 
        | V.Lval(V.Temp((_, s, _))) -> 
-       if Hashtbl.mem adaptor_vals s then
-       Hashtbl.find adaptor_vals s
+       if Hashtbl.mem adapter_vals s then
+       Hashtbl.find adapter_vals s
        else arg
        | _ -> arg))) *)
       in
-      if !opt_trace_adaptor then
+      if !opt_trace_adapter then
 	Printf.printf "setting arg=%s\n" (V.exp_to_string arg');
       symbolic_args := arg' :: !symbolic_args;
       if n > 0 then main_loop (n-1); 
@@ -735,17 +735,17 @@ let simple_adaptor fm out_nargs in_nargs =
     main_loop ((Int64.to_int in_nargs)-1);
     List.iteri (fun index _expr ->
       let expr =  
-	if (not !opt_adaptor_ivc) || !opt_adaptor_search_mode then 
+	if (not !opt_adapter_ivc) || !opt_adapter_search_mode then 
 	  _expr
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-	     if !opt_trace_adaptor then
+	     if !opt_trace_adapter then
 	       Printf.printf "%s has unique value %Lx\n" 
 	         (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
 	  | None ->
-	     if !opt_trace_adaptor then
+	     if !opt_trace_adapter then
 	       Printf.printf "%s does not have unique value\n" 
 	         (V.exp_to_string _expr);
 	    _expr
@@ -756,17 +756,17 @@ let simple_adaptor fm out_nargs in_nargs =
 	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
 	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
-	 if !opt_trace_adaptor then
+	 if !opt_trace_adapter then
 	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
 	 fm#add_adapted_addr arg_addr;
 	 fm#store_word_symbolic arg_addr expr);
     ) !symbolic_args;
   ) else ()
 
-(* Simple adaptor code ends here *)
+(* Simple adapter code ends here *)
 
 
-(* Type conversion adaptor *)
+(* Type conversion adapter *)
 
 let get_ite_typeconv_expr fm arg_idx idx_type vals n =
   V.Cast(V.CAST_SIGNED, V.REG_64, 
@@ -797,9 +797,9 @@ let get_typeconv_expr src_operand src_type extend_op =
    type = 43 -> 64-to-1 bit ITE operation on outer function arg in var_val
 *)
 
-let typeconv_adaptor fm out_nargs in_nargs =
-  if !opt_trace_adaptor then
-    Printf.printf "Starting typeconv adaptor\n";
+let typeconv_adapter fm out_nargs in_nargs =
+  if !opt_trace_adapter then
+    Printf.printf "Starting typeconv adapter\n";
   if in_nargs > 0L then (
     let arg_regs = 
       match (!opt_arch, !opt_fragments) with
@@ -833,12 +833,12 @@ let typeconv_adaptor fm out_nargs in_nargs =
     let symbolic_args = ref [] in
     let rec main_loop n =
       let var_name = String.make 1 (Char.chr ((Char.code 'a') + n)) in
-      let var_val = if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals (var_name^"_val")
+      let var_val = if not !opt_adapter_search_mode then 
+	  Hashtbl.find adapter_vals (var_name^"_val")
 	else fm#get_fresh_symbolic (var_name^"_val") size in
-      let simplify e = if not !opt_adaptor_search_mode then fm#simplify_exp e else e in
-      let var_type = if not !opt_adaptor_search_mode then 
-	  Hashtbl.find adaptor_vals (var_name^"_type")
+      let simplify e = if not !opt_adapter_search_mode then fm#simplify_exp e else e in
+      let var_type = if not !opt_adapter_search_mode then 
+	  Hashtbl.find adapter_vals (var_name^"_type")
 	else fm#get_fresh_symbolic (var_name^"_type") 8 in
       let arg =  
 	(if out_nargs = 0L then (
@@ -885,7 +885,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	      					     type_43_expr)
 	      				       ))))))))))))
       in
-      if !opt_trace_adaptor then
+      if !opt_trace_adapter then
 	Printf.printf "setting arg=%s\n" (V.exp_to_string arg);
       symbolic_args := arg :: !symbolic_args;
       if n > 0 then main_loop (n-1); 
@@ -893,17 +893,17 @@ let typeconv_adaptor fm out_nargs in_nargs =
     main_loop ((Int64.to_int in_nargs)-1);
     List.iteri (fun index _expr ->
       let expr =  
-	if (not !opt_adaptor_ivc) || !opt_adaptor_search_mode then 
+	if (not !opt_adapter_ivc) || !opt_adapter_search_mode then 
 	  _expr
 	else (
 	  match fm#query_unique_value _expr vine_size with
 	  | Some v ->
-	     if !opt_trace_adaptor then
+	     if !opt_trace_adapter then
 	       Printf.printf "%s has unique value %Lx\n" 
 	         (V.exp_to_string _expr) v;
 	    (V.Constant(V.Int(vine_size, v)))
 	  | None -> 
-	     if !opt_trace_adaptor then
+	     if !opt_trace_adapter then
 	       Printf.printf "%s does not have unique value\n" 
 	         (V.exp_to_string _expr);
 	    _expr
@@ -915,7 +915,7 @@ let typeconv_adaptor fm out_nargs in_nargs =
 	 let args_base_addr = Int64.add (fm#get_word_var R_ESP)
 	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 let arg_addr = (Int64.add args_base_addr (Int64.of_int (index*4))) in
-	 if !opt_trace_adaptor then
+	 if !opt_trace_adapter then
 	   Printf.printf "writing %s to 0x%Lx\n" (V.exp_to_string expr) arg_addr;
 	 fm#add_adapted_addr arg_addr;
 	 fm#store_word_symbolic arg_addr expr);
@@ -924,17 +924,17 @@ let typeconv_adaptor fm out_nargs in_nargs =
 
 
 
-(* Type conversion adaptor code ends here *)
+(* Type conversion adapter code ends here *)
 
 
-(* Floating point type conversion adaptor code starts here *)
+(* Floating point type conversion adapter code starts here *)
 
 let get_ite_ftypeconv_expr ite_arg_expr =
   V.FCast(V.CAST_FWIDEN, Vine_util.ROUND_NEAREST, V.REG_64, 
 	 V.Cast(V.CAST_LOW, V.REG_32, ite_arg_expr) ) 
 
-let float_typeconv_adaptor (fm:fragment_machine) out_nargs_1 in_nargs_1 =
-  Printf.printf "Starting float-typeconv adaptor\n";
+let float_typeconv_adapter (fm:fragment_machine) out_nargs_1 in_nargs_1 =
+  Printf.printf "Starting float-typeconv adapter\n";
   let out_nargs = (if out_nargs_1 > 4L then 4L else out_nargs_1) in
   let in_nargs = (if in_nargs_1 > 4L then 4L else in_nargs_1) in
   (* argument registers -- assumes SSE floating point *)
@@ -981,11 +981,11 @@ let float_typeconv_adaptor (fm:fragment_machine) out_nargs_1 in_nargs_1 =
 	fm#set_reg_symbolic (List.nth arg_regs index) expr;) !symbolic_args;
   )
 
-(* Floating point type conversion adaptor code ends here *)
+(* Floating point type conversion adapter code ends here *)
 
 
 
-(* Return value type conversion adaptor *)
+(* Return value type conversion adapter *)
 
 let rec get_len_expr fm base_addr pos max_depth =
   (*Printf.printf 
@@ -1031,14 +1031,14 @@ let rec get_ite_saved_arg_expr fm arg_idx idx_type saved_args_list n =
    type = 82 -> 1-to-64 bit zero extension on return_arg, ret_val ignored
 *)
 
-let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
+let ret_typeconv_adapter (fm:fragment_machine) in_nargs =
   let return_arg = fm#get_reg_symbolic 
     (match !opt_arch with
     | X64 -> R_RAX
     | ARM -> R0
     | X86 -> R_EAX) in
-  if !opt_trace_adaptor then
-    Printf.printf "Starting return-typeconv adaptor with return_arg = %s\n"
+  if !opt_trace_adapter then
+    Printf.printf "Starting return-typeconv adapter with return_arg = %s\n"
   (V.exp_to_string return_arg); flush(stdout);
   let (size, vine_size) = 
     match !opt_arch with 
@@ -1131,7 +1131,7 @@ let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
 	)
     )
   in
-  if !opt_trace_adaptor then
+  if !opt_trace_adapter then
     Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);
   fm#reset_saved_args;
   fm#set_reg_symbolic ( match !opt_arch with
@@ -1141,7 +1141,7 @@ let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
 (* (V.Cast(V.CAST_LOW, vine_size, arg)) not very well-tested change *)
     arg
   
-(* Return value type conversion adaptor code ends here *)
+(* Return value type conversion adapter code ends here *)
 
 
 (*
@@ -1152,8 +1152,8 @@ let ret_typeconv_adaptor (fm:fragment_machine) in_nargs =
    type = 4 -> length of an argument, ret_val counts args from zero TODO
 *)
 
-let ret_simplelen_adaptor fm in_nargs =
-  (*Printf.printf "Starting return-simplelen adaptor\n";*)
+let ret_simplelen_adapter fm in_nargs =
+  (*Printf.printf "Starting return-simplelen adapter\n";*)
   assert(in_nargs <> 0L);
   let saved_args_list = fm#get_saved_args () in
     assert((List.length saved_args_list) = (Int64.to_int in_nargs));
@@ -1190,7 +1190,7 @@ let ret_simplelen_adaptor fm in_nargs =
     (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
     fm#set_reg_symbolic R_RAX arg
 
-(* structure adaptor for concretely-addressed memory, 
+(* structure adapter for concretely-addressed memory, 
    similar implementaton in SRFM for symbolic regions *) 
 
 (*
@@ -1268,7 +1268,7 @@ let create_field_ranges_l fm =
      start array_offsets_l_h with a null entry *)
   let simplify e = 
     if !opt_split_target_formulas = true then fm#simplify_exp e else e in
-  let (t_n_fields, i_n_fields, max_size) = !opt_struct_adaptor_params in
+  let (t_n_fields, i_n_fields, max_size) = !opt_struct_adapter_params in
   let array_offsets_l_h = ref [(Hashtbl.create 0)] in 
   
   (* for i = 1 to n_fields do
@@ -1325,12 +1325,12 @@ let create_field_ranges_l fm =
 	let f_sz_str = ("f"^(Printf.sprintf "%d" field_num)^"_size") in
 	let f_n_str  = ("f"^(Printf.sprintf "%d" field_num)^"_n") in 
 	let field_sz = 
-	  if not !opt_adaptor_search_mode then 
-	    Hashtbl.find adaptor_vals f_sz_str
+	  if not !opt_adapter_search_mode then 
+	    Hashtbl.find adapter_vals f_sz_str
 	  else fm#get_fresh_symbolic f_sz_str 16 in
 	let field_n = 
-	  if not !opt_adaptor_search_mode then 
-	    Hashtbl.find adaptor_vals f_n_str
+	  if not !opt_adapter_search_mode then 
+	    Hashtbl.find adapter_vals f_n_str
 	  else fm#get_fresh_symbolic f_n_str 16 in
 	let new_s_b = (((start_byte+f_sz_t-1)/f_sz_t)*f_sz_t) in
 	let num_bytes_remaining = 
@@ -1386,7 +1386,7 @@ let create_field_ranges_l fm =
       Hashtbl.iter ( fun (field_num, _, end_byte, _, _) prev_cond  ->
 	assert(field_num = (k-1));
 	get_array_field_ranges_l k (end_byte+1) prev_cond n_fields ;
-	if !opt_trace_adaptor then
+	if !opt_trace_adapter then
 	  Printf.printf "AS.ml#field=%d Hashtbl.len = %d\n" k
 	    (Hashtbl.length (List.nth !array_offsets_l_h k));
       ) h;
@@ -1427,10 +1427,10 @@ let create_field_ranges_l fm =
   in
   t_array_field_ranges_l' := create_array_field_ranges_l t_n_fields;
   i_array_field_ranges_l' := create_array_field_ranges_l i_n_fields;
-  if !opt_trace_struct_adaptor = true then (
+  if !opt_trace_struct_adapter = true then (
     Printf.printf "SRFM#i_array_field_ranges_l'.length = %d\n" (List.length !i_array_field_ranges_l');
   );
-  if !opt_trace_struct_adaptor = true then (
+  if !opt_trace_struct_adapter = true then (
     List.iteri ( fun ind (field_num, start_b, end_b, n, sz, cond) ->
       Printf.printf "i_array_field_ranges_l'[%d]= (%d, %d, %d, %d, %d, %s)\n"
 	ind field_num start_b end_b n sz (V.exp_to_string cond);
@@ -1470,7 +1470,7 @@ let create_field_ranges_l fm =
   in 
   populate_i_n !t_array_field_ranges_l';
 
-  if !opt_trace_struct_adaptor = true then (
+  if !opt_trace_struct_adapter = true then (
     for i=0 to max_size-1 do
       Printf.printf "i_byte_arr': for byte %d: \n" i;
       let l = !((!i_byte_arr').(i)) in
@@ -1513,7 +1513,7 @@ let create_field_ranges_l fm =
 	:: !((!ranges_by_field_num).(f_num));
   ) !i_array_field_ranges_l';
 
-  if !opt_trace_struct_adaptor = true then (
+  if !opt_trace_struct_adapter = true then (
     for i=0 to max_size do
       Printf.printf "i_n_arr': for entries %d: \n" i;
       let l = !((!i_n_arr').(i)) in
@@ -1526,7 +1526,7 @@ let create_field_ranges_l fm =
   )
 
 
-let struct_adaptor (fm:fragment_machine) = 
+let struct_adapter (fm:fragment_machine) = 
   let from_concrete v sz = 
     match sz with 
     | 8 -> assert(v >= -128 && v <= 0xff);
@@ -1549,18 +1549,18 @@ let struct_adaptor (fm:fragment_machine) =
   (* let simplify e = e in *)
 
   let start_time = Sys.time () in
-  if (List.length !opt_synth_struct_adaptor) <> 0 then (
-    if !opt_trace_struct_adaptor = true then
-      Printf.printf "Starting structure adaptor\n";
+  if (List.length !opt_synth_struct_adapter) <> 0 then (
+    if !opt_trace_struct_adapter = true then
+      Printf.printf "Starting structure adapter\n";
     if !opt_time_stats then
-      (Printf.printf "Generating structure adaptor formulas...";
+      (Printf.printf "Generating structure adapter formulas...";
        flush stdout);
     List.iteri ( fun addr_list_ind addr -> 
       if !opt_time_stats then
 	(Printf.printf "(0x%08Lx)..." addr;
 	 flush stdout);
       if (Int64.abs (fix_s32 addr)) > 4096L then (
-	let (t_n_fields, i_n_fields, max_size) = !opt_struct_adaptor_params in
+	let (t_n_fields, i_n_fields, max_size) = !opt_struct_adapter_params in
 
 (* Commenting out for field_ranges_l starts here *)
 (*	let get_array_field_ranges_l field_num start_byte =
@@ -1654,9 +1654,9 @@ let struct_adaptor (fm:fragment_machine) =
 	let array_field_ranges_l = (List.rev !tmp_l) in *)
 (* Commenting out for field_ranges_l ends here *)
 
-(*	if !opt_trace_struct_adaptor = true then
+(*	if !opt_trace_struct_adapter = true then
 	  Printf.printf "AS#array_field_ranges_l.length = %d\n" (List.length array_field_ranges_l);
-	if !opt_trace_struct_adaptor = true then
+	if !opt_trace_struct_adapter = true then
 	  List.iteri ( fun ind (field_num, start_b, end_b, _, _, cond) ->
 	    Printf.printf "array_field_ranges_l[%d]= (%d, %x, %x, %s)\n"
 	      ind field_num start_b end_b (V.exp_to_string cond);
@@ -1691,7 +1691,7 @@ let struct_adaptor (fm:fragment_machine) =
 	in 
 	populate_i_n array_field_ranges_l;
 	
-	if !opt_trace_struct_adaptor = true then (
+	if !opt_trace_struct_adapter = true then (
 	  for i=0 to max_size-1 do
 	    Printf.printf "for byte %d: \n" i;
 	    let l = !((!i_byte_arr).(i)) in
@@ -1703,7 +1703,7 @@ let struct_adaptor (fm:fragment_machine) =
 	  done;
 	);
 
-	if !opt_trace_struct_adaptor = true then (
+	if !opt_trace_struct_adapter = true then (
 	  for i=0 to max_size do
 	    Printf.printf "i_n_arr: for entries %d: \n" i;
 	    let l = !((!i_n_arr).(i)) in
@@ -1815,7 +1815,7 @@ let struct_adaptor (fm:fragment_machine) =
 		     new_q_exp)
 	      in
 
-	      if !opt_trace_struct_adaptor = true then
+	      if !opt_trace_struct_adapter = true then
 		Hashtbl.replace t_field_h field_size_temp q_exp;
 	      
 	      V.Ite(cond, field_size_temp, 
@@ -1836,7 +1836,7 @@ let struct_adaptor (fm:fragment_machine) =
 	  let byte_expr_sym_str = "arr_ai_byte_"^(Printf.sprintf "%d_%d" i addr_list_ind) in
 	  let byte_expr_sym = fm#get_fresh_symbolic byte_expr_sym_str 8 in
 	  let q_exp = V.BinOp(V.EQ, byte_expr_sym, byte_expr) in
-	  if !opt_trace_struct_adaptor = true then
+	  if !opt_trace_struct_adapter = true then
 	    Printf.printf "AS#get_arr_ite_ai_byte_expr for byte %d: %s\n\n" i
 	      (V.exp_to_string q_exp);
 	  fm#add_to_path_cond q_exp; 
@@ -1844,9 +1844,9 @@ let struct_adaptor (fm:fragment_machine) =
 	done;
 	byte_expr_l := (List.rev !byte_expr_l);
 
-	if !opt_trace_struct_adaptor = true then
+	if !opt_trace_struct_adapter = true then
 	  Hashtbl.iter (fun key value ->
-	    Printf.printf "AS#apply_struct_adaptor t_field_h[%s] = %s\n" 
+	    Printf.printf "AS#apply_struct_adapter t_field_h[%s] = %s\n" 
 	      (V.exp_to_string key) (V.exp_to_string value);
 	  ) t_field_h; 
 	
@@ -1856,9 +1856,9 @@ let struct_adaptor (fm:fragment_machine) =
 	
       );
       
-    ) !opt_synth_struct_adaptor;
+    ) !opt_synth_struct_adapter;
   );
   if !opt_time_stats then
     (Printf.printf "AS#ready to apply (%f sec).\n" (Sys.time () -. start_time);
      flush stdout);
-  fm#sym_region_struct_adaptor;
+  fm#sym_region_struct_adapter;
