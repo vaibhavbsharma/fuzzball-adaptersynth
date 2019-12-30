@@ -102,6 +102,7 @@ val opt_trace_repair : bool ref
 val opt_repair_frag_start : int64 ref
 val opt_repair_frag_end : int64 ref
 val opt_repair_tests_file : (string * int) ref
+val opt_invalid_repair_tests_file : (string * int) ref
 val opt_wrong_argsub_adapters_file : string ref
 val opt_wrong_ret_adapters_file : string ref
 val opt_dont_compare_mem_se : bool ref
@@ -258,3 +259,4 @@ val opt_program_name : string option ref
 val opt_start_addr : int64 option ref
 val opt_argv : string list ref
 val state_start_addr : int64 option ref
+val synth_verify_adapter : bool ref

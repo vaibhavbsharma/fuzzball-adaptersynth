@@ -61,9 +61,12 @@ sig
     method reset : unit -> unit
 
     method read_repair_frag_inputs : unit
+    method read_invalid_repair_frag_inputs : unit
     method read_wrong_adapters: unit
     method get_repair_tests_processed : int
     method inc_repair_tests_processed : int
+    method get_invalid_repair_tests_processed : int
+    method inc_invalid_repair_tests_processed : int
     method conc_mem_struct_adapter: bool -> unit
     method sym_region_struct_adapter: unit
 

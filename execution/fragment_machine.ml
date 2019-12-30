@@ -375,9 +375,12 @@ class virtual fragment_machine = object
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
   method virtual read_repair_frag_inputs : unit
+  method virtual read_invalid_repair_frag_inputs : unit
   method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
   method virtual inc_repair_tests_processed : int
+  method virtual get_invalid_repair_tests_processed : int
+  method virtual inc_invalid_repair_tests_processed : int
   method virtual conc_mem_struct_adapter: bool -> unit
   method virtual sym_region_struct_adapter: unit
 
@@ -678,7 +681,9 @@ struct
     val mutable f1_ret_reg_val:(Vine.exp option ref) = ref None 
     val mutable f2_ret_reg_val:(Vine.exp option ref) = ref None
     val mutable num_repair_tests_processed:(int ref) = ref 0
+    val mutable num_invalid_repair_tests_processed:(int ref) = ref 0
     val mutable repair_frag_inputs:(int list list) = []
+    val mutable invalid_repair_frag_inputs:(int list list) = []
     val mutable e_o_f1_count = ref 0
     val mutable f2_init_count = ref 0
 
@@ -1194,14 +1199,28 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
-      (match (eip = !opt_repair_frag_start, eip = !opt_repair_frag_end, in_f1_range, in_f2_range, !opt_verify_adapter) with
-      | (false, false, _, _, _) -> ()
-      | (true, _, false, false, true) ->
+      let set_in_f2_range b suffix_str =
+	in_f2_range <- b;
+	let suffix = match suffix_str with
+	  | None -> ""
+	  | Some _suffix -> _suffix
+	in
+	if !opt_trace_repair then (
+	  Printf.printf "repair: Setting in_f2_range to %B, %s\n" b suffix;
+	  flush(stdout);) in
+      (match (eip = !opt_repair_frag_start,    (* 1 *)
+	      eip = !opt_repair_frag_end,      (* 2 *)
+	      in_f1_range,                     (* 3 *)
+	      in_f2_range,                     (* 4 *)
+	      !opt_verify_adapter,             (* 5 *)
+	      !synth_verify_adapter) with      (* 6 *) 
+      | (false, false, _, _, _, _) -> ()
+      | (true, _, false, false, true, false) -> (* reached frag start, verify_adapter is true *)
 	 if !opt_trace_repair then (
-	   Printf.printf "repair: Setting in_f2_range = true because verify_adapter=true\n";
+	   Printf.printf "repair: Setting in_f2_range = true because verify_adapter is true\n";
 	   flush(stdout););
-	in_f1_range <- false; in_f2_range <- true;
-      | (true, _, false, false, false) ->
+	in_f1_range <- false; set_in_f2_range true (Some " because verify_adapter is true")
+      | (true, _, false, false, false, false) -> (* reached frag start *)
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: Setting in_f1_range to true\n";
 	   flush(stdout););
@@ -1210,11 +1229,16 @@ struct
 	self#make_f1_sym_snap; 
 	self#make_f1_conc_snap;  
 	self#make_f1_special_handlers_snap ;
-      | (_, true, true, false, false) ->
+      | (true, _, false, true, false, true) -> (* reached frag start in f2 range in synth-verify mode *)
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: reached frag start in f2 range in synth-verify mode\n";
+	   flush(stdout););
+	self#apply_invalid_repair_target_frag_inputs;
+      | (_, true, true, false, false, false) -> (* reached frag end in f1 range *)
 	 if !opt_trace_repair then (
 	   Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
 	   flush(stdout););
-	in_f1_range <- false; in_f2_range <- true;
+	in_f1_range <- false; set_in_f2_range true None;
 	self#save_f1_ret_reg ;
 	self#save_f1_sym_se ;
 	self#save_f1_conc_se ;
@@ -1222,11 +1246,9 @@ struct
 	self#make_f2_sym_snap ;
 	self#make_f2_conc_snap ;
 	self#make_f2_special_handlers_snap ;
-      | (_, true, false, true, _) ->
-	 if !opt_trace_repair then (
-	   Printf.printf "repair: Setting in_f2_range to false\n";
-	   flush(stdout););
-	if not !opt_verify_adapter then (
+      | (_, true, false, true, _, false) -> (* reached frag end in f2 range *) 
+	if not !opt_verify_adapter && not !synth_verify_adapter then (
+	  (* no eqchk needed if we only verifying the adapter *)
 	  self#save_f2_ret_reg ;
 	  if not self#compare_ret_reg_vals then (
 	    raise DisqualifiedPath;);
@@ -1238,11 +1260,33 @@ struct
 	    mem#reset4_3 ();
 	    saved_f1_rsp <- 0L;
 	    saved_f2_rsp <- 0L;););
-	in_f2_range <- false;
 	Printf.printf "Match\n"; flush(stdout);
 	let (_, num_total_tests) = !opt_repair_tests_file in
+	let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
+	
 	if self#get_repair_tests_processed = num_total_tests then (
-	  Printf.printf "All tests succeeded!\n"; flush(stdout);)
+	  Printf.printf "All functional tests succeeded!\n"; flush(stdout);
+	  if self#get_invalid_repair_tests_processed < num_invalid_total_tests then (
+	    synth_verify_adapter := true;
+	    set_in_f2_range true (Some " to start running verification tests\n")
+	  ) else (
+	    Printf.printf "All tests succeeded!\n"; flush(stdout);
+	    set_in_f2_range false None
+	  )
+	) else ( set_in_f2_range false None)
+      | (_, true, false, true, false, true) -> (* reached frag end in f2 range in synth-verify mode*)
+	 Printf.printf "Match\n"; flush(stdout);
+	let (_, num_total_tests) = !opt_repair_tests_file in
+	let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
+	assert(self#get_repair_tests_processed >=num_total_tests);
+	if self#get_invalid_repair_tests_processed < num_invalid_total_tests then (
+	  synth_verify_adapter := true;
+	  set_in_f2_range true (Some (Printf.sprintf " to run more verification tests\nrepair: %d of %d verification tests processed\n" self#get_invalid_repair_tests_processed num_invalid_total_tests))
+	) else (
+	  synth_verify_adapter := false;
+	  Printf.printf "All tests succeeded!\n"; flush(stdout);
+	  set_in_f2_range false None
+	)
       | _ -> ());
 	
       let control_range_opts opts_list range_val other_val =
@@ -2429,6 +2473,8 @@ struct
       in_f1_range <- false;
       in_f2_range <- false;
       num_repair_tests_processed := 0;
+      num_invalid_repair_tests_processed := 0;
+      synth_verify_adapter := false;
       List.iter (fun h -> h#reset) special_handler_list
 
   method sym_region_struct_adapter = 
@@ -3678,26 +3724,12 @@ struct
 	(argsub_cons @ retsub_cons)
       
     method read_repair_frag_inputs =
-      let get_bytes_from_file filename len =
-	let ch = open_in filename in
-	let buf = Buffer.create len in
-	(try Buffer.add_channel buf ch len
-	 with End_of_file ->
-	   failwith (Printf.sprintf "failed to read %d bytes from %s file\n" len filename));
-	close_in ch;
-	Buffer.to_bytes buf
-      in
       let (prefix, num_tests) = !opt_repair_tests_file in
       let (_, input_size) = !opt_repair_frag_input in
       if num_tests > 0 then (
 	for i = 0 to num_tests-1 do
 	  let file_name = prefix ^ (Printf.sprintf "%d" i) in
-	  let bytes = get_bytes_from_file file_name input_size in
-	  let rec bytes_to_ints bytes ind =
-	    if ind < Bytes.length bytes then
-	      (int_of_char (Bytes.get bytes ind)) :: (bytes_to_ints bytes (ind+1))
-	    else [] in
-	  let int_vals = bytes_to_ints bytes 0 in
+	  let int_vals = self#read_int_inputs file_name input_size in
 	  repair_frag_inputs <- repair_frag_inputs @ [int_vals];
 	  if !opt_trace_repair then (
 	    Printf.printf "repair: file_name = %s, int_vals =  " file_name;
@@ -3709,8 +3741,49 @@ struct
 	done;
       );
 
+    method read_invalid_repair_frag_inputs =
+      let (prefix, num_tests) = !opt_invalid_repair_tests_file in
+      let (_, input_size) = !opt_repair_frag_input in
+      if num_tests > 0 then (
+	for i = 0 to num_tests-1 do
+	  let file_name = prefix ^ (Printf.sprintf "%d" i) in
+	  let int_vals = self#read_int_inputs file_name input_size in
+	  invalid_repair_frag_inputs <- invalid_repair_frag_inputs @ [int_vals];
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: file_name = %s, int_vals =  " file_name;
+	    for j = 0 to (List.length int_vals)-1 do
+	      Printf.printf "%d, " (List.nth int_vals j);
+	    done;
+	    Printf.printf "\n";
+	    flush(stdout););
+	done;
+      );
+
+    method private read_int_inputs file_name input_size =
+      let get_bytes_from_file filename len =
+	let ch = open_in filename in
+	let buf = Buffer.create len in
+	(try Buffer.add_channel buf ch len
+	 with End_of_file ->
+	   failwith (Printf.sprintf "failed to read %d bytes from %s file\n" len filename));
+	close_in ch;
+	Buffer.to_bytes buf
+      in
+      let bytes = get_bytes_from_file file_name input_size in
+      let rec bytes_to_ints bytes ind =
+	if ind < Bytes.length bytes then
+	  (int_of_char (Bytes.get bytes ind)) :: (bytes_to_ints bytes (ind+1))
+	else [] in
+      bytes_to_ints bytes 0
+	  
+      
     method private apply_target_frag_inputs =
-      let this_test_inputs = List.nth repair_frag_inputs !num_repair_tests_processed in
+      self#store_test_inputs (List.nth repair_frag_inputs !num_repair_tests_processed)
+
+    method private apply_invalid_repair_target_frag_inputs =
+      self#store_test_inputs (List.nth invalid_repair_frag_inputs !num_invalid_repair_tests_processed)
+
+    method private store_test_inputs this_test_inputs =
       let (target_frag_input_addr, num_bytes) = !opt_repair_frag_input in
       assert (num_bytes = List.length this_test_inputs);
       for i = 0 to num_bytes-1 do
@@ -3721,14 +3794,19 @@ struct
 	  Printf.printf "repair: Wrote %d byte value to address 0x%08Lx\n" value addr;
 	  flush(stdout););
       done;
-      ()
 	
     method get_repair_tests_processed = !num_repair_tests_processed
 
     method inc_repair_tests_processed =
       num_repair_tests_processed := !num_repair_tests_processed + 1;
       !num_repair_tests_processed
-      
+
+    method get_invalid_repair_tests_processed = !num_invalid_repair_tests_processed
+
+    method inc_invalid_repair_tests_processed =
+      num_invalid_repair_tests_processed := !num_invalid_repair_tests_processed + 1;
+      !num_invalid_repair_tests_processed
+	
      method conc_mem_struct_adapter end_of_f1 =
       let get_ite_expr arg op const_type const then_val else_val = 
 	V.Ite(V.BinOp(op, arg, V.Constant(V.Int(const_type, const))),

@@ -303,10 +303,18 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
       | (None, None, None, None, None, None, None, None, None, None, Some addr) ->
 	 (* Reached end of target fragment to be repaired *)
 	 let (_, num_total_tests) = !opt_repair_tests_file in
+	 let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
 	 let num_tests_processed = fm#get_repair_tests_processed in
+	 let num_invalid_tests_processed = fm#get_invalid_repair_tests_processed in
+	 (* We should have at least one counterexample and zero or more invalid 
+	    tests in adapter search mode. Otherwise, the number of counterexamples
+	    and invalid tests should equal zero. *)
+	 assert(((not !opt_verify_adapter || not !opt_adapter_search_mode)
+		 && (num_total_tests = 0) && (num_invalid_total_tests = 0))
+		|| (!opt_adapter_search_mode && (num_total_tests > 0 && num_invalid_total_tests >= 0))); 
 	 if !opt_trace_repair then (
-	   Printf.printf "repair: %d of %d tests processed\n"
-	     num_tests_processed num_total_tests;
+	   Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed\n"
+	     num_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
 	   flush(stdout););
 	 if (fm#get_in_f1_range ()) then Some (fun () ->
 	   if !opt_trace_repair then (
@@ -315,11 +323,14 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
            (Some !opt_repair_frag_start))
 	 else (
 	   assert (fm#get_in_f2_range ());
-	   ignore(fm#inc_repair_tests_processed);
-	   if fm#get_repair_tests_processed < num_total_tests then Some (fun () -> 
+	   if fm#get_repair_tests_processed >= num_total_tests then (
+	     ignore(fm#inc_invalid_repair_tests_processed);)
+	   else ignore(fm#inc_repair_tests_processed);
+	   if fm#get_repair_tests_processed < num_total_tests ||
+	     fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () -> 
 	     if !opt_trace_repair then (
-	       Printf.printf "repair: %d of %d tests processed, jumping to repair-frag-start\n"
-		 num_tests_processed num_total_tests;
+	       Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed, jumping to repair-frag-start\n"
+		 num_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
 	       flush(stdout););
              (Some !opt_repair_frag_start))
 	   else Some (fun () -> (); (Some eip)));
@@ -431,7 +442,10 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
     if eip = !opt_repair_frag_end && fm#get_in_f2_range ()
     && !opt_synth_repair_ret_adapter <> None then (
       (* turning off return adapter that also tries to plug in an argument as the return value *)
-      Adapter_synthesis.ret_typeconv_adapter fm 0L; 
+      match !opt_synth_repair_ret_adapter with
+      | Some (_, nargs) when nargs = 0L -> 
+	 Adapter_synthesis.ret_typeconv_adapter fm 0L;
+      | _ -> failwith "non-zero argument to retvalsub adapter not supported in repair mode"
     );
       let prog' = match call_replacements fm last_eip eip with
 	| None -> prog

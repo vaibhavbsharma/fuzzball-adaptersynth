@@ -236,6 +236,12 @@ let symbolic_state_cmdline_opts =
 	opt_repair_tests_file := (s1, int_of_string s2)),
      "string:numtests Use 'string' file as prefix to 'numtests' "^
        "test input files starting from 'string'0");
+    ("-invalid-repair-tests-file", Arg.String
+      (fun s ->
+	let (s1,s2) = split_string ':' s in
+	opt_invalid_repair_tests_file := (s1, int_of_string s2)),
+     "string:numtests Use 'string' file as prefix to 'numtests' "^
+       "test input files starting from 'string'0");
     ("-wrong-argsub-adapters-file", Arg.String
       (fun s -> opt_wrong_argsub_adapters_file := s),
      "string wrong argsub adapters are in a file named 'string'");
@@ -908,11 +914,13 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
 		    fm#make_fresh_symbolic_region base (Int64.to_int len))
 	 !opt_symbolic_regions;
        List.iter (fun (base, len) ->
-		    new_max len;
-		    fm#store_symbolic_cstr base (Int64.to_int len) false false)
+	 new_max len;
+	 fm#store_symbolic_cstr base (Int64.to_int len) false false)
 	 !opt_symbolic_strings;
        List.iter (fun (base, len) ->
 		    new_max len;
+	 Printf.printf "making new symbolic cstring with length = %Ld\n" len;
+	 flush(stdout);
 		    fm#store_symbolic_cstr base (Int64.to_int len) false true)
 	 !opt_symbolic_cstrings;
        List.iter (fun (base, len) ->
@@ -961,6 +969,7 @@ let make_symbolic_init (fm:Fragment_machine.fragment_machine)
 		    fm#make_sink_region varname size)
 	 !opt_sink_regions;
        fm#read_repair_frag_inputs;
+       fm#read_invalid_repair_frag_inputs;
        fm#read_wrong_adapters;
        opt_target_region_formulas :=
 	 List.map (fun s -> fm#parse_symbolic_expr s)
