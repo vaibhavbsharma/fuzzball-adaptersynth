@@ -3313,8 +3313,19 @@ struct
 
     method make_symbolic_region base len varname pos =
       for i = 0 to len - 1 do
-	self#store_byte (Int64.add base (Int64.of_int i))
-	  (form_man#fresh_symbolic_mem_8 varname (Int64.of_int (pos + i)))
+	let new_pos = pos + i in
+	let (regname, size, prefix_size, suffix_size, conc_val) = !opt_input_region_sympresuf in
+	if !opt_trace_repair then (
+	  Printf.printf "repair: checking input-region, %s, to have concrete value %d at position %d against argument region name, %s\n"
+	    regname conc_val new_pos varname; flush(stdout););
+	let sym_var = (form_man#fresh_symbolic_mem_8 varname (Int64.of_int (pos + i))) in
+	if varname = regname && (new_pos >= prefix_size && new_pos <= size-suffix_size-1) && new_pos < size then (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: setting input-region, %s, to have concrete value %d at position %d\n"
+	      regname conc_val new_pos; flush(stdout););
+	  let conc_exp = V.Constant(V.Int(V.REG_8, (Int64.of_int conc_val))) in
+	  opt_extra_conditions := V.BinOp(V.EQ, conc_exp, (D.to_symbolic_8 sym_var)) :: !opt_extra_conditions;);
+	self#store_byte (Int64.add base (Int64.of_int i)) sym_var;
       done
 
     method make_fresh_symbolic_region base len =

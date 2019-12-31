@@ -213,7 +213,7 @@ object(self)
                           num_read_symbolic = 0;
                           snap_num_read = 0})
     in
-      a.(0).unix_fd <- (Some Unix.stdin);
+      a.(0).unix_fd <- (Some (if !opt_replace_stdin_with_zero then Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666 else Unix.stdin));
       a.(1).unix_fd <- (Some Unix.stdout);
       a.(2).unix_fd <- (Some Unix.stderr);
       a
@@ -836,10 +836,12 @@ object(self)
     Array.iteri
       (fun fd info ->
         if info.is_symbolic then
-	  ((try
-	      Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) info.snap_pos;
-	    with Unix.Unix_error(Unix.ESPIPE, "lseek", "") -> ());
-           info.snap_num_read <- info.num_read_symbolic)
+	  (Printf.printf "attempting to make_snap on fd=%d\n" fd; flush(stdout);
+	    (try
+	       Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) info.snap_pos;
+	       Printf.printf "make_snap on fd=%d succeeded\n" fd; flush(stdout);
+	    with Unix.Unix_error(Unix.ESPIPE, "lseek", "") -> ( Printf.printf "make_snap on fd=%d failed\n" fd; flush(stdout); ));
+           info.snap_num_read <- info.num_read_symbolic);
       ) fd_info
       
   method private reset_sym_fd_positions =
@@ -934,11 +936,13 @@ object(self)
 	  let _ = while Stack.length fd_info.(fd).snap_pos > 1 do
 	      ignore(Stack.pop fd_info.(fd).snap_pos);
 	    done in
-	  (match Stack.top fd_info.(fd).snap_pos with
-	  | Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
-	  | None -> ());
+	  if Stack.length fd_info.(fd).snap_pos > 0 then
+	    (match Stack.top fd_info.(fd).snap_pos with
+	    | Some pos -> ignore(Unix.lseek (self#get_fd fd) pos Unix.SEEK_SET)
+	    | None -> ());
 	  if Stack.length fd_info.(fd).snap_pos > 1 then
-	    ignore(Stack.pop fd_info.(fd).snap_pos););
+	    ignore(Stack.pop fd_info.(fd).snap_pos);
+          info.num_read_symbolic <- 0);
       ) fd_info
 
   method make_snap = 

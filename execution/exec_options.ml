@@ -123,6 +123,7 @@ let opt_trace_mem_snapshots = ref false
 let opt_trace_adapter = ref false
 let opt_fragments = ref false
 let opt_verify_adapter = ref false
+let opt_replace_stdin_with_zero = ref false
 let opt_repair_frag_input = ref (0L, 0)
 let opt_trace_repair = ref false
 let opt_repair_tests_file = ref ("", 0)
@@ -131,6 +132,7 @@ let opt_wrong_argsub_adapters_file = ref ""
 let opt_wrong_ret_adapters_file = ref ""
 let opt_repair_frag_start = ref Int64.minus_one
 let opt_repair_frag_end = ref Int64.minus_one
+let opt_input_region_sympresuf = ref ("", 0, 0, 0, 0)
 let opt_check_store_sequence = ref false
 let opt_dont_compare_mem_se = ref false
 let opt_dont_compare_syscalls = ref false
@@ -332,7 +334,7 @@ let add_delimited_info_4 opt char s =
    (Int64.of_string (List.nth list_str 2)), 
    (Int64.of_string (List.nth list_str 3))) :: !opt
 
-let add_delimited_info_s_i_i_i opt char s =
+let add_delimited_info_s_i64_i64_i64 opt char s =
   let rec loop arg_str =
     try 
       let delim_loc = String.index arg_str char in
@@ -347,6 +349,39 @@ let add_delimited_info_s_i_i_i opt char s =
    (Int64.of_string (List.nth list_str 1)), 
    (Int64.of_string (List.nth list_str 2)), 
    (Int64.of_string (List.nth list_str 3))) :: !opt
+
+let add_delimited_info_s_i64_i64_i64 opt char s =
+  let rec loop arg_str =
+    try 
+      let delim_loc = String.index arg_str char in
+      let str1 = String.sub arg_str 0 delim_loc in
+      let str2 = String.sub arg_str (delim_loc + 1) 
+                   ((String.length arg_str) - delim_loc - 1) in
+      [str1] @ (loop str2)
+    with Not_found -> [arg_str]
+  in
+  let list_str = loop s in
+  opt := ((List.nth list_str 0), 
+   (Int64.of_string (List.nth list_str 1)), 
+   (Int64.of_string (List.nth list_str 2)), 
+   (Int64.of_string (List.nth list_str 3))) :: !opt
+    
+let add_delimited_info_s_i_i_i_i opt char s =
+  let rec loop arg_str =
+    try 
+      let delim_loc = String.index arg_str char in
+      let str1 = String.sub arg_str 0 delim_loc in
+      let str2 = String.sub arg_str (delim_loc + 1) 
+                   ((String.length arg_str) - delim_loc - 1) in
+      [str1] @ (loop str2)
+    with Not_found -> [arg_str]
+  in
+  let list_str = loop s in
+  opt := ((List.nth list_str 0), 
+	  (int_of_string (List.nth list_str 1)), 
+	  (int_of_string (List.nth list_str 2)), 
+	  (int_of_string (List.nth list_str 3)),
+	  (int_of_string (List.nth list_str 4))) :: !opt
 
 let add_delimited_info_3 opt char s =
   let rec loop arg_str =

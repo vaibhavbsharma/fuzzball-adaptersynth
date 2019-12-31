@@ -230,6 +230,8 @@ let symbolic_state_cmdline_opts =
        "address 'addr2' which uses 'nargs2' arguments");
     ("-verify-adapter", Arg.Set(opt_verify_adapter),
      " Verifies an adapter provided using -synthesize-adapter and/or -synthesize-ret-adapter");
+    ("-replace-stdin-with-zero", Arg.Set(opt_replace_stdin_with_zero),
+     " Replace reads from stdin with reads from /dev/zero");
     ("-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
@@ -275,6 +277,15 @@ let symbolic_state_cmdline_opts =
     ("-repair-frag-end", Arg.String
        (fun s -> opt_repair_frag_end := Int64.of_string s),
      " EIP where target fragment ends (insn at this EIP is also part of target fragment)");
+    ("-input-region-sympresuf", Arg.String
+      (fun s -> let opt_list = ref [] in
+       add_delimited_info_s_i_i_i_i opt_list ':' s;
+       opt_input_region_sympresuf := List.hd !opt_list;),
+     " inputregionname:SIZE:PRE:SUF:VAL allows a symbolic input region "
+     ^ "(created by -symbolic-[c]string or -symbolic-stdin-concrete-size) "
+     ^ "to have PRE prefix symbolic bytes and SUF suffix symbolic bytes "
+     ^ "with everything in between set to the concrete value VAL "
+     ^ "assuming it is going to be SIZE bytes long");
     ("-synthesize-simple+len-adapter", Arg.String 
       (add_delimited_simplelen_info opt_synth_simplelen_adapter ':'),
      "addr1:nargs1:addr2:nargs2:length Using the simple+length adapter, "^
@@ -282,7 +293,7 @@ let symbolic_state_cmdline_opts =
        "which takes 'nargs1' arguments with a call to function at "^
        "address 'addr2' which users 'nargs2' arguments");
     ("-synthesize-return-adapter", Arg.String
-      (add_delimited_info_s_i_i_i opt_synth_ret_adapter ':'),
+      (add_delimited_info_s_i64_i64_i64 opt_synth_ret_adapter ':'),
      "string:addr1:addr2:N Using adapter of type 'string', "^
        "save N argument registers at addr1, " ^
        "replace the return value at instruction with address 'addr2' "^

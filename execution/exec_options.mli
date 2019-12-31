@@ -97,10 +97,12 @@ val opt_trace_mem_snapshots : bool ref
 val opt_trace_adapter : bool ref
 val opt_fragments  : bool ref
 val opt_verify_adapter : bool ref
+val opt_replace_stdin_with_zero : bool ref
 val opt_repair_frag_input : (int64 * int) ref
 val opt_trace_repair : bool ref
 val opt_repair_frag_start : int64 ref
 val opt_repair_frag_end : int64 ref
+val opt_input_region_sympresuf : (string * int * int * int * int) ref
 val opt_repair_tests_file : (string * int) ref
 val opt_invalid_repair_tests_file : (string * int) ref
 val opt_wrong_argsub_adapters_file : string ref
@@ -232,8 +234,10 @@ val add_delimited_info_10:
   (int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64 * int64) list ref -> char -> string -> unit
 val add_delimited_info_4 :
   (int64 * int64 * int64 * int64) list ref -> char -> string -> unit
-val add_delimited_info_s_i_i_i :
+val add_delimited_info_s_i64_i64_i64 :
   (string * int64 * int64 * int64) list ref -> char -> string -> unit
+val add_delimited_info_s_i_i_i_i :
+  (string * int * int * int * int) list ref -> char -> string -> unit
 val add_delimited_info_3 :
   (string * int64 * int64 ) list ref -> char -> string -> unit
 val add_delimited_info_3_nolist :
