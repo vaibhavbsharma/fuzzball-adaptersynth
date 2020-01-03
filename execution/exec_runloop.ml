@@ -265,13 +265,13 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	       (get_ite_expr var_type V.EQ V.REG_8 0L (get_ite_arg_expr var_val out_nargs)
 		  (get_ite_len_expr var_val out_nargs)) in
 	     (*Printf.printf "call_replacements thunk() exp=%s\n" (V.exp_to_string arg);*)
-             opt_extra_conditions :=
-               V.BinOp(
+             fm#add_to_path_cond
+               (V.BinOp(
                  V.BITOR,
                  V.BinOp(V.EQ,var_type,V.Constant(V.Int(V.REG_8,1L))),
                  V.BinOp(V.LT,var_val,V.Constant(V.Int(V.REG_64,out_nargs))))
-	     (*:: (restrict_range var_type var_val lower_bound upper_bound)*)
-             :: !opt_extra_conditions;
+	       (*:: (restrict_range var_type var_val lower_bound upper_bound)*)
+               );
 	     symbolic_args := arg :: !symbolic_args;
              if n > 0 then loop (n-1); 
            in
@@ -304,7 +304,6 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	 (* Reached end of target fragment to be repaired *)
 	 let (_, num_total_tests) = !opt_repair_tests_file in
 	 let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
-	 let num_tests_processed = fm#get_repair_tests_processed in
 	 let num_invalid_tests_processed = fm#get_invalid_repair_tests_processed in
 	 (* We should have at least one counterexample and zero or more invalid 
 	    tests in adapter search mode. Otherwise, the number of counterexamples
@@ -314,7 +313,7 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 		|| (!opt_adapter_search_mode && (num_total_tests > 0 && num_invalid_total_tests >= 0))); 
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed\n"
-	     num_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
+	     fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
 	   flush(stdout););
 	 if (fm#get_in_f1_range ()) then Some (fun () ->
 	   if !opt_trace_repair then (
@@ -330,7 +329,7 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	     fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () -> 
 	     if !opt_trace_repair then (
 	       Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed, jumping to repair-frag-start\n"
-		 num_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
+		 fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
 	       flush(stdout););
              (Some !opt_repair_frag_start))
 	   else Some (fun () -> (); (Some eip)));
@@ -428,7 +427,7 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
     let nargs = ref 0L in
-    if is_adapted_target_call_insn fm sl then (
+    if (is_adapted_target_call_insn fm sl) && eip = !opt_apply_call_repair_adapter_at then (
       if !opt_trace_adapter || !opt_trace_repair then (
 	Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;
 	flush(stdout););

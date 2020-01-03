@@ -1180,12 +1180,11 @@ let ret_simplelen_adapter fm in_nargs =
 	       (* get_ite_expr ret_type V.EQ V.REG_8 3L*) ite_saved_arg_expr
 	    )))
     in
-    opt_extra_conditions :=
-      V.BinOp(
+    fm#add_to_path_cond 
+      (V.BinOp(
 	V.BITOR,
 	V.BinOp(V.EQ,ret_type,V.Constant(V.Int(V.REG_8,1L))),
-	V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs))))
-    :: !opt_extra_conditions;
+	V.BinOp(V.LT,ret_val,V.Constant(V.Int(V.REG_64,in_nargs)))));
     fm#reset_saved_args;
     (*Printf.printf "setting return arg=%s\n" (V.exp_to_string arg);*)
     fm#set_reg_symbolic R_RAX arg

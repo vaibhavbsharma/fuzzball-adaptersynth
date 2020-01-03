@@ -67,6 +67,7 @@ sig
     method inc_repair_tests_processed : int
     method get_invalid_repair_tests_processed : int
     method inc_invalid_repair_tests_processed : int
+    method get_adapter_search_mode_stdin_fd : Unix.file_descr
     method conc_mem_struct_adapter: bool -> unit
     method sym_region_struct_adapter: unit
 

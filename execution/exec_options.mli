@@ -100,6 +100,7 @@ val opt_verify_adapter : bool ref
 val opt_replace_stdin_with_zero : bool ref
 val opt_repair_frag_input : (int64 * int) ref
 val opt_trace_repair : bool ref
+val opt_apply_call_repair_adapter_at: int64 ref
 val opt_repair_frag_start : int64 ref
 val opt_repair_frag_end : int64 ref
 val opt_input_region_sympresuf : (string * int * int * int * int) ref

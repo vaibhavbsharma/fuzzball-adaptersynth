@@ -271,6 +271,9 @@ let symbolic_state_cmdline_opts =
        "with an adapted return value using 'string' return value sub. adapter");
     ("-fragments", Arg.Set(opt_fragments),
      " Run adapter synthesis assuming the target function is a code fragment");
+    ("-apply-call-repair-adapter-at", Arg.String
+       (fun s -> opt_apply_call_repair_adapter_at := Int64.of_string s),
+     " EIP where we wish to apply the repair adapter to substitute method call arguments with their adapted versions");
     ("-repair-frag-start", Arg.String
        (fun s -> opt_repair_frag_start := Int64.of_string s),
      " EIP where target fragment begins (target fragment is the one we want to repair)");

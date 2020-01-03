@@ -130,6 +130,7 @@ let opt_repair_tests_file = ref ("", 0)
 let opt_invalid_repair_tests_file = ref ("", 0)
 let opt_wrong_argsub_adapters_file = ref ""
 let opt_wrong_ret_adapters_file = ref ""
+let opt_apply_call_repair_adapter_at = ref 0L
 let opt_repair_frag_start = ref Int64.minus_one
 let opt_repair_frag_end = ref Int64.minus_one
 let opt_input_region_sympresuf = ref ("", 0, 0, 0, 0)

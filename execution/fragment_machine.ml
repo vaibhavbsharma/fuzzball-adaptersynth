@@ -381,6 +381,7 @@ class virtual fragment_machine = object
   method virtual inc_repair_tests_processed : int
   method virtual get_invalid_repair_tests_processed : int
   method virtual inc_invalid_repair_tests_processed : int
+  method virtual get_adapter_search_mode_stdin_fd : Unix.file_descr
   method virtual conc_mem_struct_adapter: bool -> unit
   method virtual sym_region_struct_adapter: unit
 
@@ -684,6 +685,7 @@ struct
     val mutable num_invalid_repair_tests_processed:(int ref) = ref 0
     val mutable repair_frag_inputs:(int list list) = []
     val mutable invalid_repair_frag_inputs:(int list list) = []
+    val mutable stdin_redirect_fd:(Unix.file_descr option ref) = ref None
     val mutable e_o_f1_count = ref 0
     val mutable f2_init_count = ref 0
 
@@ -903,7 +905,12 @@ struct
 	b
       | (None, None) -> true
       | _ -> false
-      
+
+    method private compare_f2_syscall_num =
+      if !opt_trace_repair then (
+	Printf.printf "f1 made %d syscalls, f2 made %d syscalls\n" (List.length f1_syscalls) f2_syscalls_num;
+	flush(stdout););
+      (List.length f1_syscalls) = f2_syscalls_num
 	
     method save_f1_sym_se = 
       (* this method is implemented in SRFM *)
@@ -1219,6 +1226,7 @@ struct
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: Setting in_f2_range = true because verify_adapter is true\n";
 	   flush(stdout););
+	self#make_f2_special_handlers_snap ;
 	in_f1_range <- false; set_in_f2_range true (Some " because verify_adapter is true")
       | (true, _, false, false, false, false) -> (* reached frag start *)
 	 if !opt_trace_repair then (
@@ -1246,11 +1254,16 @@ struct
 	self#make_f2_sym_snap ;
 	self#make_f2_conc_snap ;
 	self#make_f2_special_handlers_snap ;
+	if !stdin_redirect_fd <> None then ( (* assuming that no stdin-redirect happened before f1, so we dont need a stack to maintain stdin_redirect_fd *)
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
+	  Unix.close (Option.get !stdin_redirect_fd);
+	  stdin_redirect_fd := None);
       | (_, true, false, true, _, false) -> (* reached frag end in f2 range *) 
 	if not !opt_verify_adapter && not !synth_verify_adapter then (
 	  (* no eqchk needed if we only verifying the adapter *)
 	  self#save_f2_ret_reg ;
-	  if not self#compare_ret_reg_vals then (
+	  if not self#compare_ret_reg_vals || not self#compare_f2_syscall_num then (
 	    raise DisqualifiedPath;);
 	  if !opt_dont_compare_mem_se = false then (
 	    self#compare_sym_se;
@@ -1259,7 +1272,8 @@ struct
 	  else (
 	    mem#reset4_3 ();
 	    saved_f1_rsp <- 0L;
-	    saved_f2_rsp <- 0L;););
+	    saved_f2_rsp <- 0L;);)
+	else if !opt_verify_adapter then ( self#reset_f2_special_handlers_snap;); 
 	Printf.printf "Match\n"; flush(stdout);
 	let (_, num_total_tests) = !opt_repair_tests_file in
 	let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
@@ -1273,7 +1287,12 @@ struct
 	    Printf.printf "All tests succeeded!\n"; flush(stdout);
 	    set_in_f2_range false None
 	  )
-	) else ( set_in_f2_range false None)
+	) else ( set_in_f2_range false None);
+	if !stdin_redirect_fd <> None then ( (* assuming that no stdin-redirect happened before f1, so we dont need a stack to maintain stdin_redirect_fd *)
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
+	  Unix.close (Option.get !stdin_redirect_fd);
+	  stdin_redirect_fd := None);
       | (_, true, false, true, false, true) -> (* reached frag end in f2 range in synth-verify mode*)
 	 Printf.printf "Match\n"; flush(stdout);
 	let (_, num_total_tests) = !opt_repair_tests_file in
@@ -2467,7 +2486,7 @@ struct
 	 move_hash t temps);
       fuzz_finish_reasons <- [];
       disqualified <- false;
-      if (List.length !opt_match_syscalls_addr_range) <> 0 then
+      if (List.length !opt_match_syscalls_addr_range) <> 0 || !opt_repair_frag_start <> 0L then (* we dont provide -match-syscalls-addr-range when doing repair with FuzzBALL *)
 	self#reset_syscalls ;
       adapted_arg_addrs <- [];
       in_f1_range <- false;
@@ -2475,6 +2494,11 @@ struct
       num_repair_tests_processed := 0;
       num_invalid_repair_tests_processed := 0;
       synth_verify_adapter := false;
+      if !stdin_redirect_fd <> None then (
+	if !opt_trace_repair then (
+	  Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
+	Unix.close (Option.get !stdin_redirect_fd););
+      stdin_redirect_fd := None;
       List.iter (fun h -> h#reset) special_handler_list
 
   method sym_region_struct_adapter = 
@@ -3324,7 +3348,13 @@ struct
 	    Printf.printf "repair: setting input-region, %s, to have concrete value %d at position %d\n"
 	      regname conc_val new_pos; flush(stdout););
 	  let conc_exp = V.Constant(V.Int(V.REG_8, (Int64.of_int conc_val))) in
-	  opt_extra_conditions := V.BinOp(V.EQ, conc_exp, (D.to_symbolic_8 sym_var)) :: !opt_extra_conditions;);
+	  self#add_to_path_cond (V.BinOp(V.EQ, conc_exp, (D.to_symbolic_8 sym_var))))
+	else if varname = regname && new_pos = (size-1) then (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: setting input-region, %s, to have concrete value %d at position %d\n"
+	      regname 0 new_pos; flush(stdout););
+	  let conc_exp = V.Constant(V.Int(V.REG_8, 0L)) in
+	  self#add_to_path_cond (V.BinOp(V.EQ, conc_exp, (D.to_symbolic_8 sym_var))));
 	self#store_byte (Int64.add base (Int64.of_int i)) sym_var;
       done
 
@@ -3796,7 +3826,7 @@ struct
 
     method private store_test_inputs this_test_inputs =
       let (target_frag_input_addr, num_bytes) = !opt_repair_frag_input in
-      assert (num_bytes = List.length this_test_inputs);
+      assert (num_bytes = List.length this_test_inputs || target_frag_input_addr = 0L);
       for i = 0 to num_bytes-1 do
 	let addr = (Int64.add target_frag_input_addr (Int64.of_int i)) in
 	let value = (List.nth this_test_inputs i) in
@@ -3809,14 +3839,83 @@ struct
     method get_repair_tests_processed = !num_repair_tests_processed
 
     method inc_repair_tests_processed =
+      if !opt_trace_repair then (
+	Printf.printf "repair: Incrementing num_repair_tests_processed from %d to %d\n"
+	  !num_repair_tests_processed (!num_repair_tests_processed + 1);
+	flush(stdout););
       num_repair_tests_processed := !num_repair_tests_processed + 1;
+      let (_, total_repair_tests) = !opt_repair_tests_file in
+      if !num_repair_tests_processed < total_repair_tests then (
+	if !stdin_redirect_fd <> None then (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
+	  Unix.close (Option.get !stdin_redirect_fd);
+	) else (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: stdin_redirect_fd was already None\n"; flush(stdout););
+	);
+	self#open_stdin_redirect_fd;
+      );
       !num_repair_tests_processed
 
     method get_invalid_repair_tests_processed = !num_invalid_repair_tests_processed
 
     method inc_invalid_repair_tests_processed =
+      if !opt_trace_repair then (
+	Printf.printf "repair: Incrementing num_invalid_repair_tests_processed from %d to %d\n"
+	  !num_invalid_repair_tests_processed (!num_invalid_repair_tests_processed + 1);
+	flush(stdout););
       num_invalid_repair_tests_processed := !num_invalid_repair_tests_processed + 1;
+      let (_, total_invalid_repair_tests) = !opt_invalid_repair_tests_file in
+      if !num_invalid_repair_tests_processed < total_invalid_repair_tests then (
+	if !stdin_redirect_fd <> None then (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
+	  Unix.close (Option.get !stdin_redirect_fd);
+	) else (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: stdin_redirect_fd was already None\n"; flush(stdout););
+	);
+	self#open_stdin_redirect_fd;
+      );
       !num_invalid_repair_tests_processed
+
+    method get_adapter_search_mode_stdin_fd =
+      assert(!opt_adapter_search_mode);
+      if !opt_trace_repair then (
+	Printf.printf "repair: get_adapter_search_mode_stdin_fd called, in-f1-range=%B, in-f2-range=%B\n"
+	  in_f1_range in_f2_range; flush(stdout););
+      if not (self#get_in_f1_range ()) && not (self#get_in_f2_range ()) then (
+	if !opt_trace_repair then (
+	  Printf.printf "****warning: repair: get_adapter_search_mode: not in f1 or f2 range in adapter-search-mode, returning fd to /dev/zero****\n";
+	  flush(stdout););
+	Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666)
+      else (
+	let rec deoptionize_stdin_fd ref_fd = 
+	  match ref_fd with
+	  | None -> self#open_stdin_redirect_fd;
+	    deoptionize_stdin_fd !stdin_redirect_fd
+	  | Some fd -> fd in
+	deoptionize_stdin_fd !stdin_redirect_fd)
+	
+    method private open_stdin_redirect_fd =
+      assert(!opt_adapter_search_mode);
+      let get_file_name (prefix, len) ind = assert(ind < len && ind >= 0);
+	prefix ^ (Printf.sprintf "%d" ind) in
+      assert(self#get_in_f1_range () || self#get_in_f2_range ());
+      stdin_redirect_fd := Some (match (!opt_replace_stdin_with_zero, !opt_adapter_search_mode, !synth_verify_adapter) with
+      | (true, _, _) -> failwith "turn off -replace-stdin-with-zero when replacing stdin in -adapter-search-mode" 
+      | (false, true, false) ->
+	 let file_name = get_file_name !opt_repair_tests_file (self#get_repair_tests_processed) in
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: setting stdin to read from from file_name = %s\n" file_name; flush(stdout););
+	 Unix.openfile file_name [Unix.O_RDONLY] 0o600
+      | (false, true, true) ->
+	 let file_name = get_file_name !opt_invalid_repair_tests_file (self#get_invalid_repair_tests_processed) in
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: setting stdin to read from file_name = %s\n" file_name; flush(stdout););
+	 Unix.openfile file_name [Unix.O_RDONLY] 0o600
+      | (_, false, _) -> failwith "repair: fm#open_stdin_redirect_fd should never be called when adapter-search-mode is turned off");
 	
      method conc_mem_struct_adapter end_of_f1 =
       let get_ite_expr arg op const_type const then_val else_val = 

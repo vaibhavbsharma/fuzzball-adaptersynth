@@ -99,8 +99,7 @@ type fd_extra_info = {
   mutable snap_pos : int option Stack.t;
   mutable is_symbolic : bool;
   mutable is_concolic : bool;
-  mutable num_read_symbolic : int;
-  mutable snap_num_read : int;
+  mutable num_read_symbolic : int Stack.t;
 }
 
 (* N.b. the argument order here is the opposite from D.assemble64,
@@ -210,13 +209,17 @@ object(self)
                           snap_pos = Stack.create();
                           is_symbolic = false;
                           is_concolic = false;
-                          num_read_symbolic = 0;
-                          snap_num_read = 0})
+                          num_read_symbolic = let s = Stack.create() in
+					      Stack.push 0 s; s})
     in
-      a.(0).unix_fd <- (Some (if !opt_replace_stdin_with_zero then Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666 else Unix.stdin));
-      a.(1).unix_fd <- (Some Unix.stdout);
-      a.(2).unix_fd <- (Some Unix.stderr);
-      a
+    a.(0).unix_fd <- (Some (match !opt_replace_stdin_with_zero with
+    | true -> if !opt_trace_repair then (
+	 Printf.printf "Setting stdin to read from /dev/zero\n"; flush(stdout));
+       Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666
+    | false -> Unix.stdin));
+    a.(1).unix_fd <- (Some Unix.stdout);
+    a.(2).unix_fd <- (Some Unix.stderr);
+    a
 
   method private fresh_fd () =
     let rec loop i = match fd_info.(i).unix_fd with
@@ -229,9 +232,10 @@ object(self)
       raise (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
     else
       match fd_info.(vt_fd).unix_fd with
-	| Some fd -> fd
-	| None -> raise
-	    (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
+      | Some fd when vt_fd = 0 && !opt_adapter_search_mode && !opt_repair_frag_start <> 0L -> fm#get_adapter_search_mode_stdin_fd
+      | Some fd -> fd
+      | None -> raise
+	 (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
 
   method private clear_fd vt_fd =
     fd_info.(vt_fd).unix_fd <- None;
@@ -241,8 +245,8 @@ object(self)
     Stack.clear fd_info.(vt_fd).snap_pos;
     fd_info.(vt_fd).is_symbolic <- false;
     fd_info.(vt_fd).is_concolic <- false;
-    fd_info.(vt_fd).num_read_symbolic <- 0;
-    fd_info.(vt_fd).snap_num_read <- 0
+    Stack.clear fd_info.(vt_fd).num_read_symbolic;
+    Stack.push 0 fd_info.(vt_fd).num_read_symbolic;
 
   method private new_fd vt_fd unix_fd =
     self#clear_fd vt_fd;
@@ -258,7 +262,6 @@ object(self)
     fd_info.(new_vt_fd).is_symbolic <- old.is_symbolic;
     fd_info.(new_vt_fd).is_concolic <- old.is_concolic;
     fd_info.(new_vt_fd).num_read_symbolic <- old.num_read_symbolic;
-    fd_info.(new_vt_fd).snap_num_read <- old.snap_num_read;
 
   val netlink_sim_sockfd = ref 1025
   val netlink_sim_seq = ref 0L
@@ -840,8 +843,9 @@ object(self)
 	    (try
 	       Stack.push (Some (Unix.lseek (self#get_fd fd) 0 Unix.SEEK_CUR)) info.snap_pos;
 	       Printf.printf "make_snap on fd=%d succeeded\n" fd; flush(stdout);
-	    with Unix.Unix_error(Unix.ESPIPE, "lseek", "") -> ( Printf.printf "make_snap on fd=%d failed\n" fd; flush(stdout); ));
-           info.snap_num_read <- info.num_read_symbolic);
+	     with Unix.Unix_error(Unix.ESPIPE, "lseek", "") ->
+	       ( Printf.printf "make_snap on fd=%d failed\n" fd; flush(stdout); ));
+           Stack.push (Stack.top info.num_read_symbolic) info.num_read_symbolic;);
       ) fd_info
       
   method private reset_sym_fd_positions =
@@ -853,12 +857,13 @@ object(self)
 	    | None -> ());
 	    if Stack.length fd_info.(fd).snap_pos > 1 then
 	      ignore(Stack.pop fd_info.(fd).snap_pos);
-            info.num_read_symbolic <- info.snap_num_read)
+            if Stack.length fd_info.(fd).num_read_symbolic > 1 then
+	      ignore(Stack.pop info.num_read_symbolic))
       ) fd_info
 
 
   method private save_unix_fd_positions = 
-    for vt_fd = 3 to (Array.length fd_info)-1 do 
+    let save_unix_fd_positions_for_vtfd vt_fd = 
       match fd_info.(vt_fd).unix_fd with
       | Some _fd ->
 	 (try 
@@ -873,11 +878,14 @@ object(self)
 		(Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname cur_pos;
 	      flush stdout);
 	  with | Unix.Unix_error(err, _, _) -> self#put_errno err);
-      | _ -> ()
+      | _ -> () in
+    save_unix_fd_positions_for_vtfd 0;
+    for vt_fd = 3 to (Array.length fd_info)-1 do
+      save_unix_fd_positions_for_vtfd vt_fd;
     done
 
   method private reset_unix_fd_positions =
-    for vt_fd = 3 to (Array.length fd_info)-1 do 
+    let reset_unix_fd_positions_for_vtfd vt_fd = 
       match fd_info.(vt_fd).unix_fd with
       | Some _fd -> 
 	 (try
@@ -898,11 +906,14 @@ object(self)
 	  Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s\n"
 	    (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname; 
 	  flush stdout);
-      | _ -> ()
+      | _ -> () in
+    reset_unix_fd_positions_for_vtfd 0;
+    for vt_fd = 3 to (Array.length fd_info)-1 do
+      reset_unix_fd_positions_for_vtfd vt_fd; 
     done
 
   method private reset_unix_fd_positions_to_base =
-    for vt_fd = 3 to (Array.length fd_info)-1 do 
+    let reset_unix_fd_positions_to_base_for_vtfd vt_fd = 
       match fd_info.(vt_fd).unix_fd with
       | Some _fd ->
 	if !opt_trace_mem_snapshots = true then (
@@ -926,7 +937,10 @@ object(self)
 	   Printf.printf "linux_syscalls#reset_unix_fd_positions after len = %d fname = %s\n"
 	     (Stack.length fd_info.(vt_fd).snap_pos) fd_info.(vt_fd).fname;
 	   flush stdout);
-      | _ -> ()
+      | _ -> () in
+    reset_unix_fd_positions_to_base_for_vtfd 0;
+    for vt_fd = 3 to (Array.length fd_info)-1 do
+      reset_unix_fd_positions_to_base_for_vtfd vt_fd; 
     done
       
   method private reset_sym_fd_positions_to_base =
@@ -942,7 +956,12 @@ object(self)
 	    | None -> ());
 	  if Stack.length fd_info.(fd).snap_pos > 1 then
 	    ignore(Stack.pop fd_info.(fd).snap_pos);
-          info.num_read_symbolic <- 0);
+          while Stack.length info.num_read_symbolic > 1 do
+	    ignore(Stack.pop info.num_read_symbolic); done;
+	  if !opt_trace_mem_snapshots then (
+	    Printf.printf "linux_syscalls#reset_sym_fd_positions_to_base fd=%d to %d num_read_symbolic\n"
+	      fd (Stack.top info.num_read_symbolic); flush(stdout););
+	);
       ) fd_info
 
   method make_snap = 
@@ -1975,16 +1994,17 @@ object(self)
       fm#maybe_start_symbolic
         (fun () ->
 	  (let name = if fd = 0 then "stdin" else "file" and
-               pos = fd_info.(fd).num_read_symbolic
+               pos = Stack.top fd_info.(fd).num_read_symbolic
            in
            if is_concolic then
 	     fm#store_concolic_name_str buf (String.sub str 0 num_read)
                name pos
 	   else
 	     fm#make_symbolic_region buf num_read name pos;
-           fd_info.(fd).num_read_symbolic <- pos + num_read;
+	   ignore(Stack.pop fd_info.(fd).num_read_symbolic);
+	   Stack.push (pos + num_read) fd_info.(fd).num_read_symbolic;
 	   max_input_string_length :=
-	     max (!max_input_string_length) fd_info.(fd).num_read_symbolic))
+	     max (!max_input_string_length) (Stack.top fd_info.(fd).num_read_symbolic)))
     else
       fm#store_str buf 0L (String.sub str 0 num_read);
 
@@ -3207,7 +3227,7 @@ object(self)
        done;*)
        fm#add_f1_syscall_with_args syscall_num arg_list;
      );
-     if (fm#get_in_f2_range ()) && (not !opt_dont_compare_syscalls) then (
+     if (fm#get_in_f2_range ()) && (not !opt_dont_compare_syscalls) && not !synth_verify_adapter then (
        let (num_args, name) = Noop_syscalls.syscalls_x64.(syscall_num) in
        if !opt_trace_syscalls || !opt_trace_adapter then
 	 (Printf.printf "f2:syscall(%d)\n" syscall_num;
