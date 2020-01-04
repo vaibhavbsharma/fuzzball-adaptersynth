@@ -427,7 +427,30 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
     let nargs = ref 0L in
-    if (is_adapted_target_call_insn fm sl) && eip = !opt_apply_call_repair_adapter_at then (
+    let match_adapter_eip call_eip =
+      let adapter_eip_var = fm#get_fresh_symbolic "repair_EIP" 64 in
+      let cond = V.BinOp(V.EQ, adapter_eip_var, V.Constant(V.Int(V.REG_64, call_eip))) in
+      let get_constant_val const_exp =
+	match const_exp with
+	| V.Constant(V.Int(V.REG_64, value)) -> value
+	| _ -> failwith "unexpected expression provided to get_constant_val"
+      in
+      if not !opt_adapter_search_mode then (
+	(get_constant_val (Hashtbl.find Adapter_vars.adapter_vals "repair_EIP")) = call_eip)
+      else (
+	let (b,_) = (fm#query_condition cond (Some true) 0x6cff) in
+	if b = true then (
+	  if !opt_trace_repair then
+	    Printf.printf "repair: setting repair_EIP to 0x%08Lx\n" call_eip; flush(stdout);
+	  true
+	) else (
+	  if !opt_trace_repair then
+	    Printf.printf "repair: not setting repair_EIP to 0x%08Lx\n" call_eip; flush(stdout);
+	  false
+	))
+    in
+    if (is_adapted_target_call_insn fm sl)
+	&& ((eip = !opt_apply_call_repair_adapter_at) || (match_adapter_eip eip)) then (
       if !opt_trace_adapter || !opt_trace_repair then (
 	Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;
 	flush(stdout););

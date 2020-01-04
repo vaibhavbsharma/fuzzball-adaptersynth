@@ -1275,6 +1275,7 @@ struct
 	    saved_f2_rsp <- 0L;);)
 	else if !opt_verify_adapter then ( self#reset_f2_special_handlers_snap;); 
 	Printf.printf "Match\n"; flush(stdout);
+	if not !opt_adapter_search_mode then raise (SimulatedExit(0L));
 	let (_, num_total_tests) = !opt_repair_tests_file in
 	let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
 	
@@ -1285,7 +1286,8 @@ struct
 	    set_in_f2_range true (Some " to start running verification tests\n")
 	  ) else (
 	    Printf.printf "All tests succeeded!\n"; flush(stdout);
-	    set_in_f2_range false None
+	    set_in_f2_range false None;
+	    raise (SimulatedExit(0L));
 	  )
 	) else ( set_in_f2_range false None);
 	if !stdin_redirect_fd <> None then ( (* assuming that no stdin-redirect happened before f1, so we dont need a stack to maintain stdin_redirect_fd *)
@@ -1304,7 +1306,8 @@ struct
 	) else (
 	  synth_verify_adapter := false;
 	  Printf.printf "All tests succeeded!\n"; flush(stdout);
-	  set_in_f2_range false None
+	  set_in_f2_range false None;
+	  raise (SimulatedExit(0L));
 	)
       | _ -> ());
 	

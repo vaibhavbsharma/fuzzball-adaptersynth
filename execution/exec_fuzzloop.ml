@@ -166,7 +166,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	 ignore(fm#get_fresh_symbolic var_name 8);
 	 if n > -1 then chartrans_loop (n-1); in
        if mode = "simple" && in_nargs > 0L
-       then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1
+       then (simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_is_const" 1;
+	     ignore(fm#get_fresh_symbolic "repair_EIP" 64);)
        else if mode = "typeconv" && in_nargs > 0L
        then simple_loop ((Int64.to_int in_nargs)-1) out_nargs "_type" 8
        else if (mode = "arithmetic_int") && in_nargs > 0L
