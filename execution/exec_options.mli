@@ -40,8 +40,10 @@ val opt_branch_preference_unchecked : (int64, int64) Hashtbl.t
 val opt_always_prefer : bool option ref
 val opt_iteration_limit : int64 ref
 val opt_f2_iteration_limit : int64 ref
+val opt_f1_iteration_limit : int64 ref
 val opt_iteration_limit_enforced : int64 option ref
 val opt_f2_iteration_limit_enforced : int64 option ref
+val opt_f1_iteration_limit_enforced : int64 option ref
 val opt_insn_limit : int64 ref
 val opt_watch_expr_str : string option ref
 val opt_watch_expr : Vine.exp option ref
@@ -98,7 +100,11 @@ val opt_trace_adapter : bool ref
 val opt_fragments  : bool ref
 val opt_verify_adapter : bool ref
 val opt_replace_stdin_with_zero : bool ref
+val opt_save_stdin_reads_to_fd : Unix.file_descr option ref
+val opt_trace_callstack_on_syscall : int ref
+val opt_trace_callstack_at_eip: int64 list ref
 val opt_repair_frag_input : (int64 * int) ref
+val opt_stdin_replay_file_target_frag_offset : int ref
 val opt_trace_repair : bool ref
 val opt_apply_call_repair_adapter_at: int64 ref
 val opt_repair_frag_start : int64 ref
@@ -265,3 +271,4 @@ val opt_start_addr : int64 option ref
 val opt_argv : string list ref
 val state_start_addr : int64 option ref
 val synth_verify_adapter : bool ref
+val stdin_replay_fd : Unix.file_descr option ref

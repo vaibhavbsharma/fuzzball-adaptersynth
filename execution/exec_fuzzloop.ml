@@ -97,6 +97,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		   if !opt_fuzz_start_addr_count = 0 then 
 		     opt_iteration_limit_enforced := Some !opt_iteration_limit;
 		     opt_f2_iteration_limit_enforced := Some !opt_f2_iteration_limit;
+		     opt_f1_iteration_limit_enforced := Some !opt_f1_iteration_limit;
 		   !opt_fuzz_start_addr_count = 0
 		  )
 		else
@@ -370,7 +371,7 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 	     let stop str is_mismatch = if !opt_trace_stopping then
 	       let stop_eip = fm#get_eip in
 	       Printf.printf "Stopping %s at 0x%08Lx\n" str stop_eip;
-	       if fm#get_in_f2_range () && is_mismatch then (
+	       if fm#get_in_f2_range () && is_mismatch && not !opt_verify_adapter then (
 		 Printf.printf "Mismatch\n"; flush(stdout););
 	     in
 	       fm#set_iter_seed (Int64.to_int iter);
@@ -429,6 +430,8 @@ let fuzz start_eip opt_fuzz_start_eip end_eips
 		 (Hashtbl.length trans_cache - old_tcs > 0) then
 		   Printf.printf "Coverage increased to %d on %Ld\n"
 		     (Hashtbl.length trans_cache) iter;
+	       if !opt_save_stdin_reads_to_fd <> None then (
+		 Unix.close (Option.get !opt_save_stdin_reads_to_fd););
 	       periodic_stats fm false false;
 	       if not fm#finish_path then raise LastIteration;
 	       if !opt_concrete_path then raise LastIteration;

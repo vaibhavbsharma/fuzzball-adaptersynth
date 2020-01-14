@@ -88,6 +88,8 @@ sig
     method reset : unit -> unit
 
     method read_repair_frag_inputs : unit
+    method trace_entire_callstack: unit
+    method stdin_replay_file_target_frag_offset_reached : bool
     method read_invalid_repair_frag_inputs : unit
     method read_wrong_adapters: unit
     method get_repair_tests_processed : int

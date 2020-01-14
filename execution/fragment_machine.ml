@@ -375,6 +375,8 @@ class virtual fragment_machine = object
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
   method virtual read_repair_frag_inputs : unit
+  method virtual trace_entire_callstack: unit
+  method virtual stdin_replay_file_target_frag_offset_reached : bool
   method virtual read_invalid_repair_frag_inputs : unit
   method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
@@ -1104,6 +1106,7 @@ struct
 
     val mutable loop_cnt = 0L
     val mutable f2_loop_cnt = 0L
+    val mutable f1_loop_cnt = 0L
     method get_loop_cnt = loop_cnt
 
     method set_frag (dl, sl) =
@@ -1111,6 +1114,7 @@ struct
       V.VarHash.clear temps;
       loop_cnt <- 0L;
       f2_loop_cnt <- 0L;
+      f1_loop_cnt <- 0L;
       self#concretize_misc;
       insns <- sl
 
@@ -1132,6 +1136,12 @@ struct
     method add_range_opt opt_str opt =
       Hashtbl.replace range_opts_tbl opt_str opt	
 
+    method stdin_replay_file_target_frag_offset_reached =
+      if !stdin_replay_fd = None then true
+      else (
+	let cur_offset = Unix.lseek (Option.get !stdin_replay_fd) 0 Unix.SEEK_CUR in
+	cur_offset >= !opt_stdin_replay_file_target_frag_offset)
+	
     method eip_hook eip =
       (* Shouldn't be needed; we instead simplify the registers when
 	 writing to them: *)
@@ -1206,6 +1216,11 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
+      List.iter( fun trace_callstack_eip ->
+	if eip = trace_callstack_eip then (
+	  Printf.printf "tracing entire callstack at eip = 0x%08Lx\n" eip;
+	  flush(stdout);
+	  self#trace_entire_callstack);) !opt_trace_callstack_at_eip;
       let set_in_f2_range b suffix_str =
 	in_f2_range <- b;
 	let suffix = match suffix_str with
@@ -1214,21 +1229,22 @@ struct
 	in
 	if !opt_trace_repair then (
 	  Printf.printf "repair: Setting in_f2_range to %B, %s\n" b suffix;
-	  flush(stdout);) in
+	  flush(stdout);) in 
       (match (eip = !opt_repair_frag_start,    (* 1 *)
 	      eip = !opt_repair_frag_end,      (* 2 *)
 	      in_f1_range,                     (* 3 *)
 	      in_f2_range,                     (* 4 *)
 	      !opt_verify_adapter,             (* 5 *)
-	      !synth_verify_adapter) with      (* 6 *) 
-      | (false, false, _, _, _, _) -> ()
-      | (true, _, false, false, true, false) -> (* reached frag start, verify_adapter is true *)
+	      !synth_verify_adapter,           (* 6 *)
+	      self#stdin_replay_file_target_frag_offset_reached) with      (* 7 *) 
+      | (false, false, _, _, _, _, _) -> ()
+      | (true, _, false, false, true, false, true) -> (* reached frag start, verify_adapter is true *)
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: Setting in_f2_range = true because verify_adapter is true\n";
 	   flush(stdout););
 	self#make_f2_special_handlers_snap ;
 	in_f1_range <- false; set_in_f2_range true (Some " because verify_adapter is true")
-      | (true, _, false, false, false, false) -> (* reached frag start *)
+      | (true, _, false, false, false, false, true) -> (* reached frag start *)
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: Setting in_f1_range to true\n";
 	   flush(stdout););
@@ -1237,12 +1253,12 @@ struct
 	self#make_f1_sym_snap; 
 	self#make_f1_conc_snap;  
 	self#make_f1_special_handlers_snap ;
-      | (true, _, false, true, false, true) -> (* reached frag start in f2 range in synth-verify mode *)
+      | (true, _, false, true, false, true, true) -> (* reached frag start in f2 range in synth-verify mode *)
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: reached frag start in f2 range in synth-verify mode\n";
 	   flush(stdout););
 	self#apply_invalid_repair_target_frag_inputs;
-      | (_, true, true, false, false, false) -> (* reached frag end in f1 range *)
+      | (_, true, true, false, false, false, true) -> (* reached frag end in f1 range *)
 	 if !opt_trace_repair then (
 	   Printf.printf "Setting in_f1_range to false and in_f2_range = true\n";
 	   flush(stdout););
@@ -1259,21 +1275,22 @@ struct
 	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
 	  Unix.close (Option.get !stdin_redirect_fd);
 	  stdin_redirect_fd := None);
-      | (_, true, false, true, _, false) -> (* reached frag end in f2 range *) 
-	if not !opt_verify_adapter && not !synth_verify_adapter then (
-	  (* no eqchk needed if we only verifying the adapter *)
-	  self#save_f2_ret_reg ;
-	  if not self#compare_ret_reg_vals || not self#compare_f2_syscall_num then (
-	    raise DisqualifiedPath;);
-	  if !opt_dont_compare_mem_se = false then (
-	    self#compare_sym_se;
-	    self#compare_conc_se;
-	    self#reset_f2_special_handlers_snap;)
-	  else (
-	    mem#reset4_3 ();
-	    saved_f1_rsp <- 0L;
-	    saved_f2_rsp <- 0L;);)
-	else if !opt_verify_adapter then ( self#reset_f2_special_handlers_snap;); 
+      | (_, true, false, true, _, false, true) -> (* reached frag end in f2 range *) 
+	 if not !opt_verify_adapter && not !synth_verify_adapter then (
+	     (* no eqchk needed if we only verifying the adapter *)
+	   self#save_f2_ret_reg ;
+	   if not self#compare_ret_reg_vals || not self#compare_f2_syscall_num then (
+	     raise DisqualifiedPath;);
+	   if !opt_dont_compare_mem_se = false then (
+	     self#compare_sym_se;
+	     self#compare_conc_se;
+	     self#reset_f2_special_handlers_snap;)
+	   else (
+	     mem#reset4_3 ();
+	     saved_f1_rsp <- 0L;
+	     saved_f2_rsp <- 0L;);)
+	 else if !opt_verify_adapter then ( self#reset_f2_special_handlers_snap;);
+	f2_loop_cnt <- 0L;
 	Printf.printf "Match\n"; flush(stdout);
 	if not !opt_adapter_search_mode then raise (SimulatedExit(0L));
 	let (_, num_total_tests) = !opt_repair_tests_file in
@@ -1295,7 +1312,7 @@ struct
 	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
 	  Unix.close (Option.get !stdin_redirect_fd);
 	  stdin_redirect_fd := None);
-      | (_, true, false, true, false, true) -> (* reached frag end in f2 range in synth-verify mode*)
+      | (_, true, false, true, false, true, true) -> (* reached frag end in f2 range in synth-verify mode*)
 	 Printf.printf "Match\n"; flush(stdout);
 	let (_, num_total_tests) = !opt_repair_tests_file in
 	let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
@@ -1351,6 +1368,12 @@ struct
 
     val mutable call_stack = []
 
+    method trace_entire_callstack =
+      List.iteri (fun idx (_, last_eip, eip, _) ->
+	Printf.printf "%d: 0x%08Lx to 0x%08Lx\n" idx last_eip eip;
+	flush(stdout);
+      ) (List.rev call_stack);
+      
     method private trace_callstack last_insn last_eip eip =
       let pop_callstack esp =
 	while match call_stack with
@@ -3121,13 +3144,22 @@ struct
       in
       loop_cnt <- Int64.succ loop_cnt;
       (if (self#get_in_f2_range ()) then
-	f2_loop_cnt <- Int64.succ f2_loop_cnt;);
+	  f2_loop_cnt <- Int64.succ f2_loop_cnt;);
+      (if (self#get_in_f1_range ()) then
+	f1_loop_cnt <- Int64.succ f1_loop_cnt;);
         (match !opt_iteration_limit_enforced with
 	| Some lim -> if loop_cnt > lim then raise TooManyIterations;
 	| _ -> ());
 	(match !opt_f2_iteration_limit_enforced with
 	| Some lim -> if f2_loop_cnt > lim then
 	    (Printf.printf "fragment_machine raising TooManyIterations, f2_loop_cnt = %Ld\n" f2_loop_cnt;
+	     flush(stdout);
+	     raise TooManyIterations;);
+	| _ -> ());
+	(match !opt_f1_iteration_limit_enforced with
+	| Some lim -> if f1_loop_cnt > lim then
+	    (Printf.printf "fragment_machine raising TooManyIterations, f1_loop_cnt = %Ld\n" f1_loop_cnt;
+	     flush(stdout);
 	     raise TooManyIterations;);
 	| _ -> ());
 	let (_, sl) = frag in
@@ -3785,6 +3817,7 @@ struct
 	done;
       );
 
+
     method read_invalid_repair_frag_inputs =
       let (prefix, num_tests) = !opt_invalid_repair_tests_file in
       let (_, input_size) = !opt_repair_frag_input in
@@ -3889,10 +3922,16 @@ struct
 	Printf.printf "repair: get_adapter_search_mode_stdin_fd called, in-f1-range=%B, in-f2-range=%B\n"
 	  in_f1_range in_f2_range; flush(stdout););
       if not (self#get_in_f1_range ()) && not (self#get_in_f2_range ()) then (
-	if !opt_trace_repair then (
-	  Printf.printf "****warning: repair: get_adapter_search_mode: not in f1 or f2 range in adapter-search-mode, returning fd to /dev/zero****\n";
-	  flush(stdout););
-	Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666)
+	if !stdin_replay_fd <> None then (
+	  if !opt_trace_repair then (
+	    Printf.printf "repair: get_adapter_search_mode: not in f1 or f2 range in adapter-search-mode, returning fd to replay-fd\n";
+	    flush(stdout););
+	  (Option.get !stdin_replay_fd)
+	) else (
+	  if !opt_trace_repair then (
+	    Printf.printf "****warning: repair: get_adapter_search_mode: not in f1 or f2 range in adapter-search-mode, returning fd to /dev/zero****\n";
+	    flush(stdout););
+	  Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666))
       else (
 	let rec deoptionize_stdin_fd ref_fd = 
 	  match ref_fd with

@@ -143,6 +143,8 @@ class virtual fragment_machine : object
   method virtual make_snap : unit -> unit
   method virtual reset : unit -> unit
   method virtual read_repair_frag_inputs : unit
+  method virtual trace_entire_callstack: unit
+  method virtual stdin_replay_file_target_frag_offset_reached : bool
   method virtual read_invalid_repair_frag_inputs : unit
   method virtual read_wrong_adapters: unit
   method virtual get_repair_tests_processed : int
@@ -456,6 +458,8 @@ sig
     method make_snap : unit -> unit
     method reset : unit -> unit
     method read_repair_frag_inputs : unit
+    method trace_entire_callstack: unit
+    method stdin_replay_file_target_frag_offset_reached : bool
     method read_invalid_repair_frag_inputs : unit
     method read_wrong_adapters: unit
     method get_repair_tests_processed : int

@@ -214,10 +214,21 @@ object(self)
     in
     a.(0).unix_fd <- (Some (match !opt_replace_stdin_with_zero with
     | true -> if !opt_trace_repair then (
-	 Printf.printf "Setting stdin to read from /dev/zero\n"; flush(stdout));
+	 Printf.printf "repair: Setting stdin to read from /dev/zero\n"; flush(stdout));
        Unix.openfile "/dev/zero" [Unix.O_RDONLY] 0o666
-    | false -> Unix.stdin));
-    a.(1).unix_fd <- (Some Unix.stdout);
+    | false ->
+       if !stdin_replay_fd <> None then (
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: Setting stdin to read from stdin_replay_fd\n"; flush(stdout));
+	 Option.get !stdin_replay_fd)
+       else Unix.stdin));
+    a.(1).unix_fd <- (
+      if !opt_repair_frag_start <> 0L then (
+	if !opt_trace_repair then (
+	  Printf.printf "repair: redirecting stdout to /dev/null when in repair mode\n";
+	  flush(stdout););
+	Some (Unix.openfile "/dev/null" [Unix.O_WRONLY] 0o666))
+      else Some Unix.stdout);
     a.(2).unix_fd <- (Some Unix.stderr);
     a
 
@@ -233,6 +244,19 @@ object(self)
     else
       match fd_info.(vt_fd).unix_fd with
       | Some fd when vt_fd = 0 && !opt_adapter_search_mode && !opt_repair_frag_start <> 0L -> fm#get_adapter_search_mode_stdin_fd
+      | Some fd when (vt_fd = 0) && (not !opt_adapter_search_mode) && !opt_repair_frag_start <> 0L 
+	  && ((fm#get_in_f1_range ()) || (fm#get_in_f2_range ())) ->
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: get_fd: in f1 or f2 range in non-adapter-search-mode, returning fd to stdin with is_symbolic set to true\n";
+	   flush(stdout););
+	    fd_info.(0).is_symbolic <- true; fd
+      | Some fd when vt_fd = 0 && (not !opt_adapter_search_mode) && !opt_repair_frag_start <> 0L 
+		&& not (fm#get_in_f1_range () || fm#get_in_f2_range ())
+		&& (!stdin_replay_fd <> None) ->
+	 if !opt_trace_repair then (
+	   Printf.printf "repair: get_fd: not in f1 or f2 range in non-adapter-search-mode, returning fd to replay-stdin-fd with is_symbolic set to false\n";
+	   flush(stdout););
+		  fd_info.(0).is_symbolic <- false; (Option.get !stdin_replay_fd)
       | Some fd -> fd
       | None -> raise
 	 (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
@@ -402,7 +426,8 @@ object(self)
 	  | _ -> ());
        (match fd with
 	  | (1|2) ->
-	      Array.iter print_char bytes;
+	      (* Array.iter print_char bytes;*)
+	     Printf.printf "repair: not printing bytes\n"; flush(stdout);
 	      flush stdout;
 	      put_return (Int64.of_int count)
 	  | _ ->
@@ -983,6 +1008,12 @@ object(self)
     if !opt_trace_mem_snapshots = true then (
       Printf.printf "linux_syscalls#make_f1_snap called\n";
       flush stdout);
+    if not !opt_adapter_search_mode && !opt_repair_frag_start <> 0L
+      && not fd_info.(0).is_symbolic then (
+      if !opt_trace_repair then (
+	Printf.printf "repair: setting stdin fd to symbolic\n"; flush(stdout););
+      fd_info.(0).is_symbolic <- true;
+    );
     self#make_snap ;
     ()
     
@@ -2012,6 +2043,14 @@ object(self)
     let str = self#string_create count in
     let oc_fd = self#get_fd fd in
     let num_read = Unix.read oc_fd str 0 count in
+    Printf.printf "num_read = %d\n" num_read; flush(stdout);
+    if !opt_save_stdin_reads_to_fd <> None then (
+      if !opt_trace_repair then ( 
+	Printf.printf "num_read = %d, saving stdin reads to file\n" num_read ;
+	flush(stdout););
+      let num_written = Unix.write (Option.get !opt_save_stdin_reads_to_fd) (Bytes.of_string str) 0 num_read in
+      Printf.printf "num_read = %d, num_written = %d\n" num_read num_written; flush(stdout);
+    );
     self#fill_read_buf fd buf num_read str;
     put_return (Int64.of_int num_read)
 
@@ -3265,7 +3304,12 @@ object(self)
 	 Printf.printf "linux_syscalls:syscalls argument divergence raising DisqualifiedPath\n";
 	 raise DisqualifiedPath; );
      );
-       ignore(0, read_7_regs);
+     if syscall_num = !opt_trace_callstack_on_syscall then (
+       if !opt_trace_syscalls then (
+	 Printf.printf "tracing entire callstack on syscall(%d)\n" syscall_num;
+	 flush(stdout););
+       fm#trace_entire_callstack;);
+     ignore(0, read_7_regs);
        match (!opt_arch, syscall_num) with 
 	 | ((X86|ARM), 0) -> (* restart_syscall *)
 	     uh "Unhandled Linux system call restart_syscall (0)"
@@ -3299,6 +3343,11 @@ object(self)
 		 count = Int64.to_int arg3 in
 	       if !opt_trace_syscalls then
 		 Printf.printf "write(%d, 0x%08Lx, %d)\n" fd buf count;
+	     if count > 1024 && !opt_repair_frag_start <> 0L then (
+	       if !opt_trace_repair then (
+		 Printf.printf "repair: disqualifying path because more than 1024 bytes being written to a fd\n";
+		 flush(stdout););
+	       raise DisqualifiedPath);
 	       let bytes = read_buf buf count in
 		 self#sys_write fd bytes count
 	 | ((X86|ARM), 5) (* open *)

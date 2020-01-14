@@ -183,7 +183,8 @@ let is_adapted_target_call_insn fm sl =
 	 with Not_found -> false in
        if contains_call && fm#get_in_f2_range () then (
 	 if !opt_trace_adapter then (
-	   Printf.printf "found call in adapted target fragment\n";
+	   Printf.printf "found call in adapted target fragment at 0x%08Lx\n"
+	     fm#get_eip;
 	   flush(stdout););
 	 is_call := true) else loop rest
     | [] -> ()

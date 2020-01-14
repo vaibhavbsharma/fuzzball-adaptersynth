@@ -238,6 +238,18 @@ let symbolic_state_cmdline_opts =
 	opt_repair_tests_file := (s1, int_of_string s2)),
      "string:numtests Use 'string' file as prefix to 'numtests' "^
        "test input files starting from 'string'0");
+    ("-trace-callstack-on-syscall", Arg.String
+      (fun s ->
+	opt_trace_callstack_on_syscall := int_of_string s;
+	opt_trace_callstack := true),
+     "string:numtests Use 'string' file as prefix to 'numtests' "^
+       "test input files starting from 'string'0");
+    ("-trace-callstack-at-eip", Arg.String
+      (fun s ->
+	opt_trace_callstack_at_eip := (Int64.of_string s) :: !opt_trace_callstack_at_eip;
+	opt_trace_callstack := true),
+     "string:numtests Use 'string' file as prefix to 'numtests' "^
+       "test input files starting from 'string'0");
     ("-invalid-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
@@ -247,6 +259,15 @@ let symbolic_state_cmdline_opts =
     ("-wrong-argsub-adapters-file", Arg.String
       (fun s -> opt_wrong_argsub_adapters_file := s),
      "string wrong argsub adapters are in a file named 'string'");
+    ("-save-stdin-reads-to-file", Arg.String
+      (fun s -> opt_save_stdin_reads_to_fd := Some (Unix.openfile s [Unix.O_WRONLY; Unix.O_EXCL; Unix.O_CREAT] 0o640);),
+     "string save all reads from stdin to a file named 'string' ");
+    ("-stdin-replay-file", Arg.String
+      (fun s -> stdin_replay_fd := Some (Unix.openfile s [Unix.O_RDONLY] 0o640); ),
+     "string replay reads from stdin using the given file in 'string'");
+    ("-stdin-replay-file-target-frag-offset", Arg.String
+      (fun s -> opt_stdin_replay_file_target_frag_offset := int_of_string s; ),
+     "integer the target fragment begins only after <integer> bytes have been read from the stdin-replay-file");
     ("-wrong-ret-adapters-file", Arg.String
       (fun s -> opt_wrong_ret_adapters_file := s),
      "string wrong retvalsub adapters are in a file named 'string'");
@@ -378,9 +399,12 @@ let explore_cmdline_opts =
     ("-iteration-limit", Arg.String
        (fun s -> opt_iteration_limit := Int64.of_string s),
      "N Stop path if a loop iterates more than N times");
-    ("-iteration-f2-limit", Arg.String
+    ("-f2-iteration-limit", Arg.String
        (fun s -> opt_f2_iteration_limit := Int64.of_string s),
      "N Stop path if a loop iterates more than N times inside f2 when doing adapter synthesis");
+    ("-f1-iteration-limit", Arg.String
+       (fun s -> opt_f1_iteration_limit := Int64.of_string s),
+     "N Stop path if a loop iterates more than N times inside f1 when doing adapter synthesis");
     ("-insn-limit", Arg.String
        (fun s -> opt_insn_limit := Int64.of_string s),
      "N Stop path after N instructions");

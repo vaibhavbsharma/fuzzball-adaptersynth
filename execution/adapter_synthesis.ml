@@ -647,6 +647,21 @@ let rec arithmetic_float_extra_conditions fm out_nargs n =
 let simple_adapter fm out_nargs in_nargs =
   if !opt_trace_adapter then
     Printf.printf "Starting simple adapter (%Ld,%Ld)\n" out_nargs in_nargs;
+  let is_simple_adapter_formula top_exp =
+    let rec match_one_ite_level exp level =
+      if level = 0 then true else (
+	match exp with
+	| V.Ite(V.BinOp(V.NEQ, op1 , V.Constant(V.Int(V.REG_1, 0L))),
+		V.Lval(_), false_e)  ->
+	   (match_one_ite_level false_e (level-1))
+	| V.Ite(V.BinOp(V.EQ, V.Lval(_), V.Constant(V.Int(V.REG_32, _))),
+		V.Constant(V.Int(V.REG_32, _)), V.Constant(V.Int(V.REG_32, _))) ->
+	   true
+	| V.Ite(V.BinOp(V.EQ, V.Lval(_), V.Constant(V.Int(V.REG_32, _))),
+		V.Constant(V.Int(V.REG_32, _)), false_e) ->
+	   (match_one_ite_level false_e (level-1))
+	| _ -> false) in
+    match_one_ite_level top_exp (Int64.to_int out_nargs) in
   if in_nargs > 0L then (
     let arg_regs =
       match (!opt_arch, !opt_fragments) with
@@ -667,11 +682,12 @@ let simple_adapter fm out_nargs in_nargs =
 	   (if !opt_repair_frag_start = Int64.minus_one then 4L else 0L) in
 	 for i = 0 to (Int64.to_int out_nargs)-1 do
 	   let arg_exp = (fm#load_word_symbolic (Int64.add args_base_addr (Int64.of_int (i*4)))) in
-	   vals := !vals @ [arg_exp];
+	   let final_arg_exp = 
+	     if not (is_simple_adapter_formula arg_exp) then arg_exp else V.Constant(V.Int(V.REG_32, 0L)) in 
+	   vals := !vals @ [final_arg_exp];
 	   if !opt_trace_adapter then (
-	     Printf.printf "arg(%d) = %s\n" i (V.exp_to_string arg_exp);
-	     flush(stdout);
-	   );
+	     Printf.printf "arg(%d) = %s\n" i (V.exp_to_string final_arg_exp);
+	     flush(stdout););
 	 done;
 	 !vals
       | _ -> failwith "arg_vals unsupported for architecture" in

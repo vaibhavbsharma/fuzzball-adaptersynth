@@ -301,44 +301,47 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	   Adapter_synthesis.struct_adapter fm;
            (Some in_addr))
       | (None, None, None, None, None, None, None, None, None, None, Some addr) ->
+	 if fm#stdin_replay_file_target_frag_offset_reached then (
 	 (* Reached end of target fragment to be repaired *)
-	 let (_, num_total_tests) = !opt_repair_tests_file in
-	 let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
-	 let num_invalid_tests_processed = fm#get_invalid_repair_tests_processed in
+	   let (_, num_total_tests) = !opt_repair_tests_file in
+	   let (_, num_invalid_total_tests) = !opt_invalid_repair_tests_file in
+	   let num_invalid_tests_processed = fm#get_invalid_repair_tests_processed in
 	 (* We should have at least one counterexample and zero or more invalid 
 	    tests in adapter search mode. Otherwise, the number of counterexamples
 	    and invalid tests should equal zero. *)
-	 assert(((not !opt_verify_adapter || not !opt_adapter_search_mode)
-		 && (num_total_tests = 0) && (num_invalid_total_tests = 0))
-		|| (!opt_adapter_search_mode && (num_total_tests > 0 && num_invalid_total_tests >= 0))); 
-	 if !opt_trace_repair then (
-	   Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed\n"
-	     fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
-	   flush(stdout););
-	 if (fm#get_in_f1_range ()) then Some (fun () ->
+	   assert(((not !opt_verify_adapter || not !opt_adapter_search_mode)
+		   && (num_total_tests = 0) && (num_invalid_total_tests = 0))
+		  || (!opt_adapter_search_mode && (num_total_tests > 0 && num_invalid_total_tests >= 0))); 
 	   if !opt_trace_repair then (
-	     Printf.printf "repair: jumping to repair-frag-start\n";
+	     Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed\n"
+	       fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
 	     flush(stdout););
-           (Some !opt_repair_frag_start))
-	 else (
-	   assert (fm#get_in_f2_range ());
-	   if fm#get_repair_tests_processed >= num_total_tests then (
-	     ignore(fm#inc_invalid_repair_tests_processed);)
-	   else ignore(fm#inc_repair_tests_processed);
-	   if fm#get_repair_tests_processed < num_total_tests ||
-	     fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () -> 
+	   if (fm#get_in_f1_range ()) then Some (fun () ->
 	     if !opt_trace_repair then (
-	       Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed, jumping to repair-frag-start\n"
-		 fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
+	       Printf.printf "repair: jumping to repair-frag-start\n";
 	       flush(stdout););
              (Some !opt_repair_frag_start))
-	   else Some (fun () -> (); (Some eip)));
+	   else (
+	     assert (fm#get_in_f2_range ());
+	     if fm#get_repair_tests_processed >= num_total_tests then (
+	       ignore(fm#inc_invalid_repair_tests_processed);)
+	     else ignore(fm#inc_repair_tests_processed);
+	     if fm#get_repair_tests_processed < num_total_tests ||
+	       fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () -> 
+		 if !opt_trace_repair then (
+		   Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed, jumping to repair-frag-start\n"
+		     fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
+		   flush(stdout););
+		 (Some !opt_repair_frag_start))
+	     else Some (fun () -> (); (Some eip))))
+	 else (Some (fun () -> (); (Some eip)))
       | _ -> 
 	Printf.printf "eip = 0x%Lx\n" eip;
 	failwith "Contradictory replacement options"
 
 let loop_detect = Hashtbl.create 1000
 let f2_loop_detect = Hashtbl.create 1000
+let f1_loop_detect = Hashtbl.create 1000
 
 let decode_insn_at fm gamma eipT =
   try
@@ -397,7 +400,7 @@ let decode_insns_cached fm gamma eip =
 
 let rec runloop (fm : fragment_machine) eip asmir_gamma until =
   let rec loop last_eip eip is_final_loop num_insns_executed =
-    let is_too_many_iterations loop_detect eip f2_only =
+    let is_too_many_iterations loop_detect eip f1_only f2_only =
       let old_count =
 	(try
 	   Hashtbl.find loop_detect eip
@@ -405,13 +408,10 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	   Hashtbl.replace loop_detect eip 1L;
 	   1L)
       in
-      if f2_only && (fm#get_in_f2_range ()) then (
-	Hashtbl.replace loop_detect eip (Int64.succ old_count);
-      );
-      if not f2_only then
-	Hashtbl.replace loop_detect eip (Int64.succ old_count);
+      Hashtbl.replace loop_detect eip (Int64.succ old_count);
       let it_lim_enforced =
 	if f2_only then opt_f2_iteration_limit_enforced
+	else if f1_only then opt_f1_iteration_limit_enforced
 	else opt_iteration_limit_enforced
       in
       (match !it_lim_enforced with
@@ -419,11 +419,15 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	raise TooManyIterations;);
       | _ -> ())
     in
-    is_too_many_iterations loop_detect eip false;
-    is_too_many_iterations f2_loop_detect eip true;
+    is_too_many_iterations loop_detect eip false false;
+    is_too_many_iterations f1_loop_detect eip true false;
+    is_too_many_iterations f2_loop_detect eip false true;
     if ((fm#get_in_f2_range () = false) &&
       ((Hashtbl.length f2_loop_detect) <> 0)) then
       (Hashtbl.clear f2_loop_detect;);
+    if ((fm#get_in_f1_range () = false) &&
+      ((Hashtbl.length f1_loop_detect) <> 0)) then
+      (Hashtbl.clear f1_loop_detect;);
     let (dl, sl) = decode_insns_cached fm asmir_gamma eip in
     let prog = (dl, sl) in
     let nargs = ref 0L in
@@ -450,16 +454,22 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	))
     in
     if (is_adapted_target_call_insn fm sl)
-	&& ((eip = !opt_apply_call_repair_adapter_at) || (match_adapter_eip eip)) then (
-      if !opt_trace_adapter || !opt_trace_repair then (
-	Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;
-	flush(stdout););
-      match !opt_synth_repair_adapter with
-      | Some (adapter_name, _nargs) when adapter_name = "simple" ->
-	 nargs := _nargs;
-	 Adapter_synthesis.simple_adapter fm !nargs !nargs;
+      && ((eip = !opt_apply_call_repair_adapter_at) || (match_adapter_eip eip)) then (
+	if !opt_trace_adapter || !opt_trace_repair then (
+	  Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;
+	  flush(stdout););
+	match !opt_synth_repair_adapter with
+	| Some (adapter_name, _nargs) when adapter_name = "simple" ->
+	   nargs := _nargs;
+	  Adapter_synthesis.simple_adapter fm !nargs !nargs;
       (* if !opt_synth_repair_ret_adapter <> None then (fm#save_args !nargs); *)
-      | _ -> failwith "unsupported repair adapter"
+	| _ -> failwith "unsupported repair adapter"
+      );
+    if eip = !opt_repair_frag_end && fm#get_in_f2_range () then (
+      if !opt_trace_repair then (
+	Printf.printf "repair: reached end of f2, clearing f2_loop_detect\n";
+	flush(stdout););
+      Hashtbl.clear f2_loop_detect;
     );
     if eip = !opt_repair_frag_end && fm#get_in_f2_range ()
     && !opt_synth_repair_ret_adapter <> None then (
