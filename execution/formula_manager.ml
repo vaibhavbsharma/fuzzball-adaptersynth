@@ -376,18 +376,16 @@ struct
        constraints called "mem_axioms" here. Table indexing is kept
        distinct until the solver interface when it is translated into an
        SMTLIB "select" array operator or the equivalent for other
-       solvers. *)
-    method private rewrite_mem_expr e =
+       solvers. This method only does the second rewriting. The first kind
+       is handled by callers of this method. *)
+    method private rewrite_mem_to_scalar e =
       match e with
-	| V.Lval(V.Mem(table_var, idx, elt_ty))
-	    when List.mem table_var table_vars ->
-	    e
 	| V.Lval(V.Mem((_,region_str,ty1),
 		       V.Constant(V.Int((V.REG_32|V.REG_64), addr)), ty2))
 	  -> (self#add_mem_axioms region_str ty2 addr;
 	      V.Lval(V.Temp(self#mem_var region_str ty2 addr)))
 	| _ -> failwith ("Bad expression " ^ (V.exp_to_string e) ^
-			   " in rewrite_mem_expr")
+			   " in rewrite_mem_to_scalar")
 
     (* subexpression cache *)
     val subexpr_to_temp_var_info = Hashtbl.create 1001
@@ -429,9 +427,12 @@ when special_ec_vars\n"; *)
 	  | V.Lval(V.Temp(_)) -> 
 	    ((*Printf.printf "rewrite_for_solver V.Lval(V.Temp(_))\n"; *)
 	     e)
-	  | V.Lval(V.Mem(_, _, _)) -> 
-	    ((*Printf.printf "rewrite_for_solver V.Lval(V.Mem(_,_,_))\n";*)
-	     self#rewrite_mem_expr e)
+	  | V.Lval(V.Mem(table_var, idx_e, elt_ty)) 
+	      when List.mem table_var table_vars ->
+	     V.Lval(V.Mem(table_var, (loop idx_e), elt_ty))
+	  | V.Lval(V.Mem(_,_,_)) ->
+	     (*Printf.printf "rewrite_for_solver V.Lval(V.Mem(_,_,_))\n";*)
+	       self#rewrite_mem_to_scalar e
 	  | V.Name(_) -> e
 	  | V.Cast(kind, ty, e1) -> V.Cast(kind, ty, (loop e1))
 	  | V.FCast(kind, rm, ty, e1) -> V.FCast(kind, rm, ty, (loop e1))
@@ -658,7 +659,7 @@ when special_ec_vars\n"; *)
 		else
 		  let elt_e = List.nth table idx in
 		    loop elt_e
-	  | V.Lval(V.Mem(_, _, _)) -> loop (self#rewrite_mem_expr e)
+	  | V.Lval(V.Mem(_, _, _)) -> loop (self#rewrite_mem_to_scalar e)
 	  | V.Lval(V.Temp(memvar))
 	      when V.VarHash.mem mem_axioms memvar
 		->
@@ -1153,9 +1154,12 @@ when special_ec_vars\n"; *)
 	      let i = Hashtbl.length tables in
 		Hashtbl.replace tables table i;
 		if !opt_tables_as_arrays then
-		  (let table_e =
+		  (
+		    let table_e =
 		     List.map (fun v -> to_symbolic v elt_ty) table in
-		   let array_ty = V.Array(elt_ty, size) in
+		    let array_ty = V.Array(elt_ty, size) in
+		    Printf.printf "\ntables-as-arrays: elt_ty = %s size=%Ld%!\n"
+		     (V.type_to_string elt_ty) size;
 		   let name = "table" ^ (string_of_int i) in
 		   let table_var = V.newvar name array_ty in
 		     tables_by_idx <- tables_by_idx @ [table_e];
