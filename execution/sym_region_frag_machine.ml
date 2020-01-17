@@ -657,6 +657,7 @@ struct
 	  else ((self#region (Some 0)), conc_addr) 
       in
       let new_addr = (Int64.add conc_addr addr) in
+      (* Printf.printf "region_load: loading from address 0x%08Lx\n%!" new_addr; *)
       match size with
       | 8 -> mem#load_byte new_addr
       | 16 -> mem#load_short new_addr
@@ -679,6 +680,7 @@ struct
 	  else ((self#region (Some 0)), conc_addr) 
       in
       let new_addr = (Int64.add conc_addr addr) in
+      (* Printf.printf "region_store: storing to address 0x%08Lx\n%!" new_addr; *)
       match size with
       | 8 -> mem#store_byte new_addr value
       | 16 -> mem#store_short new_addr value
@@ -797,7 +799,7 @@ struct
     method private query_exp exp1 exp2 =
       if exp1 = exp2 then
 	(if !opt_trace_mem_snapshots = true then
-	    Printf.printf "equal side-effects %s = %s\n"
+	    Printf.printf "equal side-effects %s = %s\n%!"
 	      (V.exp_to_string exp1) 
 	      (V.exp_to_string exp2);
 	 adapter_score := !adapter_score + 1;
@@ -807,13 +809,13 @@ struct
 	let (b, _) = self#query_condition q_exp (Some true) 0x6df0 in
 	if b = false then (
 	  if !opt_trace_mem_snapshots = true then
-	    Printf.printf "inequivalent symbolic region side-effects %s!=\n%s\n" 
+	    Printf.printf "inequivalent symbolic region side-effects %s!=%s\n%!" 
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  raise DisqualifiedPath;
 	)
 	else (
 	  if !opt_trace_mem_snapshots = true then
-	    Printf.printf "equivalent side-effects %s=\n%s"
+	    Printf.printf "equivalent side-effects %s=%s\n%!"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  adapter_score := !adapter_score + 1;
 	)
@@ -1096,6 +1098,68 @@ struct
 	v
 
     val mutable sink_read_count = 0L
+
+    val mutable call_stack = []
+    val ret_addrs = Hashtbl.create 101
+
+(* TODO: avoid code duplication with FM.trace_callstack *)
+    method private update_ret_addrs last_insn last_eip eip =
+      let pop_callstack esp =
+	while match call_stack with
+	  | (old_esp, _, _, _) :: _ when old_esp < esp -> true
+	  | _ -> false
+	do
+	      match call_stack with
+		| (ret_addr_addr, _, _, _) :: _ ->
+		    Hashtbl.remove ret_addrs ret_addr_addr;
+		    call_stack <- List.tl call_stack
+		| _ -> failwith "Can't happen, loop invariant"
+	done
+      in
+      let get_retaddr esp =
+	match !opt_arch with
+	  | X86 -> self#load_word_conc esp
+	  | X64 -> self#load_long_conc esp
+	  | ARM -> self#get_word_var R14
+      in
+      let kind =
+	match !opt_arch with
+	  | X86 | X64 ->
+	      let s = last_insn ^ "        " in
+		if (String.sub s 0 4) = "call" &&
+		  (Int64.sub eip last_eip) <> 5L then
+		  "call"
+		else if (String.sub s 0 3) = "ret" then
+		  "return"
+		else if (String.sub s 0 8) = "repz ret" then
+		  "return"
+		else if (String.sub s 0 3) = "jmp" then
+		  "unconditional jump"
+		else if (String.sub s 0 1) = "j" then
+		  "conditional jump"
+		else
+		  "not a jump"
+	  | ARM ->
+	      (* TODO: add similar parsing for ARM mnemonics *)
+	      "not a jump"
+      in
+	match kind with
+	  | "call" ->
+	      let esp = self#get_esp in
+	      let ret_addr_addr = match !opt_arch with
+		| X86 -> esp
+		| X64 -> esp
+		| ARM -> failwith "Return address tracking not implemented for ARM"
+	      in
+	      let ret_addr = get_retaddr esp
+	      in
+		call_stack <- (esp, last_eip, eip, ret_addr) :: call_stack;
+		Hashtbl.replace ret_addrs ret_addr_addr ret_addr;
+	  | "return" ->
+	      let esp = self#get_esp in
+		pop_callstack esp;
+	  | _ -> ()
+
 
     method private check_cond cond_e ident =
       dt#start_new_query_binary;
@@ -2231,14 +2295,96 @@ struct
 	  match self#decide_maxval "Store" off_exp cloc with
 	    | None -> false
 	    | Some maxval -> self#table_store cloc (Some 0) off_exp e maxval ty value
-	  
+
+    method jump_hook last_insn last_eip eip =
+      spfm#jump_hook last_insn last_eip eip;
+      if !opt_check_for_ret_addr_overwrite then
+	self#update_ret_addrs last_insn last_eip eip
+
+    method private check_for_ret_addr_store addr_e ty =
+      if !opt_check_for_ret_addr_overwrite then
+	let size = (V.bits_of_width ty)/8 and
+	    ret_addr_size = match !opt_arch with
+	      | X86 -> 4
+	      | X64 -> 8
+	      | ARM -> 4
+	in
+	let v = self#eval_int_exp_simplify addr_e in
+	  try
+	    let addr = D.to_concrete_32 v in
+	      for offset = 1 - ret_addr_size to size - 1 do
+		let addr' = Int64.add addr (Int64.of_int offset) in
+		  if Hashtbl.mem ret_addrs addr' then
+		    (Printf.printf
+		       "Store to 0x%08Lx overwrites return address 0x%08Lx%!\n"
+		       addr' addr; flush(stdout);
+		     if !opt_disqualify_path_on_ret_addr_overwrite
+		       && (self#get_in_f1_range () || self#get_in_f2_range ()) then
+		      (raise DisqualifiedPath);
+		     if !opt_finish_on_ret_addr_overwrite then
+		       self#finish_fuzz "return address overwrite")
+	      done
+	  with NotConcrete _ ->
+	    let e = D.to_symbolic_32 v in
+	      (* We want to signal a problem if there's any overlap
+		 between the store of size "size" and the return address
+		 of size say 4.  This will happen if the store adddress
+		 is the range (loc - size + 1) to (loc + 4 - 1)
+		 inclusive. With some algebra we can rewrite this to use
+		 only a single unsigned comparison:
+
+		 loc - size + 1 <= a <= loc + 4 - 1
+		 -size + 1 <= a - loc <= 4 - 1
+		 0 <= a - loc + size - 1 <= 4 + size - 2
+		 0 <= a - (loc - (size - 1)) <= 4 + size - 2
+	      *)
+	    let size_bound = Int64.of_int (ret_addr_size + size - 2) in
+	    let bound_c = V.Constant(V.Int(V.REG_32, size_bound)) in
+	      Hashtbl.iter
+		(fun loc _ ->
+		   let first_overlap =
+		     Int64.sub loc (Int64.of_int (size - 1))
+		   in
+		   let start_c = V.Constant(V.Int(V.REG_32, first_overlap)) in
+		   let overlap_cond = V.BinOp(V.LE,
+					      V.BinOp(V.MINUS, e, start_c),
+					      bound_c)
+		   in
+		     match 
+		       self#check_cond overlap_cond 0x0000
+		     with
+		       | (None|Some true) ->
+			   Printf.printf
+			     "Store to %s might overwrite return addr 0x%Lx.\n"
+			     (V.exp_to_string e) loc;
+			 if !opt_finish_on_ret_addr_overwrite then
+			     self#finish_fuzz "return address overwrite"
+		       | Some false ->
+			   Printf.printf
+			     "Store to %s cannot overwite 0x%Lx.\n" 
+			     (V.exp_to_string e) loc
+		)
+		ret_addrs
+
+    		
     method private handle_store addr_e ty rhs_e =
+      self#save_f1_conc_write_addr addr_e;
+      self#check_for_ret_addr_store addr_e ty;
       if !opt_trace_offset_limit then
 	Printf.printf "Storing to... %s %s\n" (V.exp_to_string addr_e)
 	  (V.exp_to_string rhs_e);
       if !table_store_num > !opt_max_table_store_num then 
 	opt_no_table_store := true;
       let value = self#eval_int_exp_simplify rhs_e in
+      let to_symbolic v ty =
+	match ty with
+	| V.REG_1  -> D.to_symbolic_1  v
+	| V.REG_8  -> D.to_symbolic_8  v
+	| V.REG_16 -> D.to_symbolic_16 v
+	| V.REG_32 -> D.to_symbolic_32 v
+	| V.REG_64 -> D.to_symbolic_64 v
+	| _ -> failwith "Unexpected type in FM.to_symbolic" in
+      self#match_f2_write addr_e ty (to_symbolic value ty);
       if (!opt_no_table_store) ||
 	not (self#maybe_table_or_concrete_store addr_e ty value)
       then
@@ -2274,13 +2420,20 @@ struct
 	     (if !opt_use_tags then
 		Printf.printf " (%Ld @ %08Lx)" (D.get_tag value) location_id);
 	     Printf.printf "\n");
-	if !opt_check_store_sequence = true then (  
+	if !opt_check_store_sequence && not !opt_verify_adapter
+	  && not !synth_verify_adapter && not table_store_status then (
+	    let final_f2_addr = 
+	    if !r <> None && Hashtbl.mem region_conc_addr_h (Option.get !r) then (
+	      assert(not (self#get_in_f1_range ()));
+	      let conc_addr = Hashtbl.find region_conc_addr_h (Option.get !r) in
+	      Int64.add !addr conc_addr
+	    ) else !addr in
 	  if (self#get_in_f1_range ()) = true then (
-	    (*Printf.printf "SRFM#handle_store: mem store in f1 at %08Lx\n" addr;*)
+	    Printf.printf "SRFM#handle_store: eip = 0x%08Lx, mem store in f1 to 0x%08Lx\n%!" (self#get_eip) !addr;
 	    self#add_f1_store !addr;
 	  ) else if (self#get_in_f2_range ()) = true then (
-	    (*Printf.printf "SRFM#handle_store: mem store in f2 at %08Lx\n" addr;*)
-	    self#add_f2_store !addr;
+	    Printf.printf "SRFM#handle_store: eip = 0x%08Lx, mem store in f2 to 0x%08Lx\n%!" (self#get_eip) final_f2_addr;
+	    self#add_f2_store final_f2_addr;
 	  );
 	);
 	if !opt_track_sym_usage then

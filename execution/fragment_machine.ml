@@ -433,6 +433,8 @@ class virtual fragment_machine = object
   method virtual save_f1_conc_se : unit
   method virtual make_f2_sym_snap : unit
   method virtual make_f2_conc_snap : unit
+  method virtual save_f1_conc_write_addr : Vine.exp -> unit
+  method virtual match_f2_write : Vine.exp -> Vine.typ -> Vine.exp -> unit
   method virtual compare_sym_se : unit
   method virtual compare_conc_se : unit
   method virtual make_f1_special_handlers_snap : unit
@@ -678,6 +680,7 @@ struct
 
     val mutable f1_se = new GM.granular_hash_memory 
     val mutable f1_hash : ( (int64, GM.gran64) Hashtbl.t) = Hashtbl.create 0
+    val mutable f1_write_addrs = Hashtbl.create 1000
     val mutable f2_se = new GM.granular_hash_memory
 
     (* return register value saved for f1, f2. Used only for repair *)
@@ -695,10 +698,9 @@ struct
       adapted_arg_addrs <- adapted_arg_addrs @ [addr]
 	
     method add_f1_store addr = 
-      if (self#is_nonlocal_addr saved_f1_rsp addr) = true then
-	( if !opt_trace_stores then
-	    Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n" 
-	      addr saved_f1_rsp;
+      if (self#is_nonlocal_addr (self#get_esp) addr) = true then
+	( Printf.printf "FM#add_f1_store: %08Lx outside local scope(%08Lx)\n%!" 
+	      addr (self#get_esp);
 	  f1_write_addr_l <- f1_write_addr_l @ [addr] ;
 	);
       ()
@@ -706,18 +708,19 @@ struct
     method private is_nonlocal_addr rsp addr =
       if List.mem addr adapted_arg_addrs then false
 	else (
-      if (rsp <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) then
+      if ((Int64.add rsp 16L) <= addr) || ((addr <= 0x60000000L) && (addr >= 0x00700000L)) then
 	true 
       else false)
 	
     method add_f2_store addr = 
-      if (self#is_nonlocal_addr saved_f2_rsp addr) = true then
-	( if !opt_trace_stores then
-	    Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)\n" 
-	      addr saved_f2_rsp;
+      if (self#is_nonlocal_addr (self#get_esp) addr) = true then
+	( Printf.printf "FM#add_f2_store: %08Lx outside local scope(%08Lx)%!\n" 
+	    addr (self#get_esp);
 	 if ((List.length f1_write_addr_l) > (List.length f2_write_addr_l)) &&
 	   ((List.nth f1_write_addr_l (List.length f2_write_addr_l)) = addr) then
-	   (f2_write_addr_l <- f2_write_addr_l @ [addr] ;)
+	   (
+	     f2_write_addr_l <- f2_write_addr_l @ [addr] ;
+	   )
 	 else (
 	   raise DisqualifiedPath;
 	 )
@@ -954,6 +957,57 @@ struct
       mem#make_snap ();
       ()
 
+    method save_f1_conc_write_addr addr_e =
+      if self#get_in_f1_range () then( 
+	let v = self#eval_int_exp_simplify addr_e in
+	try
+	  let f1_addr = D.to_concrete_32 v in
+	  if Hashtbl.mem f1_write_addrs f1_addr then (
+	    let count = Hashtbl.find f1_write_addrs f1_addr in
+	    Hashtbl.replace f1_write_addrs f1_addr (count+1))
+	  else Hashtbl.replace f1_write_addrs f1_addr 1;
+	with NotConcrete _ -> ());
+	
+    method match_f2_write addr_e ty f2_exp =
+      if !opt_match_every_nonlocal_f2_write && self#get_in_f2_range ()
+	&& not !synth_verify_adapter && not !opt_verify_adapter then
+	let f1_nonlocal_se = Hashtbl.create 0 in
+	Hashtbl.iter (fun addr chunk ->
+	  let (exp1, _) = GM.gran64_get_long chunk (f1_se#get_missing) addr in
+	  let exp_sym_64 = D.to_symbolic_64 exp1 in
+	  let exp = 
+	    match ty with
+	    | V.REG_32 -> V.Cast(V.CAST_LOW, V.REG_32, exp_sym_64)
+	    | V.REG_16 -> V.Cast(V.CAST_LOW, V.REG_16, exp_sym_64)
+	    | V.REG_8 -> V.Cast(V.CAST_LOW, V.REG_8, exp_sym_64)
+	    | _ -> exp_sym_64 in
+	  if (self#is_nonlocal_addr (self#get_esp) addr) = true then
+	    Hashtbl.replace f1_nonlocal_se addr exp;
+	) f1_hash;
+	let v = self#eval_int_exp_simplify addr_e in
+	try
+	  let f2_addr = D.to_concrete_32 v in
+	  if not (Hashtbl.mem f1_write_addrs f2_addr) then (
+	    if !opt_trace_mem_snapshots = true then
+		Printf.printf "f2_addr = %Lx f2_exp = %s, f2 wrote to an address, f1 did not\n"
+		  f2_addr (V.exp_to_string f2_exp);
+	      raise DisqualifiedPath;
+	  );
+	  let count = Hashtbl.find f1_write_addrs f2_addr in
+	  if count = 1 then (
+	    Hashtbl.iter ( fun f1_addr f1_exp ->
+	      if f1_addr = f2_addr then (
+		if !opt_trace_mem_snapshots = true then (
+		  Printf.printf "eip = 0x%08Lx, addr = %Lx f1_exp = %s f2_exp = %s\n"
+		    (self#get_eip) f1_addr (V.exp_to_string f1_exp) (V.exp_to_string f2_exp);
+		  flush(stdout);
+		);
+		self#query_exp f1_exp f2_exp;);
+	    ) f1_nonlocal_se;);
+	with NotConcrete _ -> ()
+      else ()
+
+
     method compare_conc_se =
       (* compare side-effects on concrete memory between f1 and f2 *)
       if !opt_trace_mem_snapshots = true then
@@ -1010,7 +1064,7 @@ struct
 	       that is f2's non-local side-effect *)
 	    if f2_exp <> V.Constant(V.Int(V.REG_64, 0L)) then (
 	      if !opt_trace_mem_snapshots = true then
-		Printf.printf "addr = %Lx f2_exp = %s, f2 wrote to an address, f1 did not\n"
+		Printf.printf "addr = %Lx f2_exp = %s, f2 wrote to an address, f1 did not\n%!"
 		  addr (V.exp_to_string f2_exp);
 	      raise DisqualifiedPath;
 	    );
@@ -1036,13 +1090,13 @@ struct
 	let (b,_) = (self#query_condition q_exp (Some true) 0x6df0) in
 	if b = false then (
 	  if !opt_trace_mem_snapshots = true then
-	    Printf.printf "inequivalent side-effects %s!=\n%s\n" 
-	      (V.exp_to_string exp1) (V.exp_to_string exp2);
+	    Printf.printf "at eip = 0x%08Lx inequivalent side-effects %s!=%s\n%!" 
+	      (self#get_eip) (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  raise DisqualifiedPath;
 	)
 	else (
 	  if !opt_trace_mem_snapshots = true then
-	    Printf.printf "equivalent side-effects %s=\n%s"
+	    Printf.printf "equivalent side-effects %s=%s\n%!"
 	      (V.exp_to_string exp1) (V.exp_to_string exp2);
 	  (* adapter_score := !adapter_score + 1; *)
 	)
@@ -1249,6 +1303,10 @@ struct
 	   Printf.printf "repair: Setting in_f1_range to true\n";
 	   flush(stdout););
 	in_f1_range <- true;
+	saved_f1_rsp <- (match !opt_arch with
+	    | ARM 
+	    | X64 -> failwith "repair is supported only on X86 architecture code"
+	    | X86 -> self#get_word_var R_ESP);
 	if !opt_adapter_search_mode then (self#apply_target_frag_inputs;);
 	self#make_f1_sym_snap; 
 	self#make_f1_conc_snap;  
@@ -1270,6 +1328,10 @@ struct
 	self#make_f2_sym_snap ;
 	self#make_f2_conc_snap ;
 	self#make_f2_special_handlers_snap ;
+	saved_f2_rsp <- (match !opt_arch with
+	    | ARM 
+	    | X64 -> failwith "repair is supported only on X86 architecture code"
+	    | X86 -> self#get_word_var R_ESP);
 	if !stdin_redirect_fd <> None then ( (* assuming that no stdin-redirect happened before f1, so we dont need a stack to maintain stdin_redirect_fd *)
 	  if !opt_trace_repair then (
 	    Printf.printf "repair: closing previous stdin_redirect_fd\n"; flush(stdout););
@@ -1277,14 +1339,14 @@ struct
 	  stdin_redirect_fd := None);
       | (_, true, false, true, _, false, true) -> (* reached frag end in f2 range *) 
 	 if not !opt_verify_adapter && not !synth_verify_adapter then (
-	     (* no eqchk needed if we only verifying the adapter *)
+	   (* no eqchk needed if we only verifying the adapter *)
 	   self#save_f2_ret_reg ;
+	   self#reset_f2_special_handlers_snap;
 	   if not self#compare_ret_reg_vals || not self#compare_f2_syscall_num then (
 	     raise DisqualifiedPath;);
 	   if !opt_dont_compare_mem_se = false then (
 	     self#compare_sym_se;
-	     self#compare_conc_se;
-	     self#reset_f2_special_handlers_snap;)
+	     self#compare_conc_se;)
 	   else (
 	     mem#reset4_3 ();
 	     saved_f1_rsp <- 0L;
@@ -2506,6 +2568,7 @@ struct
     method reset () =
       if !opt_trace_mem_snapshots = true then
 	Printf.printf "FM#reset calling mem#reset()\n";
+      Hashtbl.clear f1_write_addrs;
       mem#reset ();
       (match snap with (r, t) ->
 	 move_hash r reg_store;

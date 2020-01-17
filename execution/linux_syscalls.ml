@@ -427,7 +427,7 @@ object(self)
        (match fd with
 	  | (1|2) ->
 	      (* Array.iter print_char bytes;*)
-	     Printf.printf "repair: not printing bytes\n"; flush(stdout);
+	      Printf.printf "repair: not printing bytes\n"; flush(stdout);
 	      flush stdout;
 	      put_return (Int64.of_int count)
 	  | _ ->
@@ -1855,7 +1855,7 @@ object(self)
 	    length < 0L || length > 1073741824L ->
 	    raise (Unix.Unix_error(Unix.ENOMEM, "Too large in mmap", ""))
 	| (0L, _, 0x3 (* PROT_READ|PROT_WRITE *),
-	   (0x22|0x20022) (* MAP_PRIVATE|MAP_ANONYMOUS, opt.MAP_STACK *), -1) ->
+	   (0x22|0x20022) (* MAP_PRIVATE|MAP_ANONYMOUS, opt.MAP_STACK *), _) ->
 	    let fresh = self#fresh_addr length in
 	      zero_region fresh (Int64.to_int length);
 	      fresh
@@ -2042,7 +2042,9 @@ object(self)
   method private read_throw fd buf count =
     let str = self#string_create count in
     let oc_fd = self#get_fd fd in
-    let num_read = Unix.read oc_fd str 0 count in
+    (* let num_read = Unix.read oc_fd str 0 count in *)
+    let num_read = Unix.read oc_fd str 0
+      (if !opt_restrict_reads_to_N_bytes <> -1 && count <> 0 then !opt_restrict_reads_to_N_bytes else count) in
     Printf.printf "num_read = %d\n" num_read; flush(stdout);
     if !opt_save_stdin_reads_to_fd <> None then (
       if !opt_trace_repair then ( 

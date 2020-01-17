@@ -103,7 +103,12 @@ val opt_replace_stdin_with_zero : bool ref
 val opt_save_stdin_reads_to_fd : Unix.file_descr option ref
 val opt_trace_callstack_on_syscall : int ref
 val opt_trace_callstack_at_eip: int64 list ref
+val opt_match_every_nonlocal_f2_write : bool ref
+val opt_check_for_ret_addr_overwrite: bool ref
+val opt_finish_on_ret_addr_overwrite: bool ref
+val opt_disqualify_path_on_ret_addr_overwrite: bool ref
 val opt_repair_frag_input : (int64 * int) ref
+val opt_restrict_reads_to_N_bytes : int ref
 val opt_stdin_replay_file_target_frag_offset : int ref
 val opt_trace_repair : bool ref
 val opt_apply_call_repair_adapter_at: int64 ref

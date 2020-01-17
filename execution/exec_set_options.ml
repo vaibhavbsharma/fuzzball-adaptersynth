@@ -298,6 +298,9 @@ let symbolic_state_cmdline_opts =
     ("-repair-frag-start", Arg.String
        (fun s -> opt_repair_frag_start := Int64.of_string s),
      " EIP where target fragment begins (target fragment is the one we want to repair)");
+    ("-restrict-reads-to-N-bytes", Arg.String
+       (fun s -> opt_restrict_reads_to_N_bytes := int_of_string s),
+     " N where all read syscalls will be restricted to reading up to N bytes");
     ("-repair-frag-end", Arg.String
        (fun s -> opt_repair_frag_end := Int64.of_string s),
      " EIP where target fragment ends (insn at this EIP is also part of target fragment)");
@@ -709,6 +712,18 @@ let cmdline_opts =
        (fun s -> opt_extra_condition_strings :=
 	  s :: !opt_extra_condition_strings),
      "cond Add an extra constraint for solving");
+    ("-check-for-ret-addr-overwrite",
+     Arg.Set(opt_check_for_ret_addr_overwrite),
+     " Check if a non-call instruction stores to a return address");
+    ("-match-every-nonlocal-f2-write",
+     Arg.Set(opt_match_every_nonlocal_f2_write),
+     " Match every non-local write in f2 with the value written by f1 to the same address");
+    ("-finish-on-ret-addr-overwrite",
+     Arg.Set(opt_finish_on_ret_addr_overwrite),
+     " Finish exploration if -check-for-ret-addr-overwrite triggers");
+    ("-disqualify-path-on-ret-addr-overwrite",
+     Arg.Set(opt_disqualify_path_on_ret_addr_overwrite),
+     " Disqualify execution path if return address overwrite is detected");
     ("-extra-conditions-file", Arg.String
        (fun s -> opt_extra_condition_strings :=
 	  !opt_extra_condition_strings @ (read_lines_file s)),

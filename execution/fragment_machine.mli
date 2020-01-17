@@ -203,6 +203,8 @@ class virtual fragment_machine : object
 
   method virtual make_f2_sym_snap : unit
   method virtual make_f2_conc_snap : unit
+  method virtual save_f1_conc_write_addr : Vine.exp -> unit
+  method virtual match_f2_write : Vine.exp -> Vine.typ -> Vine.exp -> unit
   method virtual compare_sym_se : unit
   method virtual compare_conc_se : unit
   method virtual make_f1_special_handlers_snap : unit
@@ -530,6 +532,8 @@ sig
     method save_f1_conc_se : unit
     method make_f2_sym_snap : unit
     method make_f2_conc_snap : unit
+    method save_f1_conc_write_addr : Vine.exp -> unit
+    method match_f2_write : Vine.exp -> Vine.typ -> Vine.exp -> unit
     method compare_sym_se : unit
     method compare_conc_se : unit
     method make_f1_special_handlers_snap : unit
