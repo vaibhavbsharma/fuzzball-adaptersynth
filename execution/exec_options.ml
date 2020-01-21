@@ -129,6 +129,7 @@ let opt_replace_stdin_with_zero = ref false
 let opt_save_stdin_reads_to_fd = ref None
 let opt_trace_callstack_on_syscall = ref (-1)
 let opt_trace_callstack_at_eip = ref []
+let opt_noprint_to_stdout = ref false
 let opt_repair_frag_input = ref (0L, 0)
 let opt_match_every_nonlocal_f2_write = ref false
 let opt_check_for_ret_addr_overwrite = ref false

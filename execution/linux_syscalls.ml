@@ -243,8 +243,11 @@ object(self)
       raise (Unix.Unix_error(Unix.EBADF, "Bad (virtual) file handle", ""))
     else
       match fd_info.(vt_fd).unix_fd with
-      | Some fd when vt_fd = 0 && !opt_adapter_search_mode && !opt_repair_frag_start <> 0L -> fm#get_adapter_search_mode_stdin_fd
-      | Some fd when (vt_fd = 0) && (not !opt_adapter_search_mode) && !opt_repair_frag_start <> 0L 
+      | Some fd
+	  when vt_fd = 0 && !opt_adapter_search_mode && !opt_repair_frag_start <> 0L ->
+	 fm#get_adapter_search_mode_stdin_fd (fun _ -> fd_info.(0).unix_fd <- Some fd)
+      | Some fd
+	  when (vt_fd = 0) && (not !opt_adapter_search_mode) && !opt_repair_frag_start <> 0L 
 	  && ((fm#get_in_f1_range ()) || (fm#get_in_f2_range ())) ->
 	 if !opt_trace_repair then (
 	   Printf.printf "repair: get_fd: in f1 or f2 range in non-adapter-search-mode, returning fd to stdin with is_symbolic set to true\n";
@@ -425,10 +428,10 @@ object(self)
 	      Printf.printf "[%s fd %d]: " prefix fd
 	  | _ -> ());
        (match fd with
-	  | (1|2) ->
-	      (* Array.iter print_char bytes;*)
-	      Printf.printf "repair: not printing bytes\n"; flush(stdout);
-	      flush stdout;
+       | (1|2) ->
+	  if !opt_noprint_to_stdout then (
+	    Printf.printf "not printing output bytes\n"; flush(stdout);
+	    flush stdout;) else Array.iter print_char bytes;
 	      put_return (Int64.of_int count)
 	  | _ ->
 	      let ufd = self#get_fd fd
@@ -921,7 +924,15 @@ object(self)
 	    let _ =
 	      if Stack.length fd_info.(vt_fd).snap_pos > 0 then
 		match Stack.top fd_info.(vt_fd).snap_pos with
-		| Some pos -> ignore(Unix.lseek (self#get_fd vt_fd) pos Unix.SEEK_SET); pos
+		| Some pos ->
+		   let get_fd_fd = self#get_fd vt_fd in
+		   let before_pos = Unix.lseek get_fd_fd  0 Unix.SEEK_CUR in
+		   ignore(Unix.lseek get_fd_fd pos Unix.SEEK_SET);
+		   let after_pos = Unix.lseek get_fd_fd  0 Unix.SEEK_CUR in
+		   assert(after_pos = pos);
+		   Printf.printf "linux_syscalls#reset_unix_fd_positions vt_fd = %d before pos = %d after pos = %d\n%!"
+		     vt_fd before_pos after_pos;
+		   pos
 		| None -> 0
 	      else 0 in
 	    if Stack.length fd_info.(vt_fd).snap_pos > 1 then

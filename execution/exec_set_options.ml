@@ -232,6 +232,8 @@ let symbolic_state_cmdline_opts =
      " Verifies an adapter provided using -synthesize-adapter and/or -synthesize-ret-adapter");
     ("-replace-stdin-with-zero", Arg.Set(opt_replace_stdin_with_zero),
      " Replace reads from stdin with reads from /dev/zero");
+    ("-noprint-to-stdout", Arg.Set(opt_noprint_to_stdout),
+     " Skip printing bytes to stdout");
     ("-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in

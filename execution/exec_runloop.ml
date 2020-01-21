@@ -322,16 +322,9 @@ e       "get_len_expr n_arg = %Lx pos = %Ld base_addr = %Lx\n"
 	       flush(stdout););
              (Some !opt_repair_frag_start))
 	   else (
-	     assert (fm#get_in_f2_range ());
-	     if fm#get_repair_tests_processed >= num_total_tests then (
-	       ignore(fm#inc_invalid_repair_tests_processed);)
-	     else ignore(fm#inc_repair_tests_processed);
-	     if fm#get_repair_tests_processed < num_total_tests ||
-	       fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () -> 
-		 if !opt_trace_repair then (
-		   Printf.printf "repair: %d of %d tests processed, %d of %d invalid tests processed, jumping to repair-frag-start\n"
-		     fm#get_repair_tests_processed num_total_tests num_invalid_tests_processed num_invalid_total_tests;
-		   flush(stdout););
+	     assert (fm#get_in_f2_range ()); 
+	     if fm#get_repair_tests_processed < (num_total_tests-1) ||
+	       fm#get_invalid_repair_tests_processed < num_invalid_total_tests then Some (fun () ->  
 		 (Some !opt_repair_frag_start))
 	     else Some (fun () -> (); (Some eip))))
 	 else (Some (fun () -> (); (Some eip)))
