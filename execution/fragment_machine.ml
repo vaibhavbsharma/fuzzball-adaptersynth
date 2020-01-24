@@ -570,6 +570,8 @@ class virtual fragment_machine = object
  
   method virtual get_in_f1_range: unit -> bool
   method virtual get_in_f2_range: unit -> bool
+  method virtual get_repair_eip_pref: int64 -> bool option
+  method virtual get_in_target_range: unit -> bool
   method virtual add_f1_syscall_with_args: int -> Vine.exp list -> unit
   method virtual check_f2_syscall: int -> bool
   method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
@@ -662,9 +664,11 @@ struct
     
     val form_man = new FormMan.formula_manager
     method get_form_man = form_man
-    
+
+    val mutable call_insn_eips_idx = 0
     val mutable in_f1_range = false
     val mutable in_f2_range = false
+    val mutable in_target_range = false
     val mutable f1_syscalls:(int list) = []
     val mutable f2_syscalls_num = 0
     val mutable f1_syscalls_args:(Vine.exp list) = []
@@ -754,7 +758,19 @@ struct
       );
       if !opt_trace_repair || !opt_trace_adapter then (
 	Printf.printf "repair: saved %d args\n" (List.length saved_args); flush(stdout););
-   
+
+    method get_repair_eip_pref call_eip =
+      assert(!opt_adapter_search_mode);
+      assert(self#get_in_f2_range ());
+      if (List.length !opt_target_frag_call_insn_eips) > 0 then (
+	if !opt_trace_repair then (
+	  Printf.printf "repair: attempting to set repair_eip to 0x%08Lx\n%!"
+	    (List.nth !opt_target_frag_call_insn_eips call_insn_eips_idx);
+	);
+	Some (call_eip = (List.nth !opt_target_frag_call_insn_eips call_insn_eips_idx))
+      )
+      else Some true
+      
     method get_saved_args () = saved_args
 
     method reset_saved_args = 
@@ -763,6 +779,8 @@ struct
     method get_in_f1_range () = in_f1_range 
     
     method get_in_f2_range () = in_f2_range
+    
+    method get_in_target_range () = in_target_range
     
     method add_f1_syscall_with_args syscall_num arg_list = 
       f1_syscalls <- f1_syscalls@[syscall_num] ;
@@ -1272,6 +1290,8 @@ struct
 	    )
 	  );
       ) !opt_match_syscalls_addr_range;
+      if eip = !opt_target_frag_start then ( in_target_range <- true; )
+      else if eip = !opt_target_frag_end then ( in_target_range <- false; );
       List.iter( fun trace_callstack_eip ->
 	if eip = trace_callstack_eip then (
 	  Printf.printf "tracing entire callstack at eip = 0x%08Lx\n" eip;
@@ -2590,6 +2610,8 @@ struct
       adapted_arg_addrs <- [];
       in_f1_range <- false;
       in_f2_range <- false;
+      if (List.length !opt_target_frag_call_insn_eips) > 0 then (
+	call_insn_eips_idx <- (call_insn_eips_idx + 1) mod (List.length !opt_target_frag_call_insn_eips));
       num_repair_tests_processed := 0;
       num_invalid_repair_tests_processed := 0;
       synth_verify_adapter := false;

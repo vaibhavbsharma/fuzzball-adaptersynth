@@ -435,7 +435,7 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
       if not !opt_adapter_search_mode then (
 	(get_constant_val (Hashtbl.find Adapter_vars.adapter_vals "repair_EIP")) = call_eip)
       else (
-	let (b,_) = (fm#query_condition cond (Some true) 0x6cff) in
+	let (b,_) = (fm#query_condition cond (fm#get_repair_eip_pref call_eip) 0x6cff) in
 	if b = true then (
 	  if !opt_trace_repair then
 	    Printf.printf "repair: setting repair_EIP to 0x%08Lx\n" call_eip; flush(stdout);
@@ -446,7 +446,10 @@ let rec runloop (fm : fragment_machine) eip asmir_gamma until =
 	  false
 	))
     in
-    if (is_adapted_target_call_insn fm sl)
+    if !opt_trace_target_frag_call_insns && is_adapted_target_call_insn fm sl (fun () -> (fm#get_in_target_range ()) || eip = !opt_target_frag_start) then (
+      Printf.printf "target fragment call insn at eip=0x%Lx\n%!" eip;
+    );
+    if (is_adapted_target_call_insn fm sl (fun () -> fm#get_in_f2_range ()))
       && ((eip = !opt_apply_call_repair_adapter_at) || (match_adapter_eip eip)) then (
 	if !opt_trace_adapter || !opt_trace_repair then (
 	  Printf.printf "repair: applying simple repair adapter at eip=0x%Lx\n" eip;

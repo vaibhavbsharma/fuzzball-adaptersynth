@@ -16,4 +16,4 @@ val print_insns : int64 -> Vine.program -> int64 option -> char -> unit
 val run_one_insn : Fragment_machine.fragment_machine -> Asmir.varctx -> int64
   -> char array -> int64
   
-val is_adapted_target_call_insn: Fragment_machine.fragment_machine -> Vine.stmt list -> bool
+val is_adapted_target_call_insn: Fragment_machine.fragment_machine -> Vine.stmt list -> (unit -> bool) -> bool

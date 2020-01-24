@@ -131,6 +131,8 @@ let opt_trace_callstack_on_syscall = ref (-1)
 let opt_trace_callstack_at_eip = ref []
 let opt_noprint_to_stdout = ref false
 let opt_repair_frag_input = ref (0L, 0)
+let opt_target_frag_call_insn_eips = ref []
+let opt_trace_target_frag_call_insns = ref false
 let opt_match_every_nonlocal_f2_write = ref false
 let opt_check_for_ret_addr_overwrite = ref false
 let opt_finish_on_ret_addr_overwrite = ref false 
@@ -145,6 +147,8 @@ let opt_wrong_ret_adapters_file = ref ""
 let opt_apply_call_repair_adapter_at = ref 0L
 let opt_repair_frag_start = ref Int64.minus_one
 let opt_repair_frag_end = ref Int64.minus_one
+let opt_target_frag_start = ref Int64.minus_one
+let opt_target_frag_end = ref Int64.minus_one
 let opt_input_region_sympresuf = ref ("", 0, 0, 0, 0)
 let opt_check_store_sequence = ref false
 let opt_dont_compare_mem_se = ref false
@@ -475,7 +479,16 @@ let add_delimited_triple opt char s =
    (Int64.of_string (List.nth list_str 1)), 
    (Int64.of_string (List.nth list_str 2))) :: !opt
 
-      
+let add_delimited_str_to_int64_list opt char s =
+  let rec loop arg_str =
+    try 
+      let (str1, str2) = split_string char arg_str in
+      [(Int64.of_string str1)] @ (loop str2)
+    with Not_found -> [(Int64.of_string arg_str)]
+  in
+  let list_str = loop s in 
+  opt := list_str
+    
 let opt_program_name = ref None
 let opt_start_addr = ref None
 let opt_argv = ref []

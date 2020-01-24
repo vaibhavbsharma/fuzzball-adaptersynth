@@ -107,7 +107,9 @@ val opt_match_every_nonlocal_f2_write : bool ref
 val opt_check_for_ret_addr_overwrite: bool ref
 val opt_finish_on_ret_addr_overwrite: bool ref
 val opt_disqualify_path_on_ret_addr_overwrite: bool ref
+val opt_trace_target_frag_call_insns : bool ref
 val opt_repair_frag_input : (int64 * int) ref
+val opt_target_frag_call_insn_eips : int64 list ref
 val opt_noprint_to_stdout : bool ref
 val opt_restrict_reads_to_N_bytes : int ref
 val opt_stdin_replay_file_target_frag_offset : int ref
@@ -115,6 +117,8 @@ val opt_trace_repair : bool ref
 val opt_apply_call_repair_adapter_at: int64 ref
 val opt_repair_frag_start : int64 ref
 val opt_repair_frag_end : int64 ref
+val opt_target_frag_start : int64 ref
+val opt_target_frag_end : int64 ref
 val opt_input_region_sympresuf : (string * int * int * int * int) ref
 val opt_repair_tests_file : (string * int) ref
 val opt_invalid_repair_tests_file : (string * int) ref
@@ -271,7 +275,9 @@ val add_delimited_int_triple:
   (int * int * int) ref -> char -> string -> unit
 val add_delimited_triple :
   (string * int64 * int64 ) list ref -> char -> string -> unit
-
+val add_delimited_str_to_int64_list :
+  int64 list ref -> char -> string -> unit
+  
 val opt_program_name : string option ref
 val opt_start_addr : int64 option ref
 val opt_argv : string list ref

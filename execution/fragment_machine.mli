@@ -342,6 +342,8 @@ class virtual fragment_machine : object
  
   method virtual get_in_f1_range: unit -> bool
   method virtual get_in_f2_range: unit -> bool
+  method virtual get_repair_eip_pref: int64 -> bool option
+  method virtual get_in_target_range: unit -> bool
   method virtual add_f1_syscall_with_args: int -> Vine.exp list -> unit
   method virtual check_f2_syscall: int -> bool
   method virtual check_f2_syscall_args: Vine.exp list -> int -> bool
@@ -411,6 +413,7 @@ sig
 
     val mutable in_f1_range: bool
     val mutable in_f2_range: bool
+    val mutable in_target_range: bool
     val mutable f1_syscalls: int list
     val mutable f1_syscalls_args: Vine.exp list
     val mutable f2_syscalls_num: int 
@@ -418,6 +421,8 @@ sig
     val mutable saved_args: Vine.exp list
     method get_in_f1_range: unit -> bool
     method get_in_f2_range: unit -> bool
+    method get_repair_eip_pref: int64 -> bool option
+    method get_in_target_range: unit -> bool
     method add_f1_syscall_with_args: int -> Vine.exp list -> unit
     method check_f2_syscall: int -> bool
     method check_f2_syscall_args: Vine.exp list -> int -> bool

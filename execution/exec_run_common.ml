@@ -172,7 +172,7 @@ let get_insn_string st =
   !str
 
 (* checks if a statement in a statement list corresponds to a call insn inside the target fragment *)
-let is_adapted_target_call_insn fm sl =
+let is_adapted_target_call_insn fm sl check_range =
   let is_call = ref false in
   let rec loop sl = 
     match sl with
@@ -181,7 +181,7 @@ let is_adapted_target_call_insn fm sl =
        let contains_call = 
 	 try ignore (Str.search_forward (Str.regexp_string "call") str 0); true
 	 with Not_found -> false in
-       if contains_call && fm#get_in_f2_range () then (
+       if contains_call && (check_range ()) then (
 	 if !opt_trace_adapter then (
 	   Printf.printf "found call in adapted target fragment at 0x%08Lx\n"
 	     fm#get_eip;

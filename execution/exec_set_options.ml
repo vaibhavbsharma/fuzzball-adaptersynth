@@ -234,6 +234,12 @@ let symbolic_state_cmdline_opts =
      " Replace reads from stdin with reads from /dev/zero");
     ("-noprint-to-stdout", Arg.Set(opt_noprint_to_stdout),
      " Skip printing bytes to stdout");
+    ("-trace-target-frag-call-insns", Arg.Set(opt_trace_target_frag_call_insns),
+     " Trace call instructions in the target fragment");
+    ("-target-frag-call-insn-eips", Arg.String
+      (fun s ->
+	add_delimited_str_to_int64_list opt_target_frag_call_insn_eips ':' s),
+     "list of EIPs that have call instructions in the target fragment delimited by ':' ");
     ("-repair-tests-file", Arg.String
       (fun s ->
 	let (s1,s2) = split_string ':' s in
@@ -246,6 +252,11 @@ let symbolic_state_cmdline_opts =
 	opt_trace_callstack := true),
      "string:numtests Use 'string' file as prefix to 'numtests' "^
        "test input files starting from 'string'0");
+    ("-target-frag-call-insn-eips", Arg.String
+      (fun s ->
+	opt_trace_callstack_on_syscall := int_of_string s;
+	opt_trace_callstack := true),
+     "list of EIPs that have call instructions in the target fragment delimited by ':' ");
     ("-trace-callstack-at-eip", Arg.String
       (fun s ->
 	opt_trace_callstack_at_eip := (Int64.of_string s) :: !opt_trace_callstack_at_eip;
@@ -306,6 +317,12 @@ let symbolic_state_cmdline_opts =
     ("-repair-frag-end", Arg.String
        (fun s -> opt_repair_frag_end := Int64.of_string s),
      " EIP where target fragment ends (insn at this EIP is also part of target fragment)");
+    ("-target-frag-start", Arg.String
+       (fun s -> opt_target_frag_start := Int64.of_string s),
+     " EIP where target fragment begins (target fragment is the one we want to trace something for)");
+    ("-target-frag-end", Arg.String
+       (fun s -> opt_target_frag_end := Int64.of_string s),
+     " EIP where target fragment begins (target fragment is the one we want to trace something for)");
     ("-input-region-sympresuf", Arg.String
       (fun s -> let opt_list = ref [] in
        add_delimited_info_s_i_i_i_i opt_list ':' s;
